@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>八防系统 - 数据监控大屏</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-blue: #3b82f6;
+            --alert-red: #ef4444;
+            --safe-green: #10b981;
+            --warn-yellow: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--panel-bg);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--accent-blue);
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 顶部彩色装饰条 */
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-blue), transparent);
+        }
+
+        .panel.alert::before {
+            background: linear-gradient(90deg, var(--alert-red), transparent);
+        }
+        
+        .panel.warning::before {
+            background: linear-gradient(90deg, var(--warn-yellow), transparent);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 0.8rem;
+        }
+
+        .panel-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .panel-status {
+            font-size: 0.85rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 1rem;
+            font-weight: bold;
+        }
+
+        .status-online { background-color: rgba(16, 185, 129, 0.1); color: var(--safe-green); }
+        .status-alert { background-color: rgba(239, 68, 68, 0.1); color: var(--alert-red); animation: pulse 2s infinite; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .data-item {
+            background: rgba(0,0,0,0.2);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .data-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--text-main);
+            margin: 0.3rem 0;
+        }
+
+        .data-unit {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .data-label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        /* 强调项：占据两列 */
+        .data-item.full-width {
+            grid-column: span 2;
+        }
+
+        .data-item.full-width .data-value {
+            font-size: 2.2rem;
+        }
+
+        /* 状态图标（文字形式） */
+        .icon {
+            font-size: 1.2rem;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>八防综合监控网关平台</h1>
+        <div class="subtitle">
+            实时传感数据采集监控看板 · 环境与安防
+            <br>
+            <span id="realtime-clock" style="color: var(--safe-green); font-weight: bold; margin-top: 10px; display: inline-block;"></span>
+        </div>
+    </header>
+
+    <div class="dashboard">
+        
+        <!-- 云测仪 (环境) -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><span class="icon">☁️</span> 室内空气质量变送器</div>
+                <div class="panel-status status-online">在线</div>
+            </div>
+            <div class="data-grid">
+                <div class="data-item full-width">
+                    <div class="data-label">温度 / 湿度</div>
+                    <div class="data-value" style="color: #38bdf8;"><span id="val-temp">24.5 ℃</span> / <span id="val-hum">56.2 %</span></div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">PM2.5</div>
+                    <div class="data-value" id="val-pm25">12<span class="data-unit">μg/m³</span></div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">PM10</div>
+                    <div class="data-value" id="val-pm10">25<span class="data-unit">μg/m³</span></div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">甲醛 (CH2O)</div>
+                    <div class="data-value" id="val-ch2o" style="color: var(--safe-green);">0.03<span class="data-unit">ppm</span></div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">二氧化碳 (CO2)</div>
+                    <div class="data-value" id="val-co2">450<span class="data-unit">ppm</span></div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">臭氧 (O3)</div>
+                    <div class="data-value" id="val-o3">0.01<span class="data-unit">ppm</span></div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">TVOC</div>
+                    <div class="data-value" id="val-tvoc">15<span class="data-unit">ppb</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 烟雾报警器 -->
+        <div class="panel warning">
+            <div class="panel-header">
+                <div class="panel-title"><span class="icon">🧯</span> 烟雾报警探测器</div>
+                <div class="panel-status status-online">在线</div>
+            </div>
+            <div class="data-grid">
+                <div class="data-item full-width">
+                    <div class="data-label">当前报警状态</div>
+                    <!-- 模拟正常状态 -->
+                    <div class="data-value" id="val-smoke" style="color: var(--safe-green);">正常工作</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">温度报警阀值</div>
+                    <div class="data-value" id="val-smoke-temp">55<span class="data-unit">℃</span></div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">防拆报警</div>
+                    <div class="data-value" style="color: var(--safe-green);">安全</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 水浸传感器 -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><span class="icon">💧</span> 水浸传感器</div>
+                <div class="panel-status status-online">在线</div>
+            </div>
+            <div class="data-grid">
+                <div class="data-item full-width">
+                    <div class="data-label">浸水情况</div>
+                    <!-- 模拟水位报警状态，红色闪烁 -->
+                    <div class="data-value" id="val-water" style="color: var(--alert-red);">检测到积水!</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 红外与雷达探测器 -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><span class="icon">🚶</span> 红外/雷达双鉴探测器</div>
+                <div class="panel-status status-online">在线</div>
+            </div>
+            <div class="data-grid">
+                <div class="data-item full-width">
+                    <div class="data-label">综合判定结果</div>
+                    <div class="data-value" id="val-ir-radar" style="color: var(--warn-yellow);">探测到人体游荡</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">红外感应</div>
+                    <div class="data-value" id="val-ir">触发</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">雷达感应</div>
+                    <div class="data-value" id="val-radar" style="color: var(--text-muted);">未触发</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 光感传感器 -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><span class="icon">☀️</span> 弱光检测传感器</div>
+                <div class="panel-status status-online">在线</div>
+            </div>
+            <div class="data-grid">
+                <div class="data-item full-width">
+                    <div class="data-label">当前光照度</div>
+                    <div class="data-value" id="val-lux" style="color: #fbbf24;">307<span class="data-unit"> lux</span></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function fetchData() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('val-temp').innerText = data.temp + ' ℃';
+                    document.getElementById('val-hum').innerText = data.hum + ' %';
+                    document.getElementById('val-pm25').innerText = data.pm25 + ' μg/m³';
+                    document.getElementById('val-pm10').innerText = data.pm10 + ' μg/m³';
+                    document.getElementById('val-ch2o').innerText = data.ch2o + ' ppm';
+                    document.getElementById('val-co2').innerText = data.co2 + ' ppm';
+                    document.getElementById('val-o3').innerText = data.o3 + ' ppm';
+                    document.getElementById('val-tvoc').innerText = data.tvoc + ' ppb';
+                    
+                    document.getElementById('val-smoke').innerText = data.smoke === 1 ? '报警' : '正常';
+                    document.getElementById('val-smoke-temp').innerText = data.smoke_temp + ' ℃';
+
+                    document.getElementById('val-water').innerText = data.water === 1 ? '报警' : '正常';
+                    
+                    document.getElementById('val-ir').innerText = data.ir === 1 ? '有人' : '无人';
+                    document.getElementById('val-radar').innerText = data.radar === 1 ? '活动' : '静止';
+
+                    document.getElementById('val-lux').innerText = data.lux + ' lux';
+                })
+                .catch(error => console.error('获取数据失败:', error));
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleString('zh-CN', { hour12: false });
+            const clockEl = document.getElementById('realtime-clock');
+            if (clockEl) {
+                clockEl.innerText = '当前时间: ' + timeString;
+            }
+        }
+
+        window.addEventListener('load', () => {
+            fetchData();
+            updateClock();
+            setInterval(fetchData, 2000);
+            setInterval(updateClock, 1000);
+        });
+    </script>
+</body>
+</html>

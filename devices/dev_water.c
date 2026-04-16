@@ -1,8 +1,17 @@
 #include "dev_water.h"
 #include "device_config.h"
 #include "modbus_core.h"
-#include "sensor_data.h"
+
 #include <stdio.h>
+#include <string.h>
+
+DevWaterData g_dev_water_data;
+
+void init_dev_water_data() {
+    memset(&g_dev_water_data, 0, sizeof(DevWaterData));
+    pthread_mutex_init(&g_dev_water_data.lock, NULL);
+}
+
 
 int water_read_status(const char* device, uint8_t *resp, size_t *resp_len) {
     // 假设宏定义依然被某处更改了，我用最兼容的硬编码或原样发送
@@ -48,14 +57,28 @@ int water_parse_data(const uint8_t *resp, size_t resp_len, int *is_immersed) {
 // =========================================
 // 处理当前传感器传回数据的打印和后续业务逻辑
 // =========================================
-void water_process_data(const uint8_t *resp, size_t resp_len) {
+void water_process_data(const uint8_t *resp, size_t resp_len, int rc) {
+    pthread_mutex_lock(&g_dev_water_data.lock);
+    if (rc != 0) {
+        g_dev_water_data.fail_count++;
+        if (g_dev_water_data.fail_count >= 3) {
+            g_dev_water_data.online = 0;
+            printf("  => [⚠️ 设备离线]: 水浸传感器连续3次未读到数据\n");
+        }
+        pthread_mutex_unlock(&g_dev_water_data.lock);
+        return;
+    }
+    g_dev_water_data.fail_count = 0;
+    g_dev_water_data.online = 1;
+    pthread_mutex_unlock(&g_dev_water_data.lock);
+
     int is_immersed = 0;
     int parse_rc = water_parse_data(resp, resp_len, &is_immersed);
     
     if (parse_rc == 0) {
-        pthread_mutex_lock(&g_sensor_data.lock);
-        g_sensor_data.water_status = is_immersed;
-        pthread_mutex_unlock(&g_sensor_data.lock);
+        pthread_mutex_lock(&g_dev_water_data.lock);
+        g_dev_water_data.water_status = is_immersed;
+        pthread_mutex_unlock(&g_dev_water_data.lock);
 
         if (is_immersed == 1) {
             printf("  => [🚨 水浸报警]: 检测到有溢水/漏水情况发生！\n");

@@ -322,7 +322,14 @@
                     
                     document.getElementById('val-ir').innerText = data.ir === 1 ? '有人' : '无人';
                     document.getElementById('val-radar').innerText = data.radar === 1 ? '活动' : '静止';
-
+                    if (data.ir === 1 || data.radar === 1) {
+                        document.getElementById('val-ir-radar').innerText = '探测到人体游荡';
+                        document.getElementById('val-ir-radar').style.color = 'var(--warn-yellow)';
+                    } else {
+                        document.getElementById('val-ir-radar').innerText = '安全，无人活动';
+                        document.getElementById('val-ir-radar').style.color = 'var(--text-muted)';
+                    }
+                    
                     document.getElementById('val-lux').innerText = data.lux + ' lux';
                 })
                 .catch(error => console.error('获取数据失败:', error));

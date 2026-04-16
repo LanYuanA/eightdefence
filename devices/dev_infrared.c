@@ -1,8 +1,17 @@
 #include "dev_infrared.h"
 #include "device_config.h"
 #include "modbus_core.h"
-#include "sensor_data.h"
+
 #include <stdio.h>
+#include <string.h>
+
+DevInfraredData g_dev_infrared_data;
+
+void init_dev_infrared_data() {
+    memset(&g_dev_infrared_data, 0, sizeof(DevInfraredData));
+    pthread_mutex_init(&g_dev_infrared_data.lock, NULL);
+}
+
 
 // 利用模块内的全局静态变量临时记录单一传感器的最新状态 （0=无人 1=有人）
 static int s_ir_state = 0;
@@ -47,14 +56,28 @@ static void print_combined_detect_status() {
 }
 
 // 处理红外的响应数据
-void infrared_process_ir_data(const uint8_t *resp, size_t resp_len) {
+void infrared_process_ir_data(const uint8_t *resp, size_t resp_len, int rc) {
+    pthread_mutex_lock(&g_dev_infrared_data.lock);
+    if (rc != 0) {
+        g_dev_infrared_data.fail_count++;
+        if (g_dev_infrared_data.fail_count >= 3) {
+            g_dev_infrared_data.online = 0;
+            printf("  => [⚠️ 设备离线]: 红外雷达传感器连续3次未读到数据\n");
+        }
+        pthread_mutex_unlock(&g_dev_infrared_data.lock);
+        return;
+    }
+    g_dev_infrared_data.fail_count = 0;
+    g_dev_infrared_data.online = 1;
+    pthread_mutex_unlock(&g_dev_infrared_data.lock);
+
     int state = 0;
-    int rc = parse_infrared_radar_data(resp, resp_len, &state);
-    if (rc == 0) {
+    int parse_rc = parse_infrared_radar_data(resp, resp_len, &state);
+    if (parse_rc == 0) {
         s_ir_state = state;
-        pthread_mutex_lock(&g_sensor_data.lock);
-        g_sensor_data.ir_state = state;
-        pthread_mutex_unlock(&g_sensor_data.lock);
+        pthread_mutex_lock(&g_dev_infrared_data.lock);
+        g_dev_infrared_data.ir_state = state;
+        pthread_mutex_unlock(&g_dev_infrared_data.lock);
         // 把结果交由综合判断控制打印
         print_combined_detect_status();
     } else if (rc == -2) {
@@ -65,14 +88,28 @@ void infrared_process_ir_data(const uint8_t *resp, size_t resp_len) {
 }
 
 // 处理雷达的响应数据
-void infrared_process_radar_data(const uint8_t *resp, size_t resp_len) {
+void infrared_process_radar_data(const uint8_t *resp, size_t resp_len, int rc) {
+    pthread_mutex_lock(&g_dev_infrared_data.lock);
+    if (rc != 0) {
+        g_dev_infrared_data.fail_count++;
+        if (g_dev_infrared_data.fail_count >= 3) {
+            g_dev_infrared_data.online = 0;
+            printf("  => [⚠️ 设备离线]: 红外雷达传感器连续3次未读到数据\n");
+        }
+        pthread_mutex_unlock(&g_dev_infrared_data.lock);
+        return;
+    }
+    g_dev_infrared_data.fail_count = 0;
+    g_dev_infrared_data.online = 1;
+    pthread_mutex_unlock(&g_dev_infrared_data.lock);
+
     int state = 0;
-    int rc = parse_infrared_radar_data(resp, resp_len, &state);
-    if (rc == 0) {
+    int parse_rc = parse_infrared_radar_data(resp, resp_len, &state);
+    if (parse_rc == 0) {
         s_radar_state = state;
-        pthread_mutex_lock(&g_sensor_data.lock);
-        g_sensor_data.radar_state = state;
-        pthread_mutex_unlock(&g_sensor_data.lock);
+        pthread_mutex_lock(&g_dev_infrared_data.lock);
+        g_dev_infrared_data.radar_state = state;
+        pthread_mutex_unlock(&g_dev_infrared_data.lock);
         // 把结果交由综合判断控制打印
         print_combined_detect_status();
     } else if (rc == -2) {

@@ -1,15 +1,38 @@
 #include "dev_light.h"
 #include "device_config.h"
 #include "modbus_core.h"
-#include "sensor_data.h"
+
 #include <stdio.h>
+#include <string.h>
+
+DevLightData g_dev_light_data;
+
+void init_dev_light_data() {
+    memset(&g_dev_light_data, 0, sizeof(DevLightData));
+    pthread_mutex_init(&g_dev_light_data.lock, NULL);
+}
+
 
 int light_read_illuminance(const char* device, uint8_t *resp, size_t *resp_len) {
     return modbus_build_and_send(device, 9600, DEV_LIGHT_ADDR, 0x03, REG_LIGHT_ILLUMIN, 0x0001, resp, 512, resp_len, 300);
 }
 
 // 专门处理接收到的光感数据: e.g. 50 03 02 01 33 04 0D
-void light_process_illuminance_data(const uint8_t *resp, size_t resp_len) {
+void light_process_illuminance_data(const uint8_t *resp, size_t resp_len, int rc) {
+    pthread_mutex_lock(&g_dev_light_data.lock);
+    if (rc != 0) {
+        g_dev_light_data.fail_count++;
+        if (g_dev_light_data.fail_count >= 3) {
+            g_dev_light_data.online = 0;
+            printf("  => [⚠️ 设备离线]: 光照度传感器连续3次未读到数据\n");
+        }
+        pthread_mutex_unlock(&g_dev_light_data.lock);
+        return;
+    }
+    g_dev_light_data.fail_count = 0;
+    g_dev_light_data.online = 1;
+    pthread_mutex_unlock(&g_dev_light_data.lock);
+
     // 包结构：
     // resp[0] = 0x50 (设备地址)
     // resp[1] = 0x03 (功能码)
@@ -31,9 +54,9 @@ void light_process_illuminance_data(const uint8_t *resp, size_t resp_len) {
         // 例如 01 33 转换 => 0x0133
         uint16_t illuminance_hex = (resp[3] << 8) | resp[4];
         
-        pthread_mutex_lock(&g_sensor_data.lock);
-        g_sensor_data.lux = illuminance_hex;
-        pthread_mutex_unlock(&g_sensor_data.lock);
+        pthread_mutex_lock(&g_dev_light_data.lock);
+        g_dev_light_data.lux = illuminance_hex;
+        pthread_mutex_unlock(&g_dev_light_data.lock);
 
         // C语言中 %u(%d) 格式化打印就是十进制 (0x0133 的十进制即为 307); 单位为 Lux
         printf("  => [☀️ 照度详情]: 探测当前光照度为 %u lux\n", illuminance_hex);

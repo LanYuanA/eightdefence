@@ -3,6 +3,25 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <pthread.h>
+
+typedef struct {
+    float temp;
+    float hum;
+    int pm25;
+    int pm10;
+    int tvoc;
+    int ch2o;
+    int o3;
+    int co2;
+    int online;
+    int fail_count;
+    pthread_mutex_t lock;
+} DevCloudData;
+
+extern DevCloudData g_dev_cloud_data;
+void init_dev_cloud_data();
+
 
 int cloud_read_pm25(const char* device, uint8_t *resp, size_t *resp_len);
 int cloud_read_pm10(const char* device, uint8_t *resp, size_t *resp_len);
@@ -26,13 +45,13 @@ typedef enum {
 } cloud_sensor_type_t;
 
 // 每个传感器类型的独立包裹函数，供 main.c 回调注册使用
-void cloud_process_pm25(const uint8_t *resp, size_t resp_len);
-void cloud_process_pm10(const uint8_t *resp, size_t resp_len);
-void cloud_process_humidity(const uint8_t *resp, size_t resp_len);
-void cloud_process_temperature(const uint8_t *resp, size_t resp_len);
-void cloud_process_tvoc(const uint8_t *resp, size_t resp_len);
-void cloud_process_ch2o(const uint8_t *resp, size_t resp_len);
-void cloud_process_o3(const uint8_t *resp, size_t resp_len);
-void cloud_process_co2(const uint8_t *resp, size_t resp_len);
+void cloud_process_pm25(const uint8_t *resp, size_t resp_len, int rc);
+void cloud_process_pm10(const uint8_t *resp, size_t resp_len, int rc);
+void cloud_process_humidity(const uint8_t *resp, size_t resp_len, int rc);
+void cloud_process_temperature(const uint8_t *resp, size_t resp_len, int rc);
+void cloud_process_tvoc(const uint8_t *resp, size_t resp_len, int rc);
+void cloud_process_ch2o(const uint8_t *resp, size_t resp_len, int rc);
+void cloud_process_o3(const uint8_t *resp, size_t resp_len, int rc);
+void cloud_process_co2(const uint8_t *resp, size_t resp_len, int rc);
 
 #endif

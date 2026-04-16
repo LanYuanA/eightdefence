@@ -1,14 +1,37 @@
 #include "dev_smoke.h"
 #include "device_config.h"
 #include "modbus_core.h"
-#include "sensor_data.h"
+
 #include <stdio.h>
+#include <string.h>
+
+DevSmokeData g_dev_smoke_data;
+
+void init_dev_smoke_data() {
+    memset(&g_dev_smoke_data, 0, sizeof(DevSmokeData));
+    pthread_mutex_init(&g_dev_smoke_data.lock, NULL);
+}
+
 
 int smoke_read_alarm_status(const char* device, uint8_t *resp, size_t *resp_len) {
     return modbus_build_and_send(device, 9600, DEV_SMOKE_ADDR, 0x03, REG_SMOKE_ALARM, 0x000A, resp, 512, resp_len, 300);
 }
 
-void smoke_process_alarm_data(const uint8_t *resp, size_t resp_len) {
+void smoke_process_alarm_data(const uint8_t *resp, size_t resp_len, int rc) {
+    pthread_mutex_lock(&g_dev_smoke_data.lock);
+    if (rc != 0) {
+        g_dev_smoke_data.fail_count++;
+        if (g_dev_smoke_data.fail_count >= 3) {
+            g_dev_smoke_data.online = 0;
+            printf("  => [⚠️ 设备离线]: 烟雾传感器连续3次未读到数据\n");
+        }
+        pthread_mutex_unlock(&g_dev_smoke_data.lock);
+        return;
+    }
+    g_dev_smoke_data.fail_count = 0;
+    g_dev_smoke_data.online = 1;
+    pthread_mutex_unlock(&g_dev_smoke_data.lock);
+
     // 根据通信协议，发送 70 03 0001 000A 会响应 20 个字节（0x14 = 20字节数据）
     // 假设回包: 70 03 14 0000 0070 0003 0037 0001 0000 0000 0000 0000 0000 254C 
     // - resp[0]: 0x70 (地址)
@@ -39,10 +62,10 @@ void smoke_process_alarm_data(const uint8_t *resp, size_t resp_len) {
         // 解析: 报警温度阈值 [第4寄存器, 相对首寄存器偏移了3位，对应resp里的resp[3+3*2]=resp[9], resp[10]]
         uint16_t temp_thresh = (resp[9] << 8) | resp[10];
 
-        pthread_mutex_lock(&g_sensor_data.lock);
-        g_sensor_data.smoke_status = alarm_status;
-        g_sensor_data.smoke_temp_thresh = temp_thresh;
-        pthread_mutex_unlock(&g_sensor_data.lock);
+        pthread_mutex_lock(&g_dev_smoke_data.lock);
+        g_dev_smoke_data.smoke_status = alarm_status;
+        g_dev_smoke_data.smoke_temp_thresh = temp_thresh;
+        pthread_mutex_unlock(&g_dev_smoke_data.lock);
 
         // 统一打印报警结果
         switch(alarm_status) {

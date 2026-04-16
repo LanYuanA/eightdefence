@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <pthread.h>
 #include "modbus_core.h"
-#include "sensor_data.h"
 #include "web_server.h"
 #include "dev_cloud.h"
 #include "dev_smoke.h"
@@ -12,7 +11,7 @@
 
 // 1. 定义统一的设备API函数指针类型
 typedef int (*device_api_func)(const char*, uint8_t*, size_t*);
-typedef void (*device_parse_func)(const uint8_t*, size_t);
+typedef void (*device_parse_func)(const uint8_t*, size_t, int rc);
 
 // 2. 定义一条任务的结构体
 typedef struct {
@@ -21,11 +20,24 @@ typedef struct {
     device_parse_func parse_func; // 解析与业务处理函数 (可为主逻辑省去冗余代码)
 } device_task_t;
 
+//设备初始化
+void init_dev(){
+    init_dev_cloud_data();
+    init_dev_smoke_data();
+    init_dev_water_data();
+    init_dev_infrared_data();
+    init_dev_light_data();
+}
+
 int main(int argc, char *argv[]) {
     // 初始化传感器数据缓冲并启动 Web 服务器
-    init_sensor_data();
+    init_dev();
     pthread_t web_tid;
+    //创建网络线程
     pthread_create(&web_tid, NULL, start_web_server, NULL);
+    
+    
+    //未来有更多服务直接在此添加线程...
 
     const char *device = "/dev/ttyS9";
     uint8_t response[512];
@@ -34,8 +46,7 @@ int main(int argc, char *argv[]) {
 
     if (argc >= 2) device = argv[1];
 
-    // 3. 把所有的API指令全部注册到这个数组表里（表驱动法）
-    // 以后有几百条指令，就只在这个数组里加一行即可，主逻辑完全不用动！
+    //把所有的API指令全部注册到这个数组表里（表驱动法）
     device_task_t tasks[] = {
         {"Cloud Instrument - PM2.5", cloud_read_pm25, cloud_process_pm25},
         {"Cloud Instrument - PM10", cloud_read_pm10, cloud_process_pm10},
@@ -67,13 +78,11 @@ int main(int argc, char *argv[]) {
             if (rc == 0) {
                 printf("RX SUCCESS: ");
                 print_hex_bytes(response, response_len);
-
-                // 通过配置里提供的具体处理函数来下发各自的处理内容（解耦 main 和 业务）
-                if (tasks[i].parse_func != NULL) {
-                    tasks[i].parse_func(response, response_len);
-                }
             } else {
                 printf("RX FAILED : Error Code %d\n", rc);
+            }
+            if (tasks[i].parse_func != NULL) {
+                tasks[i].parse_func(response, response_len, rc);
             }
             printf("\n");
         }

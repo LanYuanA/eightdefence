@@ -1,154 +1,169 @@
 # 八防综合监控网关平台 (Multi-Defense Sensor Gateway)
 
-基于 C 语言开发的一款轻量级、模块化、事件驱动的 Modbus RTU 传感器网关。该项目通过 RS485 串口定时轮询各类环境与安防传感器，对报文进行校验和业务解析，同时在后台独立线程上运行一个轻量的 C Web Server，为前端实时大屏端点 (`dashboard.html`) 提供 JSON 数据。
+基于 C++ 开发的工程化、面向对象、事件驱动的 Modbus RTU 传感器网关及全栈监控面板。系统通过 RS485 串口定时轮询各类环境与安防传感器，对报文进行 CRC 校验和业务解析，同时在后台启动独立线程的 C++ HTTP Server，为 Vue 3 + Vite 构建的赛博朋克风格大屏提供静态资源托管及 RESTful API 数据分发，并支持对受控设备的远程指令透传。
 
-## 🌟 特性
+## 特性
 
-- **基于表驱动法 (Table-Driven)**：无需处理庞大臃肿的 `switch-case`，一行注册表配置即可轻松扩展数个传感器轮询任务。
-- **全自动 CRC-16 校验构建**：发送指令动态拼接并自动计算 Modbus CRC-16 与返回数据的校验，无需手工计算任何十六进制常数。
-- **多线程并行架构与高度解耦**：独立的前端通信线程与后端的 Modbus 轮询采集线程分离。摒弃了全局大一统的数据结构，每个传感器各自维护自己的数据结构、互斥锁 (`pthread_mutex_t`) 和运行状态，真正实现高内聚低耦合。
-- **在线状态监控与容错 (Online Tracking)**：网关会实时追踪各设备的状态，连续 3 次通信失败将自动标记设备为离线状态 (`online = 0`)，并在 Web API 中向前端实时反馈。
-- **多设备分离解析 (Modular Design)**：彻底解耦协议层与设备业务层，每个独立的硬件设备都在独立的 `.c` 模块实现专属清洗过滤规则及自身状态管理。
+- **面向对象设备抽象**：基于 `DeviceBase` 基类继承体系，每个传感器与控制设备（空调、恒湿机、净化器等）拥有独立的读写及 Modbus 命令组帧能力。
+- **全自动 CRC-16 校验**：透明计算并拼接 RS485 总线数据帧的校验码，上层无需关心底层通信细节。
+- **表驱动任务调度 (Table-Driven)**：设备通过 `DeviceTask` 结构自描述轮询任务，无需臃肿的 `switch-case`，新增设备即插即用，与 Web Server、解析模块完全解耦。
+- **在线状态监控与容错**：网关实时追踪各设备通信状态，连续 3 次失败自动标记离线并在 API 响应中携带告警。
+- **现代前端工程化**：Vue 3 + Vite + TypeScript + Tailwind CSS 构建赛博朋克深色面板，集成 Element Plus 组件库与 Vue-ECharts 实时图表。
+- **双向控制接口**：针对空调、恒湿一体机、霉菌净化机等设备，通过 `/api/control` 提供下行控制信道，支持开关机、模式切换、参数设定等操作。
+- **登录鉴权**：前端集成登录页面与路由守卫，基于 localStorage 的会话管理。
 
-## 📂 项目结构
+## 支持的设备
+
+| 设备 | 地址 | 类型 | 说明 |
+|------|------|------|------|
+| 室内空气质量变送器 (云测仪) | `0x30` | 传感器 | PM2.5 / PM10 / 温度 / 湿度 / TVOC / CH2O / O3 / CO2 |
+| 烟雾报警器 | `0x70` | 传感器 | 烟雾检测报警 |
+| 水浸传感器 | `0x90` | 传感器 | 水浸检测 |
+| 红外探测器 | `0x40` | 传感器 | 红外 + 雷达双鉴探测 |
+| 光感传感器 | `0x50` | 传感器 | 环境光照度检测 |
+| 恒湿净化一体机 | `0x20` | 控制设备 | 开关机 / 除湿 / 加湿 / 净化 / 恒湿模式控制 |
+| 空调集中控制器 | `0x60` | 控制设备 | 制冷 / 制热开关控制 |
+| 霉菌空气净化机 | `0x10` | 控制设备 | 开关机 / 运行模式 / 手动模式控制 |
+| 报警装置 (驱鼠器) | `0x80` | 控制设备 | 继电器吸合/断开控制 |
+
+## 项目结构
 
 ```text
-├── core/                        # 核心组件库
-│   ├── device_config.h          # 传感器的 Modbus 寄存器及地址常量统一定义
-│   ├── modbus_core.c/h          # 底层串口通信 (RS485)、报文封包发包及 CRC 校验
-│   └── web_server.c/h           # 轻量级 HTTP Socket Server (提供 /api/data)
-├── devices/                     # 各种硬件设备的业务解析层代码
-│   ├── dev_cloud.c/h            # 空气质量/环境传感器：独立的数据缓存、锁及在线状态维护
-│   ├── dev_infrared.c/h         # 红外雷达双鉴传感器读写和解析
-│   ├── dev_light.c/h            # 环境光照度传感器读写和解析
-│   ├── dev_smoke.c/h            # 烟雾/火警侦测传感器读写和解析
-│   └── dev_water.c/h            # 水浸漏水检测传感器读写和解析
-├── dashboard.html               # 纯前端数据可视化监控大屏面板
-├── main.c                       # 主程序：包含任务执行表以及多线程服务拉起
-└── Makefile                     # 编译构建脚本 (-lpthread)
+├── application/
+│   ├── web_server.cpp           # C++ HTTP Server：静态资源托管 + RESTful API
+│   └── web_server.h
+├── core/
+│   ├── device_config.h          # 全设备 Modbus 寄存器地址与功能码定义
+│   ├── global_devices.hpp       # 全局设备实例声明 (extern)
+│   ├── main.cpp                 # 主入口：设备初始化、任务收集、轮询主循环
+│   ├── modbus_core.c/h          # RS485 串口通信底层与 CRC-16 校验
+├── devices/
+│   ├── device_base.hpp          # 设备抽象基类 (DeviceBase / DeviceTask / DeviceStatus)
+│   ├── dev_common.c/h           # 公共工具函数
+│   ├── dev_cloud_sensors.cpp/hpp# 云测仪 8 路传感器 (PM2.5/PM10/温湿度/TVOC/CH2O/O3/CO2)
+│   ├── dev_smoke.cpp/hpp        # 烟雾报警器
+│   ├── dev_water.cpp/hpp        # 水浸传感器
+│   ├── dev_infrared.cpp/hpp     # 红外+雷达双鉴探测器
+│   ├── dev_light.cpp/hpp        # 光感传感器
+│   ├── dev_humidifier.cpp/hpp   # 恒湿净化一体机 (读写双向)
+│   ├── dev_air_conditioner.cpp/hpp  # 空调集中控制器 (写控制)
+│   ├── dev_air_purifier.cpp/hpp # 霉菌空气净化机 (读写双向)
+│   └── dev_alarm_device.cpp/hpp # 报警装置/驱鼠器 (线圈控制)
+├── service/
+│   ├── modbus_service.cpp/hpp   # Modbus 通信服务：串口上下文管理与指令收发
+│   └── parse_service.cpp/hpp    # 报文解析服务：CRC 校验 + 数据反序列化
+├── ui/                          # Vue 3 前端工程
+│   ├── src/
+│   │   ├── views/
+│   │   │   ├── Login.vue        # 登录页面
+│   │   │   └── Dashboard.vue    # 赛博朋克监控大屏 (传感器面板 + ECharts 图表 + 控制面板)
+│   │   ├── router/index.ts      # Vue Router 路由配置与登录守卫
+│   │   ├── components/          # 公共组件
+│   │   ├── App.vue
+│   │   └── main.ts
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── dist/                    # 构建产物
+├── doc/                         # 设计文档与指令集参考
+├── public/                      # 部署用静态资源 (由 Vite 构建产物拷贝)
+├── test/                        # 测试文件
+├── Makefile                     # C++ 后端构建脚本
+└── test.c                       # 测试用例
 ```
 
-## 🚀 编译与运行
+## 编译与运行
 
-**1. 准备环境**
-系统需安装 GCC 构建工具并支持 POSIX 进程线程 API (`pthread`)，硬件需要有可写权限的 RS485 串口节点，目前系统默认为 `/dev/ttyS9`。
+### 1. 环境准备 (Ubuntu/Debian)
 
-**2. 编译项目**
-在根目录执行以下命令：
+- `g++` (支持 C++17)
+- `make`
+- `Node.js` (推荐 v24+) 与 npm
+- RS485 硬件串口节点 (默认 `/dev/ttyS9`)，仿真环境可使用本地 pty 接口
+
+### 2. 构建前端
+
+```bash
+cd ui
+npm install
+npm run build
+cd ..
+# 将构建产物部署到 public 目录供后端托管
+cp -r ui/dist/* public/ 2>/dev/null || :
+cp ui/dist/index.html dashboard.html
+```
+
+### 3. 构建并运行 C++ 后端
+
 ```bash
 make clean
 make
-```
-即可在根目录生成编译好的可执行文件 `app_gateway`。
 
-**3. 运行程序**
-```bash
-# 默认监听 /dev/ttyS9 串口，并同时在 8080 端口启动 Web API。
+# 默认使用 /dev/ttyS9 串口，在 8080 端口启动 HTTP Server
 sudo ./app_gateway
 ```
 
-也可以通过传递参数自定义串口路径（如 `/dev/ttyUSB0`）：
+自定义串口路径：
+
 ```bash
 sudo ./app_gateway /dev/ttyUSB0
 ```
 
-**4. 访问大屏**
-通过浏览器直接访问 `http://localhost:8080`，你可以看到每数秒局部刷新一次数据的实时动态可视化控制面板。
+### 4. 访问面板
 
-## ⚙ 技术实现与代码逻辑
+浏览器打开 `http://localhost:8080`，系统将跳转至登录页面，登录后进入赛博朋克风格的实时监控大屏，支持传感器数据实时刷新与设备远程控制。
 
-网关运作依赖于 `main.c` 中注册的**轮询任务一览表** `device_task_t` 型数组。
-每当网关启动，首先会调用各设备模块自带的 `init_dev_*_data()` 初始化自身数据与读写锁。接着衍生一条 `start_web_server` 线程绑定 8080 端口进行阻塞监听。
-主线程进入死循环后持续遍历上述的轮询表：
-1. 提取任务表定义的设备请求函数（如 `cloud_read_pm25`）。
-2. 构建标准 RS485 数据帧经过内核 Socket 发送到物理串口。
-3. 等待回应后由 `modbus_core.c` 接管执行基于长度和字节的基础截断，获得返回码 `rc`。
-4. 将报文与通信结果 `rc` 交付给任务表定义的相应解析器（如 `cloud_process_pm25`）。
-5. 专用解析器首先判断是否通信失败，如果连续三次 `rc != 0`，则将自身设备标记为 `online = 0`。若成功，则剥离业务异常包或检查 CRC 后，争夺自身模块的互斥锁（如 `g_dev_cloud_data.lock`），将转化后的数值写入自身状态机并重置失败计数。
-6. 并发的 HTTP 服务端在接获 `/api/data` 的 GET 请求后即时向各模块加锁读取参数与在线状态，组装为一串标准 JSON 交由 `dashboard.html` 的定时器消费刷新。
+## API 接口
 
-## 🔧 如何添加新设备 API 或拓展功能？
+### `GET /api/data`
 
-如果在后续工作中引进了一个**新的传感器**（例如甲烷报警器），基于目前的表驱动与高内聚设计，开发者**无需修改现有的任何数据结构，也不用打乱主线循环**。请遵循如下步骤进行对接：
+返回所有传感器数据及设备在线状态的 JSON：
 
-**Step 1: 全局地址分配**
-在 `core/device_config.h` 中分配并录入新设备的从站地址或寄存器起步段，例如：
-```c
-#define DEV_METHANE_ADDR  0x05
-#define REG_METHANE_STATE 0x0001
-```
-
-**Step 2: 建立对应驱动头文件与数据结构**
-在 `devices/dev_methane.h` 中定义你的专属数据结构并暴漏初始化方法与处理函数：
-```c
-#include <stdint.h>
-#include <stddef.h>
-#include <pthread.h>
-
-typedef struct {
-    int methane_ppm;
-    int online;
-    int fail_count;
-    pthread_mutex_t lock;
-} DevMethaneData;
-
-extern DevMethaneData g_dev_methane_data;
-
-void init_dev_methane_data();
-int methane_read_state(const char* device, uint8_t *resp, size_t *resp_len);
-void methane_process_data(const uint8_t *resp, size_t resp_len, int rc);
-```
-
-**Step 3: 实现驱动逻辑与离线判断**
-在 `devices/dev_methane.c` 中处理具体逻辑并更新状态：
-```c
-#include "dev_methane.h"
-#include "modbus_core.h"
-#include "device_config.h"
-#include <string.h>
-#include <stdio.h>
-
-DevMethaneData g_dev_methane_data;
-
-void init_dev_methane_data() {
-    memset(&g_dev_methane_data, 0, sizeof(DevMethaneData));
-    pthread_mutex_init(&g_dev_methane_data.lock, NULL);
-}
-
-int methane_read_state(const char* device, uint8_t *resp, size_t *resp_len) {
-    return modbus_build_and_send(device, 9600, DEV_METHANE_ADDR, 0x03, REG_METHANE_STATE, 0x0001, resp, 512, resp_len, 300);
-}
-
-void methane_process_data(const uint8_t *resp, size_t resp_len, int rc) {
-    pthread_mutex_lock(&g_dev_methane_data.lock);
-    
-    // 离线容错处理
-    if (rc != 0) {
-        g_dev_methane_data.fail_count++;
-        if (g_dev_methane_data.fail_count >= 3) {
-            g_dev_methane_data.online = 0;
-        }
-        pthread_mutex_unlock(&g_dev_methane_data.lock);
-        return;
-    }
-    g_dev_methane_data.fail_count = 0;
-    g_dev_methane_data.online = 1;
-    
-    // 正常业务解码
-    if (resp_len >= 7) {
-        g_dev_methane_data.methane_ppm = (resp[3] << 8) | resp[4];
-    }
-    pthread_mutex_unlock(&g_dev_methane_data.lock);
+```json
+{
+  “pm25”: 35, “pm25_online”: 1,
+  “temperature”: 26, “temperature_online”: 1,
+  “humidity”: 55, “humidity_online”: 1,
+  “smoke”: 0, “smoke_online”: 1,
+  “humidifier_power”: 1, “humidifier_online”: 1,
+  “purifier_run_mode”: 2, “purifier_online”: 1
 }
 ```
 
-**Step 4: 暴露 API 到前端并注册轮询**
-1. 在 `core/web_server.c` 中 `include "dev_methane.h"`，获取该锁并在 JSON 拼接时追加 `g_dev_methane_data.methane_ppm` 与 `g_dev_methane_data.online`。
-2. 在 `main.c` 顶部调用 `init_dev_methane_data();`。
-3. 在 `main.c` 的 `tasks[]` 轮询表中加入一行你的新指令：
-```c
-{"Methane Detector - PPM", methane_read_state, methane_process_data},
-```
+### `GET /api/control?device=xxx&action=yyy&val=zzz`
 
-**Step 5: 添加进编译脚本**
-切记去编辑根目录的 `Makefile` 并将其录入，执行 `make` 得到最新的工程。如果你还需要展示在网页上，接着只需同步在前端 `dashboard.html` 内建一个数据卡片绑定其更新的 JSON 字段即可！
+下行控制指令，支持的设备与动作：
+
+| device | action | val | 说明 |
+|--------|--------|-----|------|
+| `ac` | `cool_on` / `cool_off` | - | 空调制冷开/关 |
+| `ac` | `heat_on` / `heat_off` | - | 空调制热开/关 |
+| `humidifier` | `power` | 0/1 | 恒湿机开关机 |
+| `humidifier` | `dehumidify` | 0/1 | 除湿开关 |
+| `humidifier` | `humidify` | 0/1 | 加湿开关 |
+| `humidifier` | `purify` | 0/1 | 净化开关 |
+| `humidifier` | `const_hum` | 0/1 | 恒湿模式开关 |
+| `purifier` | `power` | 0/1 | 净化机开关机 |
+| `purifier` | `run_mode` | 模式值 | 运行模式设定 |
+| `purifier` | `manual` | 0/1 | 手动模式开关 |
+
+## 技术实现
+
+网关运作依赖于 `main.cpp` 中实例化的各个 C++ 设备类，通信流程如下：
+
+1. **初始化**：所有设备实例调用 `init()` 初始化数据缓冲，Web Server 在独立 pthread 中启动。
+2. **任务收集**：各设备通过 `getTasks()` 返回 `DeviceTask` 列表（含 readFunc 和 processFunc），统一收集到 `all_tasks` 向量。
+3. **轮询主循环**：按序遍历所有任务，调用 `readFunc` 发送 Modbus 请求并接收响应，再由 `processFunc` 完成 CRC 校验、数据解析与实例状态更新。循环间隔 60 秒。
+4. **数据上报**：前端通过 `/api/data` 获取全局设备实例的最新数据与在线状态，驱动 ECharts 图表与面板刷新。
+5. **远程控制**：前端发起 `/api/control` 请求，后端匹配设备与动作后调用对应设备的 set 方法，动态组帧 Modbus 写指令通过 RS485 下发执行。
+
+## 拓展新设备
+
+1. 在 `devices/` 下新建 `.cpp/.hpp`，继承 `DeviceBase`。
+2. 实现 `init()`、`getTasks()`、`getName()` 接口，定义设备的读取与解析逻辑。
+3. 在 `core/global_devices.hpp` 中声明全局设备实例 (extern)。
+4. 在 `core/main.cpp` 中实例化设备并收集其任务。
+5. 在 `application/web_server.cpp` 的 `/api/data` JSON 组装与 `/api/control` 路由中添加对应字段。
+
+## 许可证
+
+本项目仅供学习与研究使用。

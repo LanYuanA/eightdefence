@@ -19,7 +19,6 @@ static speed_t baud_to_termios(int baud) {
 		case 57600: return B57600;
 		case 115200: return B115200;
 		default: return 0;
-	}
 }
 
 static int hex_char_to_val(char c) {
@@ -202,7 +201,7 @@ int modbus_send_and_recv_hex(const char *device,
 
 int main(int argc, char *argv[]) {
 	const char *device = "/dev/ttyS9";
-	const char *cmd_hex = "70030001000A";
+	const char *cmd_hex = "300300000001";
 	int baud = 9600;
 	int timeout_ms = 300;
 	uint8_t response[512];

@@ -1,57 +1,68 @@
 #ifndef DEV_CLOUD_H
 #define DEV_CLOUD_H
 
+/**
+ * @file dev_cloud.h
+ * @brief 设备抽象层 - 室内空气质量变送器 (云测仪, Air Quality Sensor)
+ *
+ * 设备地址: 0x30 (48)
+ * 支持读取: PM2.5, PM10, 湿度, 温度, TVOC, 甲醛, O3, CO2
+ *
+ * API命名遵循Word文档规范:
+ *   ntfPM25() / ntfPM25Proc()     - PM2.5 数据
+ *   ntfPM10() / ntfPM10Proc()     - PM10 数据
+ *   ntfHmd()  / ntfHmdProc()      - 湿度数据
+ *   ntfT()    / ntfTProc()        - 温度数据
+ *   ntfTVOC() / ntfTVOCProc()     - TVOC 数据
+ *   ntfCH2O() / ntfCH2OProc()     - 甲醛数据
+ *   ntfO3()   / ntfO3Proc()       - 臭氧数据
+ *   ntfCO2()  / ntfCO2Proc()      - CO2 数据
+ */
+
 #include <stdint.h>
 #include <stddef.h>
-#include <pthread.h>
+#include "dev_common.h"
+#include "service/modbus_service.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
-    float temp;
-    float hum;
-    int pm25;
-    int pm10;
-    int tvoc;
-    int ch2o;
-    int o3;
-    int co2;
-    int online;
-    int fail_count;
-    pthread_mutex_t lock;
+    DeviceStatus status;
+    EnvData      env;
 } DevCloudData;
 
 extern DevCloudData g_dev_cloud_data;
+
 void init_dev_cloud_data();
 
+/* ============================================================
+ * 读取API (ntf*) - 使用原子服务层的 ModbusContext
+ * ============================================================ */
+int ntfPM25(ModbusContext *ctx, uint8_t *resp, size_t *resp_len);
+int ntfPM10(ModbusContext *ctx, uint8_t *resp, size_t *resp_len);
+int ntfHmd(ModbusContext *ctx, uint8_t *resp, size_t *resp_len);
+int ntfT(ModbusContext *ctx, uint8_t *resp, size_t *resp_len);
+int ntfTVOC(ModbusContext *ctx, uint8_t *resp, size_t *resp_len);
+int ntfCH2O(ModbusContext *ctx, uint8_t *resp, size_t *resp_len);
+int ntfO3(ModbusContext *ctx, uint8_t *resp, size_t *resp_len);
+int ntfCO2(ModbusContext *ctx, uint8_t *resp, size_t *resp_len);
 
-int cloud_read_pm25(const char* device, uint8_t *resp, size_t *resp_len);
-int cloud_read_pm10(const char* device, uint8_t *resp, size_t *resp_len);
-int cloud_read_humidity(const char* device, uint8_t *resp, size_t *resp_len);
-int cloud_read_temperature(const char* device, uint8_t *resp, size_t *resp_len);
-int cloud_read_tvoc(const char* device, uint8_t *resp, size_t *resp_len);
-int cloud_read_ch2o(const char* device, uint8_t *resp, size_t *resp_len);
-int cloud_read_o3(const char* device, uint8_t *resp, size_t *resp_len);
-int cloud_read_co2(const char* device, uint8_t *resp, size_t *resp_len);
+/* ============================================================
+ * 数据处理API (ntf*Proc)
+ * ============================================================ */
+void ntfPM25Proc(const uint8_t *resp, size_t resp_len, int rc);
+void ntfPM10Proc(const uint8_t *resp, size_t resp_len, int rc);
+void ntfHmdProc(const uint8_t *resp, size_t resp_len, int rc);
+void ntfTProc(const uint8_t *resp, size_t resp_len, int rc);
+void ntfTVOCProc(const uint8_t *resp, size_t resp_len, int rc);
+void ntfCH2OProc(const uint8_t *resp, size_t resp_len, int rc);
+void ntfO3Proc(const uint8_t *resp, size_t resp_len, int rc);
+void ntfCO2Proc(const uint8_t *resp, size_t resp_len, int rc);
 
-// 新增数据处理机制：枚举类型
-typedef enum {
-    CLOUD_TYPE_PM25,
-    CLOUD_TYPE_PM10,
-    CLOUD_TYPE_HUMIDITY,
-    CLOUD_TYPE_TEMPERATURE,
-    CLOUD_TYPE_TVOC,
-    CLOUD_TYPE_CH2O,
-    CLOUD_TYPE_O3,
-    CLOUD_TYPE_CO2
-} cloud_sensor_type_t;
-
-// 每个传感器类型的独立包裹函数，供 main.c 回调注册使用
-void cloud_process_pm25(const uint8_t *resp, size_t resp_len, int rc);
-void cloud_process_pm10(const uint8_t *resp, size_t resp_len, int rc);
-void cloud_process_humidity(const uint8_t *resp, size_t resp_len, int rc);
-void cloud_process_temperature(const uint8_t *resp, size_t resp_len, int rc);
-void cloud_process_tvoc(const uint8_t *resp, size_t resp_len, int rc);
-void cloud_process_ch2o(const uint8_t *resp, size_t resp_len, int rc);
-void cloud_process_o3(const uint8_t *resp, size_t resp_len, int rc);
-void cloud_process_co2(const uint8_t *resp, size_t resp_len, int rc);
-
+#ifdef __cplusplus
+}
 #endif
+
+#endif /* DEV_CLOUD_H */

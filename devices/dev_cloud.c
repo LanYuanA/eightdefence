@@ -1,6 +1,6 @@
 #include "dev_cloud.h"
 #include "device_config.h"
-#include "modbus_core.h"
+#include "service/parse_service.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -9,128 +9,191 @@ DevCloudData g_dev_cloud_data;
 
 void init_dev_cloud_data() {
     memset(&g_dev_cloud_data, 0, sizeof(DevCloudData));
-    pthread_mutex_init(&g_dev_cloud_data.lock, NULL);
+    dev_status_init(&g_dev_cloud_data.status);
+    env_data_init(&g_dev_cloud_data.env);
 }
 
-
-int cloud_read_pm25(const char* device, uint8_t *resp, size_t *resp_len) {
-    return modbus_build_and_send(device, 9600, DEV_CLOUD_ADDR, REG_READ, REG_CLOUD_PM25, REG_CLOUD_DATA, resp, 512, resp_len, 300);
+/* ============================================================
+ * 读取API实现 (ntf*)
+ * ============================================================ */
+int ntfPM25(ModbusContext *ctx, uint8_t *resp, size_t *resp_len) {
+    return modbusReadReg(ctx, DEV_CLOUD_ADDR, REG_CLOUD_PM25,
+                         REG_CLOUD_DATA, resp, 512, resp_len);
 }
 
-int cloud_read_pm10(const char* device, uint8_t *resp, size_t *resp_len) {
-    return modbus_build_and_send(device, 9600, DEV_CLOUD_ADDR, REG_READ, REG_CLOUD_PM10, REG_CLOUD_DATA, resp, 512, resp_len, 300);
+int ntfPM10(ModbusContext *ctx, uint8_t *resp, size_t *resp_len) {
+    return modbusReadReg(ctx, DEV_CLOUD_ADDR, REG_CLOUD_PM10,
+                         REG_CLOUD_DATA, resp, 512, resp_len);
 }
 
-int cloud_read_humidity(const char* device, uint8_t *resp, size_t *resp_len) {
-    return modbus_build_and_send(device, 9600, DEV_CLOUD_ADDR, REG_READ, REG_CLOUD_HUMIDITY, REG_CLOUD_DATA, resp, 512, resp_len, 300);
+int ntfHmd(ModbusContext *ctx, uint8_t *resp, size_t *resp_len) {
+    return modbusReadReg(ctx, DEV_CLOUD_ADDR, REG_CLOUD_HUMIDITY,
+                         REG_CLOUD_DATA, resp, 512, resp_len);
 }
 
-int cloud_read_temperature(const char* device, uint8_t *resp, size_t *resp_len) {
-    return modbus_build_and_send(device, 9600, DEV_CLOUD_ADDR, REG_READ, REG_CLOUD_TEMP, REG_CLOUD_DATA, resp, 512, resp_len, 300);
+int ntfT(ModbusContext *ctx, uint8_t *resp, size_t *resp_len) {
+    return modbusReadReg(ctx, DEV_CLOUD_ADDR, REG_CLOUD_TEMP,
+                         REG_CLOUD_DATA, resp, 512, resp_len);
 }
 
-int cloud_read_tvoc(const char* device, uint8_t *resp, size_t *resp_len) {
-    return modbus_build_and_send(device, 9600, DEV_CLOUD_ADDR, REG_READ, REG_CLOUD_TVOC, REG_CLOUD_DATA, resp, 512, resp_len, 300);
+int ntfTVOC(ModbusContext *ctx, uint8_t *resp, size_t *resp_len) {
+    return modbusReadReg(ctx, DEV_CLOUD_ADDR, REG_CLOUD_TVOC,
+                         REG_CLOUD_DATA, resp, 512, resp_len);
 }
 
-int cloud_read_ch2o(const char* device, uint8_t *resp, size_t *resp_len) {
-    return modbus_build_and_send(device, 9600, DEV_CLOUD_ADDR, REG_READ, REG_CLOUD_CH2O, REG_CLOUD_DATA, resp, 512, resp_len, 300);
+int ntfCH2O(ModbusContext *ctx, uint8_t *resp, size_t *resp_len) {
+    return modbusReadReg(ctx, DEV_CLOUD_ADDR, REG_CLOUD_CH2O,
+                         REG_CLOUD_DATA, resp, 512, resp_len);
 }
 
-int cloud_read_o3(const char* device, uint8_t *resp, size_t *resp_len) {
-    return modbus_build_and_send(device, 9600, DEV_CLOUD_ADDR, REG_READ, REG_CLOUD_O3, REG_CLOUD_DATA, resp, 512, resp_len, 300);
+int ntfO3(ModbusContext *ctx, uint8_t *resp, size_t *resp_len) {
+    return modbusReadReg(ctx, DEV_CLOUD_ADDR, REG_CLOUD_O3,
+                         REG_CLOUD_DATA, resp, 512, resp_len);
 }
 
-int cloud_read_co2(const char* device, uint8_t *resp, size_t *resp_len) {
-    return modbus_build_and_send(device, 9600, DEV_CLOUD_ADDR, REG_READ, REG_CLOUD_CO2, REG_CLOUD_DATA, resp, 512, resp_len, 300);
+int ntfCO2(ModbusContext *ctx, uint8_t *resp, size_t *resp_len) {
+    return modbusReadReg(ctx, DEV_CLOUD_ADDR, REG_CLOUD_CO2,
+                         REG_CLOUD_DATA, resp, 512, resp_len);
 }
 
-
-
-static void cloud_process_data_internal(const uint8_t *resp, size_t resp_len, cloud_sensor_type_t sensor_type, int rc) {
-    pthread_mutex_lock(&g_dev_cloud_data.lock);
-    if (rc != 0) {
-        g_dev_cloud_data.fail_count++;
-        if (g_dev_cloud_data.fail_count >= 3) {
-            g_dev_cloud_data.online = 0;
-            printf("  => [⚠️ 设备离线]: 云测仪连续3次未读到数据\n");
-        }
-        pthread_mutex_unlock(&g_dev_cloud_data.lock);
-        return;
+/* ============================================================
+ * 数据处理辅助函数
+ * ============================================================ */
+static void handle_cloud_failure(const char *name) {
+    if (dev_status_on_failure(&g_dev_cloud_data.status, 3)) {
+        printf("  => [⚠️ 设备离线]: %s 连续3次未读到数据\n", name);
     }
-    g_dev_cloud_data.fail_count = 0;
-    g_dev_cloud_data.online = 1;
-    pthread_mutex_unlock(&g_dev_cloud_data.lock);
+}
 
-    if (resp_len >= 7 && resp[0] == DEV_CLOUD_ADDR && resp[1] == 0x03) {
-        
-        // 1. 进行 CRC16 校验
-        uint16_t expected_crc = crc16_modbus(resp, resp_len - 2);
-        uint16_t actual_crc = resp[resp_len - 2] | (resp[resp_len - 1] << 8);
-        if (expected_crc != actual_crc) {
-             printf("  => [❌ 解析失败]: 云测仪数据 CRC 校验报错\n");
-             return;
-        }
-
-        // 2. 取出回包数据(1个寄存器=2字节)
-        uint16_t data = (resp[3] << 8) | resp[4];
-
-        // 3. 根据原 Java 方案分类进行：模型赋值 与 二次处理
-        pthread_mutex_lock(&g_dev_cloud_data.lock);
-        switch(sensor_type) {
-            case CLOUD_TYPE_TEMPERATURE: {
-                // 温度读回的整型通常放大了 10 倍
-                float temp_actual = data / 10.0f;
-                g_dev_cloud_data.temp = temp_actual;
-                printf("  => [🌡️ 模拟赋值 IndoorModel.setTemperature]: %.1f ℃\n", temp_actual);
-                printf("  => [📊 模拟入库 ChartDataUtils.addTemperatureData]: %.1f ℃\n", temp_actual);
-                break;
-            }
-            case CLOUD_TYPE_HUMIDITY: {
-                // 湿度同理除了 10
-                float hum_actual = data / 10.0f;
-                g_dev_cloud_data.hum = hum_actual;
-                printf("  => [💧 模拟赋值 IndoorModel.setHumidity]: %.1f %%RH\n", hum_actual);
-                printf("  => [📊 模拟入库 ChartDataUtils.addHumidityData]: %.1f %%RH\n", hum_actual);
-                break;
-            }
-            case CLOUD_TYPE_PM25:
-                g_dev_cloud_data.pm25 = data;
-                printf("  => [🌬️ 模拟赋值 IndoorModel.setPm25]: %d μg/m³\n", data);
-                break;
-            case CLOUD_TYPE_PM10:
-                g_dev_cloud_data.pm10 = data;
-                printf("  => [🌬️ 模拟赋值 IndoorModel.setPm10]: %d μg/m³\n", data);
-                break;
-            case CLOUD_TYPE_TVOC:
-                g_dev_cloud_data.tvoc = data;
-                printf("  => [☣️ 模拟赋值 IndoorModel.setTvoc]: %d ppb\n", data);
-                break;
-            case CLOUD_TYPE_CH2O:
-                g_dev_cloud_data.ch2o = data;
-                printf("  => [🧪 模拟赋值 IndoorModel.setCh2o (甲醛)]: %d ppm\n", data);
-                break;
-            case CLOUD_TYPE_O3:
-                g_dev_cloud_data.o3 = data;
-                printf("  => [☁️ 模拟赋值 IndoorModel.setO3 (臭氧)]: %d ppm\n", data);
-                break;
-            case CLOUD_TYPE_CO2:
-                g_dev_cloud_data.co2 = data;
-                printf("  => [💨 模拟赋值 IndoorModel.setCo2 (二氧化氮)]: %d ppm\n", data);
-                break;
-        }
-        pthread_mutex_unlock(&g_dev_cloud_data.lock);
+static void handle_cloud_parse_error(const char *name, int parse_rc) {
+    if (parse_rc == PARSE_ERR_CRC) {
+        printf("  => [❌ 解析失败]: %s CRC校验位错误\n", name);
+    } else if (parse_rc == PARSE_ERR_ADDR) {
+        printf("  => [❌ 解析失败]: %s 设备地址不匹配\n", name);
     } else {
-        printf("  => [❌ 解析失败]: 数据包头或地址不匹配\n");
+        printf("  => [❌ 解析失败]: %s 响应格式不符合预期协议\n", name);
     }
 }
 
-// 暴露出匹配 main.c 单一对应参数表的回调接口
-void cloud_process_pm25(const uint8_t *resp, size_t resp_len, int rc) { cloud_process_data_internal(resp, resp_len, CLOUD_TYPE_PM25, rc); }
-void cloud_process_pm10(const uint8_t *resp, size_t resp_len, int rc) { cloud_process_data_internal(resp, resp_len, CLOUD_TYPE_PM10, rc); }
-void cloud_process_humidity(const uint8_t *resp, size_t resp_len, int rc) { cloud_process_data_internal(resp, resp_len, CLOUD_TYPE_HUMIDITY, rc); }
-void cloud_process_temperature(const uint8_t *resp, size_t resp_len, int rc) { cloud_process_data_internal(resp, resp_len, CLOUD_TYPE_TEMPERATURE, rc); }
-void cloud_process_tvoc(const uint8_t *resp, size_t resp_len, int rc) { cloud_process_data_internal(resp, resp_len, CLOUD_TYPE_TVOC, rc); }
-void cloud_process_ch2o(const uint8_t *resp, size_t resp_len, int rc) { cloud_process_data_internal(resp, resp_len, CLOUD_TYPE_CH2O, rc); }
-void cloud_process_o3(const uint8_t *resp, size_t resp_len, int rc) { cloud_process_data_internal(resp, resp_len, CLOUD_TYPE_O3, rc); }
-void cloud_process_co2(const uint8_t *resp, size_t resp_len, int rc) { cloud_process_data_internal(resp, resp_len, CLOUD_TYPE_CO2, rc); }
+/* ============================================================
+ * 数据处理API实现 (ntf*Proc)
+ * ============================================================ */
+void ntfPM25Proc(const uint8_t *resp, size_t resp_len, int rc) {
+    if (rc != 0) { handle_cloud_failure("PM2.5"); return; }
+    dev_status_on_success(&g_dev_cloud_data.status);
+    int parse_rc = parseValidateResp(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 2);
+    if (parse_rc == PARSE_OK) {
+        uint16_t val = parseU16(resp, 0);
+        pthread_mutex_lock(&g_dev_cloud_data.env.lock);
+        g_dev_cloud_data.env.pm25 = val;
+        pthread_mutex_unlock(&g_dev_cloud_data.env.lock);
+        printf("  => [📊 PM2.5详情]: PM2.5值为 %d ug/m3\n", val);
+    } else {
+        handle_cloud_parse_error("PM2.5", parse_rc);
+    }
+}
+
+void ntfPM10Proc(const uint8_t *resp, size_t resp_len, int rc) {
+    if (rc != 0) { handle_cloud_failure("PM10"); return; }
+    dev_status_on_success(&g_dev_cloud_data.status);
+    int parse_rc = parseValidateResp(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 2);
+    if (parse_rc == PARSE_OK) {
+        uint16_t val = parseU16(resp, 0);
+        pthread_mutex_lock(&g_dev_cloud_data.env.lock);
+        g_dev_cloud_data.env.pm10 = val;
+        pthread_mutex_unlock(&g_dev_cloud_data.env.lock);
+        printf("  => [📊 PM10详情]: PM10值为 %d ug/m3\n", val);
+    } else {
+        handle_cloud_parse_error("PM10", parse_rc);
+    }
+}
+
+void ntfHmdProc(const uint8_t *resp, size_t resp_len, int rc) {
+    if (rc != 0) { handle_cloud_failure("湿度"); return; }
+    dev_status_on_success(&g_dev_cloud_data.status);
+    int parse_rc = parseValidateResp(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 2);
+    if (parse_rc == PARSE_OK) {
+        uint16_t val = parseU16(resp, 0);
+        pthread_mutex_lock(&g_dev_cloud_data.env.lock);
+        g_dev_cloud_data.env.humidity = val;
+        pthread_mutex_unlock(&g_dev_cloud_data.env.lock);
+        printf("  => [💧 湿度详情]: 湿度为 %d.%d%%RH\n", val / 10, val % 10);
+    } else {
+        handle_cloud_parse_error("湿度", parse_rc);
+    }
+}
+
+void ntfTProc(const uint8_t *resp, size_t resp_len, int rc) {
+    if (rc != 0) { handle_cloud_failure("温度"); return; }
+    dev_status_on_success(&g_dev_cloud_data.status);
+    int parse_rc = parseValidateResp(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 2);
+    if (parse_rc == PARSE_OK) {
+        int16_t val = parseS16(resp, 0);
+        pthread_mutex_lock(&g_dev_cloud_data.env.lock);
+        g_dev_cloud_data.env.temperature = val;
+        pthread_mutex_unlock(&g_dev_cloud_data.env.lock);
+        printf("  => [🌡️ 温度详情]: 温度为 %d.%d℃\n", val / 10, val % 10);
+    } else {
+        handle_cloud_parse_error("温度", parse_rc);
+    }
+}
+
+void ntfTVOCProc(const uint8_t *resp, size_t resp_len, int rc) {
+    if (rc != 0) { handle_cloud_failure("TVOC"); return; }
+    dev_status_on_success(&g_dev_cloud_data.status);
+    int parse_rc = parseValidateResp(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 2);
+    if (parse_rc == PARSE_OK) {
+        uint16_t val = parseU16(resp, 0);
+        pthread_mutex_lock(&g_dev_cloud_data.env.lock);
+        g_dev_cloud_data.env.tvoc = val;
+        pthread_mutex_unlock(&g_dev_cloud_data.env.lock);
+        printf("  => [💨 TVOC详情]: TVOC值为 %d ppb\n", val);
+    } else {
+        handle_cloud_parse_error("TVOC", parse_rc);
+    }
+}
+
+void ntfCH2OProc(const uint8_t *resp, size_t resp_len, int rc) {
+    if (rc != 0) { handle_cloud_failure("甲醛"); return; }
+    dev_status_on_success(&g_dev_cloud_data.status);
+    int parse_rc = parseValidateResp(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 2);
+    if (parse_rc == PARSE_OK) {
+        uint16_t val = parseU16(resp, 0);
+        pthread_mutex_lock(&g_dev_cloud_data.env.lock);
+        g_dev_cloud_data.env.ch2o = val;
+        pthread_mutex_unlock(&g_dev_cloud_data.env.lock);
+        printf("  => [🧪 甲醛详情]: 甲醛值为 %d mg/m3\n", val);
+    } else {
+        handle_cloud_parse_error("甲醛", parse_rc);
+    }
+}
+
+void ntfO3Proc(const uint8_t *resp, size_t resp_len, int rc) {
+    if (rc != 0) { handle_cloud_failure("臭氧"); return; }
+    dev_status_on_success(&g_dev_cloud_data.status);
+    int parse_rc = parseValidateResp(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 2);
+    if (parse_rc == PARSE_OK) {
+        uint16_t val = parseU16(resp, 0);
+        pthread_mutex_lock(&g_dev_cloud_data.env.lock);
+        g_dev_cloud_data.env.o3 = val;
+        pthread_mutex_unlock(&g_dev_cloud_data.env.lock);
+        printf("  => [🌬️ 臭氧详情]: 臭氧值为 %d ppb\n", val);
+    } else {
+        handle_cloud_parse_error("臭氧", parse_rc);
+    }
+}
+
+void ntfCO2Proc(const uint8_t *resp, size_t resp_len, int rc) {
+    if (rc != 0) { handle_cloud_failure("CO2"); return; }
+    dev_status_on_success(&g_dev_cloud_data.status);
+    int parse_rc = parseValidateResp(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 2);
+    if (parse_rc == PARSE_OK) {
+        uint16_t val = parseU16(resp, 0);
+        pthread_mutex_lock(&g_dev_cloud_data.env.lock);
+        g_dev_cloud_data.env.co2 = val;
+        pthread_mutex_unlock(&g_dev_cloud_data.env.lock);
+        printf("  => [☁️ CO2详情]: CO2值为 %d ppm\n", val);
+    } else {
+        handle_cloud_parse_error("CO2", parse_rc);
+    }
+}

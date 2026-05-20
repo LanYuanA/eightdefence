@@ -70,32 +70,38 @@ void* start_web_server(void *arg) {
         if (strncmp(buffer, "GET /api/data", 13) == 0) {
             // 返回 JSON 数据
             char json[1024];
-            pthread_mutex_lock(&g_dev_cloud_data.lock);
-            pthread_mutex_lock(&g_dev_smoke_data.lock);
-            pthread_mutex_lock(&g_dev_water_data.lock);
-            pthread_mutex_lock(&g_dev_infrared_data.lock);
-            pthread_mutex_lock(&g_dev_light_data.lock);
+            /* 使用 DeviceStatus.lock 和 EnvData.lock 进行线程安全访问 */
+            pthread_mutex_lock(&g_dev_cloud_data.status.lock);
+            pthread_mutex_lock(&g_dev_cloud_data.env.lock);
+            pthread_mutex_lock(&g_dev_smoke_data.status.lock);
+            pthread_mutex_lock(&g_dev_water_data.status.lock);
+            pthread_mutex_lock(&g_dev_infrared_data.status.lock);
+            pthread_mutex_lock(&g_dev_light_data.status.lock);
             snprintf(json, sizeof(json),
                 "{"
                 "\"temp\": %.1f, \"hum\": %.1f, \"pm25\": %d, \"pm10\": %d, \"ch2o\": %d, "
                 "\"co2\": %d, \"o3\": %d, \"tvoc\": %d, \"cloud_online\": %d, "
-                "\"smoke\": %d, \"smoke_temp\": %d, \"smoke_online\": %d, "
+                "\"smoke\": %d, \"smoke_online\": %d, "
                 "\"water\": %d, \"water_online\": %d, "
                 "\"ir\": %d, \"radar\": %d, \"ir_online\": %d, "
                 "\"lux\": %d, \"light_online\": %d"
                 "}",
-                g_dev_cloud_data.temp, g_dev_cloud_data.hum, g_dev_cloud_data.pm25, g_dev_cloud_data.pm10, g_dev_cloud_data.ch2o,
-                g_dev_cloud_data.co2, g_dev_cloud_data.o3, g_dev_cloud_data.tvoc, g_dev_cloud_data.online,
-                g_dev_smoke_data.smoke_status, g_dev_smoke_data.smoke_temp_thresh, g_dev_smoke_data.online,
-                g_dev_water_data.water_status, g_dev_water_data.online,
-                g_dev_infrared_data.ir_state, g_dev_infrared_data.radar_state, g_dev_infrared_data.online,
-                g_dev_light_data.lux, g_dev_light_data.online
+                g_dev_cloud_data.env.temperature / 10.0, g_dev_cloud_data.env.humidity / 10.0,
+                g_dev_cloud_data.env.pm25, g_dev_cloud_data.env.pm10, g_dev_cloud_data.env.ch2o,
+                g_dev_cloud_data.env.co2, g_dev_cloud_data.env.o3, g_dev_cloud_data.env.tvoc,
+                g_dev_cloud_data.status.online,
+                g_dev_smoke_data.alarm_state, g_dev_smoke_data.status.online,
+                g_dev_water_data.water_state, g_dev_water_data.status.online,
+                g_dev_infrared_data.infrared_state, g_dev_infrared_data.radar_state,
+                g_dev_infrared_data.status.online,
+                g_dev_light_data.illuminance, g_dev_light_data.status.online
             );
-            pthread_mutex_unlock(&g_dev_light_data.lock);
-            pthread_mutex_unlock(&g_dev_infrared_data.lock);
-            pthread_mutex_unlock(&g_dev_water_data.lock);
-            pthread_mutex_unlock(&g_dev_smoke_data.lock);
-            pthread_mutex_unlock(&g_dev_cloud_data.lock);
+            pthread_mutex_unlock(&g_dev_light_data.status.lock);
+            pthread_mutex_unlock(&g_dev_infrared_data.status.lock);
+            pthread_mutex_unlock(&g_dev_water_data.status.lock);
+            pthread_mutex_unlock(&g_dev_smoke_data.status.lock);
+            pthread_mutex_unlock(&g_dev_cloud_data.env.lock);
+            pthread_mutex_unlock(&g_dev_cloud_data.status.lock);
             
             send_response(new_socket, "200 OK", "application/json; charset=utf-8", json, strlen(json));
             

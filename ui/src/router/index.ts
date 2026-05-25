@@ -3,6 +3,7 @@ import Login from '../views/Login.vue'
 import Dashboard from '../views/Dashboard.vue'
 import LogViewer from '../views/LogViewer.vue'
 import Devices from '../views/Devices.vue'
+import Security from '../views/Security.vue'
 
 const router = createRouter({
   history: createWebHistory('/'),
@@ -26,6 +27,11 @@ const router = createRouter({
       path: '/devices',
       name: 'devices',
       component: Devices
+    },
+    {
+      path: '/security',
+      name: 'security',
+      component: Security
     }
   ]
 })

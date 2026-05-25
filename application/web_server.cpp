@@ -320,7 +320,7 @@ void* start_web_server(void *arg) {
             }
 
         } else if (req.find("GET /api/logs/") == 0) {
-            size_t start = 13;
+            size_t start = 14;
             size_t end = req.find(" HTTP/");
             std::string filename = req.substr(start, end - start);
             if (filename.find("..") != std::string::npos || filename.find("/") != std::string::npos) {
@@ -439,7 +439,7 @@ void* start_web_server(void *arg) {
             size_t start = req.find("/assets/");
             size_t end = req.find(" HTTP/");
             if (start != std::string::npos && end != std::string::npos) {
-                std::string path = "ui/dist" + req.substr(start, end - start);
+                std::string path = "public" + req.substr(start, end - start);
                 serve_file(new_socket, path);
             }
 

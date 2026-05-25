@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
 import Dashboard from '../views/Dashboard.vue'
+import LogViewer from '../views/LogViewer.vue'
+import Devices from '../views/Devices.vue'
 
 const router = createRouter({
   history: createWebHistory('/'),
@@ -14,6 +16,16 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: Dashboard
+    },
+    {
+      path: '/logs',
+      name: 'logs',
+      component: LogViewer
+    },
+    {
+      path: '/devices',
+      name: 'devices',
+      component: Devices
     }
   ]
 })

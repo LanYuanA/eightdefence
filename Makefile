@@ -1,7 +1,7 @@
 CC = gcc
 CXX = g++
 CFLAGS = -Wall -I. -I./devices -I./core -I./application -I./service
-CXXFLAGS = -Wall -I. -I./devices -I./core -I./application -I./service
+CXXFLAGS = -Wall -std=c++17 -I. -I./devices -I./core -I./application -I./service
 LDFLAGS = -lpthread
 
 TARGET = app_gateway
@@ -19,6 +19,8 @@ CXX_SRCS = service/modbus_service.cpp service/parse_service.cpp \
            devices/dev_air_conditioner.cpp devices/dev_air_purifier.cpp \
            devices/dev_alarm_device.cpp \
            application/web_server.cpp \
+           core/serial_bus.cpp core/polling_manager.cpp \
+           core/logger.cpp core/command_queue.cpp \
            core/main.cpp
 CXX_OBJS = $(CXX_SRCS:.cpp=.o)
 

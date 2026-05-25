@@ -3,6 +3,7 @@
  * @brief 原子服务层 - Modbus通信服务 (C++封装)
  *
  * 封装底层 modbus_core.c 的C函数，提供面向对象的接口。
+ * v2.0: 支持 SerialBus 线程安全模式，用于多线程轮询。
  */
 
 #ifndef MODBUS_SERVICE_HPP
@@ -17,13 +18,21 @@ extern "C" {
 #include "modbus_core.h"
 }
 
+class SerialBus;  // 前向声明
+
 class ModbusService {
 public:
     /**
-     * @brief 构造函数，创建Modbus上下文
+     * @brief 构造函数 (传统模式 - 使用底层C函数，非线程安全)
      * @param device 串口设备路径 (如 "/dev/ttyS9")
      */
     explicit ModbusService(const char *device);
+
+    /**
+     * @brief 构造函数 (SerialBus模式 - 线程安全)
+     * @param bus 共享的 SerialBus 实例
+     */
+    explicit ModbusService(SerialBus *bus);
 
     /**
      * @brief 析构函数
@@ -86,11 +95,14 @@ public:
                   uint8_t *resp, size_t resp_max, size_t *resp_len);
 
     /**
-     * @brief 获取底层Modbus上下文（供兼容用途）
+     * @brief 是否使用 SerialBus 模式
      */
+    bool usesSerialBus() const { return bus_ != nullptr; }
 
 private:
-    std::string device_; int baud_;
+    std::string device_;
+    int         baud_;
+    SerialBus   *bus_ = nullptr;  // SerialBus 模式
 };
 
 /* ============================================================

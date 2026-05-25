@@ -11,6 +11,9 @@
 #include <fcntl.h>
 #include <string>
 #include <vector>
+#include <dirent.h>
+#include <algorithm>
+#include <sys/stat.h>
 
 #define PORT 8080
 
@@ -182,6 +185,167 @@ void* start_web_server(void *arg) {
             const char* msg = (rc == 0) ? "{\"status\":\"success\"}" : "{\"status\":\"failed\"}";
             send_response(new_socket, "200 OK", "application/json; charset=utf-8", msg, strlen(msg));
             
+        } else if (req.find("GET /api/logs/list") == 0) {
+            // 列出所有日志文件
+            DIR *dir = opendir("./logs");
+            std::vector<std::string> files;
+            if (dir) {
+                struct dirent *entry;
+                while ((entry = readdir(dir)) != NULL) {
+                    std::string name = entry->d_name;
+                    if (name.size() > 4 && name.substr(name.size()-4) == ".log") {
+                        files.push_back(name);
+                    }
+                }
+                closedir(dir);
+                std::sort(files.begin(), files.end(), std::greater<std::string>());
+            }
+            std::string json = "[";
+            for (size_t i = 0; i < files.size(); i++) {
+                if (i > 0) json += ",";
+                json += "\"" + files[i] + "\"";
+            }
+            json += "]";
+            send_response(new_socket, "200 OK", "application/json; charset=utf-8", json.c_str(), json.size());
+
+        } else if (req.find("GET /api/logs/latest") == 0) {
+            // 获取最新日志内容
+            DIR *dir = opendir("./logs");
+            std::string latest;
+            if (dir) {
+                struct dirent *entry;
+                while ((entry = readdir(dir)) != NULL) {
+                    std::string name = entry->d_name;
+                    if (name.size() > 4 && name.substr(name.size()-4) == ".log") {
+                        if (name > latest) latest = name;
+                    }
+                }
+                closedir(dir);
+            }
+            if (!latest.empty()) {
+                std::string path = "./logs/" + latest;
+                serve_file(new_socket, path);
+            } else {
+                const char *err = "[]";
+                send_response(new_socket, "200 OK", "application/json; charset=utf-8", err, strlen(err));
+            }
+
+        } else if (req.find("GET /api/logs/") == 0) {
+            // 获取指定日志文件内容
+            size_t start = 13; // after "GET /api/logs/"
+            size_t end = req.find(" HTTP/");
+            std::string filename = req.substr(start, end - start);
+            // 安全检查: 防止路径遍历
+            if (filename.find("..") != std::string::npos || filename.find("/") != std::string::npos) {
+                const char *err = "403 Forbidden";
+                send_response(new_socket, "403 Forbidden", "text/plain", err, strlen(err));
+            } else {
+                std::string path = "./logs/" + filename;
+                serve_file(new_socket, path);
+            }
+
+        } else if (req.find("GET /api/devices") == 0) {
+            // 获取所有设备状态信息
+            char json[8192];
+            snprintf(json, sizeof(json),
+                "["
+                "{\"name\":\"PM2.5传感器\",\"type\":\"cloud_pm25\",\"online\":%d,\"value\":%u,\"unit\":\"μg/m³\","
+                 "\"description\":\"云测仪PM2.5细颗粒物传感器\",\"category\":\"sensor\"},"
+                "{\"name\":\"PM10传感器\",\"type\":\"cloud_pm10\",\"online\":%d,\"value\":%u,\"unit\":\"μg/m³\","
+                 "\"description\":\"云测仪PM10可吸入颗粒物传感器\",\"category\":\"sensor\"},"
+                "{\"name\":\"温度传感器\",\"type\":\"cloud_temp\",\"online\":%d,\"value\":%d,\"unit\":\"°C\","
+                 "\"description\":\"云测仪环境温度传感器\",\"category\":\"sensor\"},"
+                "{\"name\":\"湿度传感器\",\"type\":\"cloud_humidity\",\"online\":%d,\"value\":%u,\"unit\":\"%%\","
+                 "\"description\":\"云测仪环境湿度传感器\",\"category\":\"sensor\"},"
+                "{\"name\":\"TVOC传感器\",\"type\":\"cloud_tvoc\",\"online\":%d,\"value\":%u,\"unit\":\"ppb\","
+                 "\"description\":\"云测仪总挥发性有机化合物传感器\",\"category\":\"sensor\"},"
+                "{\"name\":\"甲醛传感器\",\"type\":\"cloud_ch2o\",\"online\":%d,\"value\":%u,\"unit\":\"ppb\","
+                 "\"description\":\"云测仪甲醛浓度传感器\",\"category\":\"sensor\"},"
+                "{\"name\":\"臭氧传感器\",\"type\":\"cloud_o3\",\"online\":%d,\"value\":%u,\"unit\":\"ppb\","
+                 "\"description\":\"云测仪臭氧浓度传感器\",\"category\":\"sensor\"},"
+                "{\"name\":\"CO2传感器\",\"type\":\"cloud_co2\",\"online\":%d,\"value\":%u,\"unit\":\"ppm\","
+                 "\"description\":\"云测仪二氧化碳浓度传感器\",\"category\":\"sensor\"},"
+                "{\"name\":\"烟雾探测器\",\"type\":\"smoke\",\"online\":%d,\"value\":%d,\"unit\":\"\","
+                 "\"description\":\"烟雾火灾探测报警器\",\"category\":\"alarm\"},"
+                "{\"name\":\"积水探测器\",\"type\":\"water\",\"online\":%d,\"value\":%d,\"unit\":\"\","
+                 "\"description\":\"机房积水漏水检测传感器\",\"category\":\"alarm\"},"
+                "{\"name\":\"红外探测器\",\"type\":\"infrared\",\"online\":%d,\"value\":%d,\"unit\":\"\","
+                 "\"description\":\"红外入侵+雷达微波双鉴探测器\",\"category\":\"alarm\"},"
+                "{\"name\":\"灯光控制器\",\"type\":\"light\",\"online\":%d,\"value\":%u,\"unit\":\"lux\","
+                 "\"description\":\"智能灯光照度采集控制器\",\"category\":\"control\"},"
+                "{\"name\":\"加湿器\",\"type\":\"humidifier\",\"online\":%d,\"value\":%d,\"unit\":\"\","
+                 "\"description\":\"工业加湿除湿净化一体机\",\"category\":\"control\"},"
+                "{\"name\":\"空调控制器\",\"type\":\"ac\",\"online\":%d,\"value\":0,\"unit\":\"\","
+                 "\"description\":\"精密空调制冷制热控制器\",\"category\":\"control\"},"
+                "{\"name\":\"空气净化器\",\"type\":\"purifier\",\"online\":%d,\"value\":%d,\"unit\":\"\","
+                 "\"description\":\"空气净化器多模式控制器\",\"category\":\"control\"},"
+                "{\"name\":\"报警设备\",\"type\":\"alarm\",\"online\":%d,\"value\":0,\"unit\":\"\","
+                 "\"description\":\"声光报警联动控制器\",\"category\":\"control\"}"
+                "]",
+                dev_pm25.isOnline(), dev_pm25.getValue(),
+                dev_pm10.isOnline(), dev_pm10.getValue(),
+                dev_temperature.isOnline(), dev_temperature.getValue(),
+                dev_humidity.isOnline(), dev_humidity.getValue(),
+                dev_tvoc.isOnline(), dev_tvoc.getValue(),
+                dev_ch2o.isOnline(), dev_ch2o.getValue(),
+                dev_o3.isOnline(), dev_o3.getValue(),
+                dev_co2.isOnline(), dev_co2.getValue(),
+                dev_smoke.isOnline(), dev_smoke.getAlarmState(),
+                dev_water.isOnline(), dev_water.getWaterState(),
+                dev_infrared.isOnline(), dev_infrared.getInfraredState(),
+                dev_light.isOnline(), dev_light.getIlluminance(),
+                dev_humidifier.isOnline(), dev_humidifier.getPowerState(),
+                dev_ac.isOnline(),
+                dev_purifier.isOnline(), dev_purifier.getPowerStatus(),
+                dev_alarm.isOnline()
+            );
+            send_response(new_socket, "200 OK", "application/json; charset=utf-8", json, strlen(json));
+
+        } else if (req.find("GET /api/bus/stats") == 0) {
+            // 获取总线统计信息
+            if (g_serial_bus) {
+                const BusStats &stats = g_serial_bus->getStats();
+                char json[1024];
+                snprintf(json, sizeof(json),
+                    "{\"totalTransactions\":%lu,\"totalErrors\":%lu,"
+                    "\"bytesSent\":%lu,\"bytesRecv\":%lu,"
+                    "\"avgLatencyMs\":%.2f,\"maxLatencyMs\":%.2f,"
+                    "\"busContentionCount\":%lu}",
+                    (unsigned long)stats.totalTransactions.load(),
+                    (unsigned long)stats.totalErrors.load(),
+                    (unsigned long)stats.totalBytesSent.load(),
+                    (unsigned long)stats.totalBytesRecv.load(),
+                    stats.avgLatencyMs.load(),
+                    stats.maxLatencyMs.load(),
+                    (unsigned long)stats.busContentionCount.load()
+                );
+                send_response(new_socket, "200 OK", "application/json; charset=utf-8", json, strlen(json));
+            } else {
+                const char *err = "{}";
+                send_response(new_socket, "200 OK", "application/json; charset=utf-8", err, strlen(err));
+            }
+
+        } else if (req.find("GET /api/cmd/stats") == 0) {
+            // 获取命令队列统计
+            if (g_cmd_queue) {
+                const auto &stats = g_cmd_queue->getStats();
+                char json[512];
+                snprintf(json, sizeof(json),
+                    "{\"submitted\":%lu,\"executed\":%lu,\"success\":%lu,\"failed\":%lu,"
+                    "\"queueSize\":%lu,\"avgExecTimeMs\":%.1f}",
+                    (unsigned long)stats.totalSubmitted.load(),
+                    (unsigned long)stats.totalExecuted.load(),
+                    (unsigned long)stats.totalSuccess.load(),
+                    (unsigned long)stats.totalFailed.load(),
+                    (unsigned long)stats.currentQueueSize.load(),
+                    stats.avgExecTimeMs.load()
+                );
+                send_response(new_socket, "200 OK", "application/json; charset=utf-8", json, strlen(json));
+            } else {
+                const char *err = "{}";
+                send_response(new_socket, "200 OK", "application/json; charset=utf-8", err, strlen(err));
+            }
+
         } else if (req.find("GET /assets/") == 0) {
             // Serve static files inside /assets/
             size_t start = req.find("/assets/");

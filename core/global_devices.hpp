@@ -11,6 +11,9 @@
 #include "devices/dev_air_purifier.hpp"
 #include "devices/dev_alarm_device.hpp"
 #include "service/modbus_service.hpp"
+#include "serial_bus.hpp"
+#include "polling_manager.hpp"
+#include "command_queue.hpp"
 
 extern DevCloudPm25        dev_pm25;
 extern DevCloudPm10        dev_pm10;
@@ -31,5 +34,7 @@ extern DevAirPurifier      dev_purifier;
 extern DevAlarmDevice      dev_alarm;
 
 extern ModbusService*      g_modbus;
+extern SerialBus*          g_serial_bus;
+extern CommandQueue*       g_cmd_queue;
 
 #endif // GLOBAL_DEVICES_HPP

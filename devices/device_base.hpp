@@ -84,8 +84,16 @@ struct EnvDataCpp {
  */
 struct DeviceTask {
     std::string description;   // 任务描述
+
+    // 读取和处理函数放在前面, 保持与现有设备代码的兼容性
     std::function<int(ModbusService &svc, uint8_t *resp, size_t *resp_len)> readFunc;
     std::function<void(const uint8_t *resp, size_t resp_len, int rc)> processFunc;
+
+    // 可配置参数 (带默认值, 可按设备自定义)
+    int         pollIntervalMs = 5000;  // 轮询间隔(毫秒), 可针对不同设备自定义
+    int         timeoutMs      = 1000;  // 单次通信超时(毫秒)
+    uint8_t     devAddr        = 0;     // Modbus 设备地址 (用于日志/调试)
+    int         priority       = 0;     // 优先级: 0=普通, 1=高优先级(安全类设备)
 };
 
 /**

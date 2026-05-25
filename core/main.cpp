@@ -40,6 +40,8 @@ extern "C" {
 #include "devices/dev_air_purifier.hpp"
 #include "devices/dev_alarm_device.hpp"
 #include "global_devices.hpp"
+#include "application/app_manager.hpp"
+#include "application/apps/security/app_security.hpp"
 
 /* ============================================================
  * 设备实例
@@ -150,6 +152,13 @@ int main(int argc, char *argv[]) {
     /* 初始化传感器数据缓冲 */
     init_all_devices();
     LOG_INFO("所有设备已初始化");
+
+    /* 注册应用到 AppManager */
+    auto& appMgr = AppManager::instance();
+    appMgr.registerApp(std::make_shared<AppSecurity>());
+    appMgr.initAll();
+    appMgr.startAll();
+    LOG_INFO("应用管理器已启动, 注册了 %zu 个应用", appMgr.getAllApps().size());
 
     /* 启动 Web 服务器 */
     pthread_t web_tid;
@@ -347,6 +356,9 @@ int main(int argc, char *argv[]) {
     /* ============================================================
      * 清理退出
      * ============================================================ */
+    LOG_INFO("正在停止所有应用...");
+    appMgr.stopAll();
+
     LOG_INFO("正在停止命令队列...");
     cmdQueue.stop();
 

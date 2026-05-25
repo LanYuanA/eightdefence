@@ -1,5 +1,6 @@
 #include "web_server.h"
 #include "core/global_devices.hpp"
+#include "application/app_manager.hpp"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,6 +36,13 @@ void send_response(int client_socket, const char *header, const char *content_ty
     write(client_socket, body, body_len);
 }
 
+void send_http_response(int client_socket, const HttpResponse& resp) {
+    char statusStr[64];
+    snprintf(statusStr, sizeof(statusStr), "%d %s", resp.statusCode, resp.statusText.c_str());
+    send_response(client_socket, statusStr, resp.contentType.c_str(),
+                  resp.body.c_str(), resp.body.size());
+}
+
 // 提取查询参数
 std::string get_query_param(const std::string& url, const std::string& key) {
     size_t pos = url.find(key + "=");
@@ -43,6 +51,26 @@ std::string get_query_param(const std::string& url, const std::string& key) {
     size_t end = url.find('&', pos);
     if (end == std::string::npos) end = url.find(' ', pos);
     return url.substr(pos, end - pos);
+}
+
+// 从 HTTP 请求行中提取路径和查询字符串
+void parse_request_path(const std::string& req, std::string& path, std::string& query) {
+    size_t pathStart = req.find(" ") + 1;
+    size_t pathEnd = req.find(" ", pathStart);
+    if (pathStart == std::string::npos || pathEnd == std::string::npos) {
+        path = "/";
+        query = "";
+        return;
+    }
+    std::string fullPath = req.substr(pathStart, pathEnd - pathStart);
+    size_t qPos = fullPath.find('?');
+    if (qPos != std::string::npos) {
+        path = fullPath.substr(0, qPos);
+        query = fullPath.substr(qPos + 1);
+    } else {
+        path = fullPath;
+        query = "";
+    }
 }
 
 void serve_file(int client_socket, const std::string& filepath) {
@@ -67,12 +95,68 @@ void serve_file(int client_socket, const std::string& filepath) {
     else if (ends_with(filepath, ".js")) content_type = "application/javascript; charset=utf-8";
     else if (ends_with(filepath, ".css")) content_type = "text/css; charset=utf-8";
     else if (ends_with(filepath, ".json")) content_type = "application/json; charset=utf-8";
+    else if (ends_with(filepath, ".svg")) content_type = "image/svg+xml";
 
     send_response(client_socket, "200 OK", content_type, data, fsize);
     free(data);
 }
 
+/**
+ * @brief 尝试通过 AppManager 处理请求
+ * @return true 如果请求已被处理
+ */
+static bool try_app_route(int client_socket, const std::string& path, const std::string& query) {
+    auto& mgr = AppManager::instance();
+
+    // 1. 系统级 API: 应用列表
+    if (path == "/api/apps") {
+        auto resp = mgr.routeRequest("GET", "/api/apps", "", "");
+        if (resp) {
+            send_http_response(client_socket, *resp);
+            return true;
+        }
+    }
+
+    // 2. 尝试匹配应用路由
+    auto apps = mgr.getAllApps();
+    for (auto& app : apps) {
+        if (app->matchRoute(path)) {
+            std::string subPath = app->stripPrefix(path);
+
+            // API 请求 -> 由应用处理
+            if (subPath.find("/api/") == 0) {
+                auto resp = mgr.routeRequest("GET", path, query, "");
+                if (resp) {
+                    send_http_response(client_socket, *resp);
+                    return true;
+                }
+            }
+
+            // 静态文件请求 -> 直接从应用静态目录提供
+            std::string staticDir = app->getStaticDir();
+            if (!staticDir.empty()) {
+                if (subPath == "/" || subPath.empty()) {
+                    // 返回应用首页
+                    std::string indexPage = app->getIndexPage();
+                    if (!indexPage.empty()) {
+                        serve_file(client_socket, indexPage);
+                        return true;
+                    }
+                } else {
+                    // 返回静态资源文件
+                    std::string filePath = staticDir + subPath;
+                    serve_file(client_socket, filePath);
+                    return true;
+                }
+            }
+            break;
+        }
+    }
+    return false;
+}
+
 void* start_web_server(void *arg) {
+    (void)arg;
     int server_fd, new_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
@@ -114,9 +198,16 @@ void* start_web_server(void *arg) {
             close(new_socket);
             continue;
         }
-        
+
         std::string req(buffer);
-        
+        std::string reqPath, reqQuery;
+        parse_request_path(req, reqPath, reqQuery);
+
+        /* ============================================================
+         * 路由分发 (优先级从高到低)
+         * ============================================================ */
+
+        // --- 核心系统 API ---
         if (req.find("GET /api/data") == 0) {
             char json[4096];
             snprintf(json, sizeof(json),
@@ -154,17 +245,17 @@ void* start_web_server(void *arg) {
                 dev_purifier.getPowerStatus(), dev_purifier.getRunMode(), dev_purifier.isOnline()
             );
             send_response(new_socket, "200 OK", "application/json; charset=utf-8", json, strlen(json));
-            
+
         } else if (req.find("GET /api/control") == 0) {
             std::string device = get_query_param(req, "device");
             std::string action = get_query_param(req, "action");
             std::string value_str = get_query_param(req, "val");
             uint16_t val = value_str.empty() ? 0 : std::stoi(value_str);
-            
+
             uint8_t resp[512];
             size_t resp_len = 0;
             int rc = -1;
-            
+
             if (device == "ac" && g_modbus != nullptr) {
                 if (action == "cool_on") rc = dev_ac.setCoolOn(*g_modbus, resp, &resp_len);
                 else if (action == "cool_off") rc = dev_ac.setCoolOff(*g_modbus, resp, &resp_len);
@@ -181,12 +272,11 @@ void* start_web_server(void *arg) {
                 else if (action == "run_mode") rc = dev_purifier.setRunMode(*g_modbus, val, resp, &resp_len);
                 else if (action == "manual") rc = dev_purifier.setManual(*g_modbus, val, resp, &resp_len);
             }
-            
+
             const char* msg = (rc == 0) ? "{\"status\":\"success\"}" : "{\"status\":\"failed\"}";
             send_response(new_socket, "200 OK", "application/json; charset=utf-8", msg, strlen(msg));
-            
+
         } else if (req.find("GET /api/logs/list") == 0) {
-            // 列出所有日志文件
             DIR *dir = opendir("./logs");
             std::vector<std::string> files;
             if (dir) {
@@ -209,7 +299,6 @@ void* start_web_server(void *arg) {
             send_response(new_socket, "200 OK", "application/json; charset=utf-8", json.c_str(), json.size());
 
         } else if (req.find("GET /api/logs/latest") == 0) {
-            // 获取最新日志内容
             DIR *dir = opendir("./logs");
             std::string latest;
             if (dir) {
@@ -231,11 +320,9 @@ void* start_web_server(void *arg) {
             }
 
         } else if (req.find("GET /api/logs/") == 0) {
-            // 获取指定日志文件内容
-            size_t start = 13; // after "GET /api/logs/"
+            size_t start = 13;
             size_t end = req.find(" HTTP/");
             std::string filename = req.substr(start, end - start);
-            // 安全检查: 防止路径遍历
             if (filename.find("..") != std::string::npos || filename.find("/") != std::string::npos) {
                 const char *err = "403 Forbidden";
                 send_response(new_socket, "403 Forbidden", "text/plain", err, strlen(err));
@@ -245,7 +332,6 @@ void* start_web_server(void *arg) {
             }
 
         } else if (req.find("GET /api/devices") == 0) {
-            // 获取所有设备状态信息
             char json[8192];
             snprintf(json, sizeof(json),
                 "["
@@ -302,7 +388,6 @@ void* start_web_server(void *arg) {
             send_response(new_socket, "200 OK", "application/json; charset=utf-8", json, strlen(json));
 
         } else if (req.find("GET /api/bus/stats") == 0) {
-            // 获取总线统计信息
             if (g_serial_bus) {
                 const BusStats &stats = g_serial_bus->getStats();
                 char json[1024];
@@ -326,7 +411,6 @@ void* start_web_server(void *arg) {
             }
 
         } else if (req.find("GET /api/cmd/stats") == 0) {
-            // 获取命令队列统计
             if (g_cmd_queue) {
                 const auto &stats = g_cmd_queue->getStats();
                 char json[512];
@@ -346,18 +430,24 @@ void* start_web_server(void *arg) {
                 send_response(new_socket, "200 OK", "application/json; charset=utf-8", err, strlen(err));
             }
 
-        } else if (req.find("GET /assets/") == 0) {
-            // Serve static files inside /assets/
+        // --- 应用路由 (由 AppManager 分发) ---
+        } else if (try_app_route(new_socket, reqPath, reqQuery)) {
+            // 已由应用处理, 什么都不做
+
+        // --- 静态资源 (Vue UI) ---
+        } else if (reqPath.find("/assets/") == 0) {
             size_t start = req.find("/assets/");
             size_t end = req.find(" HTTP/");
             if (start != std::string::npos && end != std::string::npos) {
                 std::string path = "ui/dist" + req.substr(start, end - start);
                 serve_file(new_socket, path);
             }
+
+        // --- 默认: 返回主仪表盘 ---
         } else {
-            // 所有其他路由返回 dashboard.html 以支持 Vue Router 的 History 模式
             serve_file(new_socket, "dashboard.html");
         }
+
         close(new_socket);
     }
     return NULL;

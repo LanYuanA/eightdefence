@@ -46,6 +46,11 @@ extern "C" {
 #include "global_devices.hpp"
 #include "application/app_manager.hpp"
 #include "application/apps/security/app_security.hpp"
+#include "service/atomic/svc_sound_light_alarm.hpp"
+#include "service/atomic/svc_drainage.hpp"
+#include "service/atomic/svc_temp_humidity_control.hpp"
+#include "service/atomic/svc_gas_response.hpp"
+#include "service/atomic/svc_command_center.hpp"
 
 /* ============================================================
  * 设备实例
@@ -175,9 +180,18 @@ int main(int argc, char *argv[]) {
     init_all_devices();
     LOG_INFO("所有设备已初始化");
 
-    /* 注册应用到 AppManager */
+    /* 创建原子服务 */
+    SvcSoundLightAlarm     svcSoundLight;
+    SvcDrainage            svcDrainage;
+    SvcTempHumidityControl svcTempHumid;
+    SvcGasResponse         svcGasResp;
+    SvcCommandCenter       svcCmdCenter;
+
+    /* 注册应用到 AppManager, 注入服务 */
     auto& appMgr = AppManager::instance();
-    appMgr.registerApp(std::make_shared<AppSecurity>());
+    auto securityApp = std::make_shared<AppSecurity>();
+    securityApp->setServices(&svcSoundLight, &svcDrainage, &svcTempHumid, &svcGasResp, &svcCmdCenter);
+    appMgr.registerApp(securityApp);
     appMgr.initAll();
     appMgr.startAll();
     LOG_INFO("应用管理器已启动, 注册了 %zu 个应用", appMgr.getAllApps().size());

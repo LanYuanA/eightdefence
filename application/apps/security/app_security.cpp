@@ -373,6 +373,9 @@ void AppSecurity::evaluateRisk(int waterState, int irState, int radarState) {
     // 设备离线或有风险时, 系统不正常
     bool allOnline = waterOnline && irOnline && gasOnline;
     m_state.systemNormal.store(maxRisk == 0 && allOnline);
+
+    // 根据风险等级驱动原子服务
+    handleRiskResponse();
 }
 
 SecurityRiskLevel AppSecurity::calcWaterRisk(float level, int sensorState) {
@@ -443,4 +446,65 @@ void AppSecurity::clearAlarm(const std::string& type) {
     }
     APP_LOG_INFO("报警解除(%s)", type.c_str());
     addLog("normal", "报警解除 - " + type, "报警状态已清除");
+}
+
+void AppSecurity::setServices(SvcSoundLightAlarm* a1, SvcDrainage* a2,
+                               SvcTempHumidityControl* a3, SvcGasResponse* a4,
+                               SvcCommandCenter* a5) {
+    m_svcSoundLight = a1;
+    m_svcDrainage   = a2;
+    m_svcTempHumid  = a3;
+    m_svcGasResp    = a4;
+    m_svcCmdCenter  = a5;
+}
+
+void AppSecurity::handleRiskResponse() {
+    bool anyHigh = false;
+
+    // 水浸高风险: 声光报警 + 排水 + 指挥中心告警
+    if (m_state.waterRisk >= SecurityRiskLevel::HIGH) {
+        anyHigh = true;
+        if (m_svcSoundLight) m_svcSoundLight->activate();
+        if (m_svcDrainage) m_svcDrainage->activate();
+        if (m_svcCmdCenter) m_svcCmdCenter->alert("high", "水浸警报",
+            "水位超限, 风险等级: 高风险, 排水系统已启动");
+        m_state.alarmSoundActive.store(true);
+        m_state.alarmCenterActive.store(true);
+        m_state.waterControlActive.store(true);
+    } else {
+        if (m_svcDrainage) m_svcDrainage->deactivate();
+        m_state.waterControlActive.store(false);
+    }
+
+    // 入侵高风险: 声光报警 + 指挥中心告警
+    if (m_state.intrusionRisk >= SecurityRiskLevel::HIGH) {
+        anyHigh = true;
+        if (m_svcSoundLight) m_svcSoundLight->activate();
+        if (m_svcCmdCenter) m_svcCmdCenter->alert("high", "入侵警报",
+            "检测到非法入侵, 风险等级: 高风险");
+        m_state.alarmSoundActive.store(true);
+        m_state.alarmCenterActive.store(true);
+    }
+
+    // 气体高风险: 净化器 + 声光报警 + 指挥中心告警
+    if (m_state.gasRisk >= SecurityRiskLevel::HIGH) {
+        anyHigh = true;
+        if (m_svcSoundLight) m_svcSoundLight->activate();
+        if (m_svcGasResp) m_svcGasResp->activate();
+        if (m_svcCmdCenter) m_svcCmdCenter->alert("high", "有害气体警报",
+            "有害气体浓度超限, 净化系统已启动");
+        m_state.alarmSoundActive.store(true);
+        m_state.alarmCenterActive.store(true);
+        m_state.ventilationActive.store(true);
+    } else {
+        if (m_svcGasResp) m_svcGasResp->deactivate();
+        m_state.ventilationActive.store(false);
+    }
+
+    // 无高风险时关闭声光报警
+    if (!anyHigh) {
+        if (m_svcSoundLight) m_svcSoundLight->deactivate();
+        m_state.alarmSoundActive.store(false);
+        m_state.alarmCenterActive.store(false);
+    }
 }

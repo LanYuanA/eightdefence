@@ -13,6 +13,9 @@ C_OBJS = $(C_SRCS:.c=.o)
 
 # C++ 源文件 (新抽象层 + 主程序)
 CXX_SRCS = service/modbus_service.cpp service/parse_service.cpp \
+           service/atomic/svc_sound_light_alarm.cpp service/atomic/svc_drainage.cpp \
+           service/atomic/svc_temp_humidity_control.cpp service/atomic/svc_gas_response.cpp \
+           service/atomic/svc_command_center.cpp \
            devices/dev_smoke.cpp devices/dev_water.cpp \
            devices/dev_infrared.cpp devices/dev_light.cpp \
            devices/dev_cloud_sensors.cpp devices/dev_humidifier.cpp \

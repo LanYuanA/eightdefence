@@ -14,6 +14,11 @@
 #define APP_SECURITY_HPP
 
 #include "../../app_base.hpp"
+#include "service/atomic/svc_sound_light_alarm.hpp"
+#include "service/atomic/svc_drainage.hpp"
+#include "service/atomic/svc_temp_humidity_control.hpp"
+#include "service/atomic/svc_gas_response.hpp"
+#include "service/atomic/svc_command_center.hpp"
 #include <string>
 #include <atomic>
 #include <thread>
@@ -83,6 +88,11 @@ public:
     void triggerAlarm(const std::string& type, const std::string& message);
     void clearAlarm(const std::string& type);
 
+    // 服务注入
+    void setServices(SvcSoundLightAlarm* a1, SvcDrainage* a2,
+                     SvcTempHumidityControl* a3, SvcGasResponse* a4,
+                     SvcCommandCenter* a5);
+
 private:
     // API 处理函数
     HttpResponse handleGetStatus(const HttpRequest& req);
@@ -109,6 +119,16 @@ private:
     SecurityState m_state;
     std::vector<LogEntry> m_logs;
     mutable std::mutex m_logMutex;
+
+    // 原子服务指针（由外部注入，不拥有所有权）
+    SvcSoundLightAlarm*      m_svcSoundLight = nullptr;
+    SvcDrainage*             m_svcDrainage = nullptr;
+    SvcTempHumidityControl*  m_svcTempHumid = nullptr;
+    SvcGasResponse*          m_svcGasResp = nullptr;
+    SvcCommandCenter*        m_svcCmdCenter = nullptr;
+
+    // 风险响应: 根据风险等级驱动原子服务
+    void handleRiskResponse();
 };
 
 #endif // APP_SECURITY_HPP

@@ -90,6 +90,10 @@ HttpResponse AppSecurity::handleGetStatus(const HttpRequest& /*req*/) {
     // 设备在线状态
     bool waterOnline = dev_water.isOnline();
     bool irOnline = dev_infrared.isOnline();
+    bool smokeOnline = dev_smoke.isOnline();
+    bool alarmOnline = dev_alarm.isOnline();
+    bool purifierOnline = dev_purifier.isOnline();
+    bool humidifierOnline = dev_humidifier.isOnline();
 
     // 读取云测仪有害气体传感器
     bool tvocOnline = dev_tvoc.isOnline();
@@ -149,6 +153,14 @@ HttpResponse AppSecurity::handleGetStatus(const HttpRequest& /*req*/) {
         "\"alarm\":{"
         "\"soundActive\":%s,"
         "\"centerActive\":%s"
+        "},"
+        "\"devices\":{"
+        "\"water\":{\"online\":%s},"
+        "\"infrared\":{\"online\":%s},"
+        "\"smoke\":{\"online\":%s},"
+        "\"alarm\":{\"online\":%s},"
+        "\"purifier\":{\"online\":%s},"
+        "\"humidifier\":{\"online\":%s}"
         "}"
         "}",
         riskStr[static_cast<int>(m_state.overallRisk)],
@@ -171,7 +183,13 @@ HttpResponse AppSecurity::handleGetStatus(const HttpRequest& /*req*/) {
         riskStr[static_cast<int>(m_state.gasRisk)],
         m_state.ventilationActive.load() ? "true" : "false",
         m_state.alarmSoundActive.load() ? "true" : "false",
-        m_state.alarmCenterActive.load() ? "true" : "false"
+        m_state.alarmCenterActive.load() ? "true" : "false",
+        waterOnline ? "true" : "false",
+        irOnline ? "true" : "false",
+        smokeOnline ? "true" : "false",
+        alarmOnline ? "true" : "false",
+        purifierOnline ? "true" : "false",
+        humidifierOnline ? "true" : "false"
     );
 
     return HttpResponse::json(json);
@@ -232,22 +250,21 @@ HttpResponse AppSecurity::handlePostControl(const HttpRequest& req) {
     if (target == "water") {
         if (action == "simulate") {
             m_state.waterLevel.store(5.8f);
-            m_state.alarmSoundActive.store(true);
-            m_state.alarmCenterActive.store(true);
-            m_state.waterControlActive.store(true);
+            // 通过 evaluateRisk 触发真实的原子服务联动
+            int waterState = dev_water.getWaterState();
+            int irState = dev_infrared.getInfraredState();
+            int radarState = dev_infrared.getRadarState();
+            evaluateRisk(waterState, irState, radarState);
             APP_LOG_WARNING("水浸风险警报: 检测到水位异常(5.8cm), 触发高风险评估");
             addLog("alarm", "水浸风险警报",
                 "检测到水位异常(5.8cm), 触发安防风险评估(高风险), 联动报警服务和防护处置服务");
-            addLog("warning", "防护处置启动",
-                "水浸联动服务: 排水设备启动, 关闭相关水源阀门");
-            addLog("warning", "报警服务启动",
-                "声光报警: 蜂鸣器长鸣, LED灯闪烁; 指挥中心报警: 系统后台发出警报");
             return HttpResponse::json("{\"status\":\"success\",\"message\":\"水浸异常模拟已触发\"}");
         } else if (action == "reset") {
             m_state.waterLevel.store(0.2f);
-            m_state.alarmSoundActive.store(false);
-            m_state.alarmCenterActive.store(false);
-            m_state.waterControlActive.store(false);
+            int waterState = dev_water.getWaterState();
+            int irState = dev_infrared.getInfraredState();
+            int radarState = dev_infrared.getRadarState();
+            evaluateRisk(waterState, irState, radarState);
             APP_LOG_INFO("水浸风险解除: 水位恢复正常(0.2cm)");
             addLog("normal", "水浸风险解除",
                 "水位恢复正常(0.2cm), 风险等级降低, 关闭报警和处置服务");
@@ -255,6 +272,10 @@ HttpResponse AppSecurity::handlePostControl(const HttpRequest& req) {
         }
     } else if (target == "intrusion") {
         if (action == "simulate") {
+            // 入侵模拟: 通过设置红外状态标志, 下次 evaluateRisk 会检测到
+            // 直接调用服务联动
+            if (m_svcSoundLight) m_svcSoundLight->activate();
+            if (m_svcCmdCenter) { m_svcCmdCenter->activate(); m_svcCmdCenter->alert("high", "入侵警报", "红外探测器识别非法闯入行为"); }
             m_state.alarmSoundActive.store(true);
             m_state.alarmCenterActive.store(true);
             APP_LOG_WARNING("人员入侵警报: 红外探测器识别非法闯入行为");
@@ -264,6 +285,8 @@ HttpResponse AppSecurity::handlePostControl(const HttpRequest& req) {
                 "声光报警: 现场警示; 指挥中心报警: 通知管理员紧急处置");
             return HttpResponse::json("{\"status\":\"success\",\"message\":\"入侵模拟已触发\"}");
         } else if (action == "reset") {
+            if (m_svcSoundLight) m_svcSoundLight->deactivate();
+            if (m_svcCmdCenter) m_svcCmdCenter->deactivate();
             m_state.alarmSoundActive.store(false);
             m_state.alarmCenterActive.store(false);
             APP_LOG_INFO("入侵警报解除: 红外探测器确认无非法入侵");
@@ -278,16 +301,14 @@ HttpResponse AppSecurity::handlePostControl(const HttpRequest& req) {
             m_state.simCh2o.store(150);   // >100 ppb 高风险
             m_state.simO3.store(130);     // >100 ppb 高风险
             m_state.simCo2.store(1200);   // >1000 ppm 高风险
-            m_state.alarmSoundActive.store(true);
-            m_state.alarmCenterActive.store(true);
-            m_state.ventilationActive.store(true);
+            // 通过 evaluateRisk 触发真实的原子服务联动
+            int waterState = dev_water.getWaterState();
+            int irState = dev_infrared.getInfraredState();
+            int radarState = dev_infrared.getRadarState();
+            evaluateRisk(waterState, irState, radarState);
             APP_LOG_WARNING("有害气体警报: 检测到多种有害气体浓度超限(TVOC:680ppb CH2O:150ppb O3:130ppb CO2:1200ppm)");
             addLog("alarm", "有害气体警报",
                 "检测到多种有害气体浓度超限, 触发安防风险评估(高风险)");
-            addLog("warning", "防护处置启动",
-                "通风设备服务: 自动启动通风系统, 降低危害");
-            addLog("warning", "报警服务启动",
-                "声光报警和指挥中心报警已激活");
             return HttpResponse::json("{\"status\":\"success\",\"message\":\"气体泄漏模拟已触发\"}");
         } else if (action == "reset") {
             m_state.gasSimulated.store(false);
@@ -295,9 +316,10 @@ HttpResponse AppSecurity::handlePostControl(const HttpRequest& req) {
             m_state.simCh2o.store(0);
             m_state.simO3.store(0);
             m_state.simCo2.store(0);
-            m_state.alarmSoundActive.store(false);
-            m_state.alarmCenterActive.store(false);
-            m_state.ventilationActive.store(false);
+            int waterState = dev_water.getWaterState();
+            int irState = dev_infrared.getInfraredState();
+            int radarState = dev_infrared.getRadarState();
+            evaluateRisk(waterState, irState, radarState);
             APP_LOG_INFO("气体浓度恢复正常: 已取消模拟, 读取真实传感器数据");
             addLog("normal", "气体浓度恢复正常",
                 "有害气体模拟已取消, 恢复读取真实传感器数据");
@@ -466,24 +488,33 @@ void AppSecurity::handleRiskResponse() {
         anyHigh = true;
         if (m_svcSoundLight) m_svcSoundLight->activate();
         if (m_svcDrainage) m_svcDrainage->activate();
-        if (m_svcCmdCenter) m_svcCmdCenter->alert("high", "水浸警报",
-            "水位超限, 风险等级: 高风险, 排水系统已启动");
+        if (m_svcCmdCenter) { m_svcCmdCenter->activate(); m_svcCmdCenter->alert("high", "水浸警报", "水位超限, 风险等级: 高风险, 排水系统已启动"); }
         m_state.alarmSoundActive.store(true);
         m_state.alarmCenterActive.store(true);
         m_state.waterControlActive.store(true);
+        if (m_prevWaterRisk < SecurityRiskLevel::HIGH) {
+            addLog("alarm", "水浸风险警报", "检测到水位异常, 触发安防风险评估(高风险), 联动声光报警+排水+指挥中心");
+        }
     } else {
         if (m_svcDrainage) m_svcDrainage->deactivate();
         m_state.waterControlActive.store(false);
+        if (m_prevWaterRisk >= SecurityRiskLevel::HIGH) {
+            addLog("normal", "水浸风险解除", "水位恢复正常, 排水服务已停止");
+        }
     }
 
     // 入侵高风险: 声光报警 + 指挥中心告警
     if (m_state.intrusionRisk >= SecurityRiskLevel::HIGH) {
         anyHigh = true;
         if (m_svcSoundLight) m_svcSoundLight->activate();
-        if (m_svcCmdCenter) m_svcCmdCenter->alert("high", "入侵警报",
-            "检测到非法入侵, 风险等级: 高风险");
+        if (m_svcCmdCenter) { m_svcCmdCenter->activate(); m_svcCmdCenter->alert("high", "入侵警报", "检测到非法入侵, 风险等级: 高风险"); }
         m_state.alarmSoundActive.store(true);
         m_state.alarmCenterActive.store(true);
+        if (m_prevIntrusionRisk < SecurityRiskLevel::HIGH) {
+            addLog("alarm", "入侵警报", "检测到非法入侵, 触发安防风险评估(高风险), 联动声光报警+指挥中心");
+        }
+    } else if (m_prevIntrusionRisk >= SecurityRiskLevel::HIGH) {
+        addLog("normal", "入侵警报解除", "入侵风险降低, 报警服务关闭");
     }
 
     // 气体高风险: 净化器 + 声光报警 + 指挥中心告警
@@ -491,14 +522,19 @@ void AppSecurity::handleRiskResponse() {
         anyHigh = true;
         if (m_svcSoundLight) m_svcSoundLight->activate();
         if (m_svcGasResp) m_svcGasResp->activate();
-        if (m_svcCmdCenter) m_svcCmdCenter->alert("high", "有害气体警报",
-            "有害气体浓度超限, 净化系统已启动");
+        if (m_svcCmdCenter) { m_svcCmdCenter->activate(); m_svcCmdCenter->alert("high", "有害气体警报", "有害气体浓度超限, 净化系统已启动"); }
         m_state.alarmSoundActive.store(true);
         m_state.alarmCenterActive.store(true);
         m_state.ventilationActive.store(true);
+        if (m_prevGasRisk < SecurityRiskLevel::HIGH) {
+            addLog("alarm", "有害气体警报", "有害气体浓度超限, 触发安防风险评估(高风险), 联动声光报警+净化器+指挥中心");
+        }
     } else {
         if (m_svcGasResp) m_svcGasResp->deactivate();
         m_state.ventilationActive.store(false);
+        if (m_prevGasRisk >= SecurityRiskLevel::HIGH) {
+            addLog("normal", "气体风险解除", "有害气体浓度恢复正常, 净化服务已停止");
+        }
     }
 
     // 无高风险时关闭声光报警
@@ -507,4 +543,9 @@ void AppSecurity::handleRiskResponse() {
         m_state.alarmSoundActive.store(false);
         m_state.alarmCenterActive.store(false);
     }
+
+    // 保存本次风险等级供下次比较
+    m_prevWaterRisk = m_state.waterRisk;
+    m_prevIntrusionRisk = m_state.intrusionRisk;
+    m_prevGasRisk = m_state.gasRisk;
 }

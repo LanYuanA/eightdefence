@@ -120,6 +120,11 @@ private:
     std::vector<LogEntry> m_logs;
     mutable std::mutex m_logMutex;
 
+    // 上次风险等级, 用于检测变化避免重复日志
+    SecurityRiskLevel m_prevWaterRisk{SecurityRiskLevel::LOW};
+    SecurityRiskLevel m_prevIntrusionRisk{SecurityRiskLevel::LOW};
+    SecurityRiskLevel m_prevGasRisk{SecurityRiskLevel::LOW};
+
     // 原子服务指针（由外部注入，不拥有所有权）
     SvcSoundLightAlarm*      m_svcSoundLight = nullptr;
     SvcDrainage*             m_svcDrainage = nullptr;

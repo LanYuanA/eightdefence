@@ -208,57 +208,61 @@
         </div>
       </div>
 
-      <!-- 基础硬件层 -->
+      <!-- 设备在线状态 -->
       <div class="hardware-section mb-5">
         <h3 class="service-title">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-          基础硬件层
+          设备在线状态
         </h3>
-        <p class="hardware-desc">支撑上层原子服务所需的基础硬件设备</p>
+        <p class="hardware-desc">安防系统关联的所有硬件设备通信状态</p>
         <div class="hardware-grid">
-          <div class="hardware-item" :class="{ 'hardware-offline': status.water?.online === false }">
+          <div class="hardware-item" :class="{ 'hardware-offline': status.devices?.water?.online === false }">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
             <p>水浸传感器</p>
-            <small>支撑水浸数据采集服务</small>
             <div class="hw-status">
-              <span class="hw-dot" :class="status.water?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
-              <span :class="status.water?.online === false ? 'text-danger' : 'text-safe'">{{ status.water?.online === false ? '离线' : '在线' }}</span>
+              <span class="hw-dot" :class="status.devices?.water?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
+              <span :class="status.devices?.water?.online === false ? 'text-danger' : 'text-safe'">{{ status.devices?.water?.online === false ? '离线' : '在线' }}</span>
             </div>
-            <button class="hw-btn" :class="status.water?.online === false ? 'btn-enable' : 'btn-disable'" @click="toggleDevice('water', status.water?.online)">{{ status.water?.online === false ? '启用' : '禁用' }}</button>
           </div>
-          <div class="hardware-item" :class="{ 'hardware-offline': status.intrusion?.online === false }">
+          <div class="hardware-item" :class="{ 'hardware-offline': status.devices?.infrared?.online === false }">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             <p>红外探测器</p>
-            <small>支撑红外人体检测服务</small>
             <div class="hw-status">
-              <span class="hw-dot" :class="status.intrusion?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
-              <span :class="status.intrusion?.online === false ? 'text-danger' : 'text-safe'">{{ status.intrusion?.online === false ? '离线' : '在线' }}</span>
-            </div>
-            <button class="hw-btn" :class="status.intrusion?.online === false ? 'btn-enable' : 'btn-disable'" @click="toggleDevice('infrared', status.intrusion?.online)">{{ status.intrusion?.online === false ? '启用' : '禁用' }}</button>
-          </div>
-          <div class="hardware-item" :class="{ 'hardware-offline': status.gas?.online === false }">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18.5 8c.83 0 1.5-.67 1.5-1.5S19.33 5 18.5 5c-.17 0-.34.03-.5.08A2.5 2.5 0 0 0 16 3a2.5 2.5 0 0 0-2 4v.02A1.5 1.5 0 0 0 13 8.5c0 .83.67 1.5 1.5 1.5h4z"/><path d="M12 9V2"/></svg>
-            <p>有害气体探测器</p>
-            <small>支撑有害气体安全防护</small>
-            <div class="hw-status">
-              <span class="hw-dot" :class="status.gas?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
-              <span :class="status.gas?.online === false ? 'text-danger' : 'text-safe'">{{ status.gas?.online === false ? '离线' : '在线' }}</span>
+              <span class="hw-dot" :class="status.devices?.infrared?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
+              <span :class="status.devices?.infrared?.online === false ? 'text-danger' : 'text-safe'">{{ status.devices?.infrared?.online === false ? '离线' : '在线' }}</span>
             </div>
           </div>
-          <div class="hardware-item">
+          <div class="hardware-item" :class="{ 'hardware-offline': status.devices?.smoke?.online === false }">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/></svg>
+            <p>烟雾报警器</p>
+            <div class="hw-status">
+              <span class="hw-dot" :class="status.devices?.smoke?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
+              <span :class="status.devices?.smoke?.online === false ? 'text-danger' : 'text-safe'">{{ status.devices?.smoke?.online === false ? '离线' : '在线' }}</span>
+            </div>
+          </div>
+          <div class="hardware-item" :class="{ 'hardware-offline': status.devices?.alarm?.online === false }">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
             <p>声光报警装置</p>
-            <small>支撑声光报警服务</small>
+            <div class="hw-status">
+              <span class="hw-dot" :class="status.devices?.alarm?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
+              <span :class="status.devices?.alarm?.online === false ? 'text-danger' : 'text-safe'">{{ status.devices?.alarm?.online === false ? '离线' : '在线' }}</span>
+            </div>
           </div>
-          <div class="hardware-item">
+          <div class="hardware-item" :class="{ 'hardware-offline': status.devices?.purifier?.online === false }">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
-            <p>通风设备</p>
-            <small>支撑通风设备服务</small>
+            <p>空气净化器</p>
+            <div class="hw-status">
+              <span class="hw-dot" :class="status.devices?.purifier?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
+              <span :class="status.devices?.purifier?.online === false ? 'text-danger' : 'text-safe'">{{ status.devices?.purifier?.online === false ? '离线' : '在线' }}</span>
+            </div>
           </div>
-          <div class="hardware-item">
+          <div class="hardware-item" :class="{ 'hardware-offline': status.devices?.humidifier?.online === false }">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>
-            <p>排水/阀门控制设备</p>
-            <small>支撑水浸联动服务</small>
+            <p>恒湿净化一体机</p>
+            <div class="hw-status">
+              <span class="hw-dot" :class="status.devices?.humidifier?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
+              <span :class="status.devices?.humidifier?.online === false ? 'text-danger' : 'text-safe'">{{ status.devices?.humidifier?.online === false ? '离线' : '在线' }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -299,6 +303,7 @@ interface SecurityStatus {
   intrusion: { infraredState: number; radarState: number; risk: string; online: boolean }
   gas: { online: boolean; tvoc: { value: number; unit: string; online: boolean }; ch2o: { value: number; unit: string; online: boolean }; o3: { value: number; unit: string; online: boolean }; co2: { value: number; unit: string; online: boolean }; risk: string; ventilationActive: boolean }
   alarm: { soundActive: boolean; centerActive: boolean }
+  devices?: { water?: { online: boolean }; infrared?: { online: boolean }; smoke?: { online: boolean }; alarm?: { online: boolean }; purifier?: { online: boolean }; humidifier?: { online: boolean } }
 }
 
 interface LogEntry {
@@ -313,7 +318,8 @@ const status = ref<SecurityStatus>({
   water: { level: 0, sensorState: 0, risk: "低风险", controlActive: false, online: true },
   intrusion: { infraredState: 0, radarState: 0, risk: "低风险", online: true },
   gas: { online: true, tvoc: { value: 0, unit: "ppb", online: true }, ch2o: { value: 0, unit: "ppb", online: true }, o3: { value: 0, unit: "ppb", online: true }, co2: { value: 0, unit: "ppm", online: true }, risk: "低风险", ventilationActive: false },
-  alarm: { soundActive: false, centerActive: false }
+  alarm: { soundActive: false, centerActive: false },
+  devices: { water: { online: true }, infrared: { online: true }, smoke: { online: true }, alarm: { online: true }, purifier: { online: true }, humidifier: { online: true } }
 })
 
 const logs = ref<LogEntry[]>([])
@@ -382,21 +388,6 @@ const doControl = async (target: string, action: string) => {
     }
     fetchStatus()
     fetchLogs()
-  } catch (e) {
-    ElMessage.error("网络请求失败")
-  }
-}
-
-const toggleDevice = async (device: string, currentOnline?: boolean) => {
-  try {
-    const action = currentOnline === false ? 'enable' : 'disable'
-    const res = await axios.get("/api/device/control", { params: { device, action } })
-    if (res.data.status === "success") {
-      ElMessage.success(action === 'enable' ? '设备已启用' : '设备已禁用')
-    } else {
-      ElMessage.warning("操作失败")
-    }
-    fetchStatus()
   } catch (e) {
     ElMessage.error("网络请求失败")
   }

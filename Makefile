@@ -30,7 +30,23 @@ CXX_OBJS = $(CXX_SRCS:.cpp=.o)
 
 OBJS = $(C_OBJS) $(CXX_OBJS)
 
-all: $(TARGET)
+# 前端源文件 (任一变化则重新编译前端)
+FRONTEND_SRCS = $(wildcard ui/src/*.ts ui/src/*.vue ui/src/**/*.ts ui/src/**/*.vue)
+FRONTEND_OUT = ui/dist/assets/index.js
+
+all: frontend $(TARGET)
+
+# 前端编译: npm run build + 拷贝到 public + 更新 dashboard.html
+frontend: $(FRONTEND_OUT)
+
+$(FRONTEND_OUT): $(FRONTEND_SRCS)
+	cd ui && npm run build
+	cp ui/dist/assets/*.js public/assets/
+	cp ui/dist/assets/*.css public/assets/
+	NEW_JS=$$(ls ui/dist/assets/*.js | xargs -I{} basename {}); \
+	NEW_CSS=$$(ls ui/dist/assets/*.css | xargs -I{} basename {}); \
+	sed -i "s|src=\"/assets/[^\"]*\"|src=\"/assets/$$NEW_JS\"|" dashboard.html; \
+	sed -i "s|href=\"/assets/[^\"]*\\.css\"|href=\"/assets/$$NEW_CSS\"|" dashboard.html
 
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS)
@@ -43,3 +59,6 @@ $(TARGET): $(OBJS)
 
 clean:
 	rm -f $(C_OBJS) $(CXX_OBJS) $(TARGET)
+
+clean-all: clean
+	rm -rf ui/dist ui/node_modules public/assets/*.js public/assets/*.css

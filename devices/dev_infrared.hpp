@@ -25,6 +25,10 @@ public:
     int getInfraredState() const { return infrared_state_.load(); }
     int getRadarState() const { return radar_state_.load(); }
     bool isOnline() { return status_.isOnline(); }
+    void setOnline(bool online) {
+        if (online) status_.onSuccess();
+        else status_.forceOffline();
+    }
 
 private:
     DeviceStatusCpp status_;

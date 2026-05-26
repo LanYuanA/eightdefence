@@ -88,16 +88,22 @@
           </div>
           <p class="app-card-desc">监测水浸隐患，触发预警与处置流程</p>
           <div class="data-row">
+            <span class="data-label">水浸传感器</span>
+            <span>
+              <span class="data-value" :class="status.water?.online === false ? 'text-danger' : 'text-safe'">{{ status.water?.online === false ? '离线' : '在线' }}</span>
+            </span>
+          </div>
+          <div class="data-row">
             <span class="data-label">水浸传感器状态</span>
-            <span class="data-value" :class="status.water?.sensorState !== 0 ? 'text-danger' : ''">{{ status.water?.sensorState !== 0 ? '异常' : '正常' }}</span>
+            <span class="data-value" :class="status.water?.online === false ? 'text-unknown' : status.water?.sensorState !== 0 ? 'text-danger' : ''">{{ status.water?.online === false ? '未知' : status.water?.sensorState !== 0 ? '异常' : '正常' }}</span>
           </div>
           <div class="data-row">
             <span class="data-label">水位监测</span>
-            <span class="data-value">{{ status.water?.level?.toFixed(1) ?? '--' }}cm</span>
+            <span class="data-value" :class="status.water?.online === false ? 'text-unknown' : ''">{{ status.water?.online === false ? '--' : (status.water?.level?.toFixed(1) ?? '--') + 'cm' }}</span>
           </div>
           <div class="data-row">
             <span class="data-label">风险评估</span>
-            <span class="data-value" :class="riskClass(status.water?.risk)">{{ status.water?.risk ?? '--' }}</span>
+            <span class="data-value" :class="status.water?.online === false ? 'text-unknown' : riskClass(status.water?.risk)">{{ status.water?.online === false ? '未知' : (status.water?.risk ?? '--') }}</span>
           </div>
           <div class="flex gap-2 mt-4">
             <button class="action-btn water-btn" @click="doControl('water', 'simulate')">模拟水浸异常</button>
@@ -113,16 +119,22 @@
           </div>
           <p class="app-card-desc">识别非法闯入行为，联动报警与记录</p>
           <div class="data-row">
+            <span class="data-label">红外探测器</span>
+            <span>
+              <span class="data-value" :class="status.intrusion?.online === false ? 'text-danger' : 'text-safe'">{{ status.intrusion?.online === false ? '离线' : '在线' }}</span>
+            </span>
+          </div>
+          <div class="data-row">
             <span class="data-label">红外探测器状态</span>
-            <span class="data-value" :class="status.intrusion?.infraredState !== 0 ? 'text-danger' : ''">{{ status.intrusion?.infraredState !== 0 ? '检测中' : '正常' }}</span>
+            <span class="data-value" :class="status.intrusion?.online === false ? 'text-unknown' : status.intrusion?.infraredState !== 0 ? 'text-danger' : ''">{{ status.intrusion?.online === false ? '未知' : status.intrusion?.infraredState !== 0 ? '检测中' : '正常' }}</span>
           </div>
           <div class="data-row">
             <span class="data-label">当前检测状态</span>
-            <span class="data-value" :class="status.intrusion?.infraredState !== 0 || status.intrusion?.radarState !== 0 ? 'text-danger' : ''">{{ intrusionStatusText }}</span>
+            <span class="data-value" :class="status.intrusion?.online === false ? 'text-unknown' : (status.intrusion?.infraredState !== 0 || status.intrusion?.radarState !== 0) ? 'text-danger' : ''">{{ status.intrusion?.online === false ? '未知' : intrusionStatusText }}</span>
           </div>
           <div class="data-row">
             <span class="data-label">风险评估</span>
-            <span class="data-value" :class="riskClass(status.intrusion?.risk)">{{ status.intrusion?.risk ?? '--' }}</span>
+            <span class="data-value" :class="status.intrusion?.online === false ? 'text-unknown' : riskClass(status.intrusion?.risk)">{{ status.intrusion?.online === false ? '未知' : (status.intrusion?.risk ?? '--') }}</span>
           </div>
           <div class="flex gap-2 mt-4">
             <button class="action-btn intrusion-btn" @click="doControl('intrusion', 'simulate')">模拟人员入侵</button>
@@ -138,16 +150,30 @@
           </div>
           <p class="app-card-desc">检测有害气体浓度，超限时触发通风/报警</p>
           <div class="data-row">
-            <span class="data-label">有害气体探测器状态</span>
-            <span class="data-value" :class="(status.gas?.concentration ?? 0) > 100 ? 'text-danger' : ''">{{ (status.gas?.concentration ?? 0) > 100 ? '超限' : '正常' }}</span>
+            <span class="data-label">有害气体探测器</span>
+            <span>
+              <span class="data-value" :class="status.gas?.online === false ? 'text-danger' : 'text-safe'">{{ status.gas?.online === false ? '离线' : '在线' }}</span>
+            </span>
           </div>
           <div class="data-row">
-            <span class="data-label">气体浓度</span>
-            <span class="data-value">{{ status.gas?.concentration ?? '--' }} PPM</span>
+            <span class="data-label">TVOC (挥发性有机物)</span>
+            <span class="data-value" :class="gasItemClass(status.gas?.tvoc, 200)">{{ gasItemText(status.gas?.tvoc) }}</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">CH2O (甲醛)</span>
+            <span class="data-value" :class="gasItemClass(status.gas?.ch2o, 50)">{{ gasItemText(status.gas?.ch2o) }}</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">O3 (臭氧)</span>
+            <span class="data-value" :class="gasItemClass(status.gas?.o3, 60)">{{ gasItemText(status.gas?.o3) }}</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">CO2 (二氧化碳)</span>
+            <span class="data-value" :class="gasItemClass(status.gas?.co2, 800)">{{ gasItemText(status.gas?.co2) }}</span>
           </div>
           <div class="data-row">
             <span class="data-label">风险评估</span>
-            <span class="data-value" :class="riskClass(status.gas?.risk)">{{ status.gas?.risk ?? '--' }}</span>
+            <span class="data-value" :class="status.gas?.online === false ? 'text-unknown' : riskClass(status.gas?.risk)">{{ status.gas?.online === false ? '未知' : (status.gas?.risk ?? '--') }}</span>
           </div>
           <div class="flex gap-2 mt-4">
             <button class="action-btn gas-btn" @click="doControl('gas', 'simulate')">模拟气体泄漏</button>
@@ -190,25 +216,39 @@
         </h3>
         <p class="hardware-desc">支撑上层原子服务所需的基础硬件设备</p>
         <div class="hardware-grid">
+          <div class="hardware-item" :class="{ 'hardware-offline': status.water?.online === false }">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+            <p>水浸传感器</p>
+            <small>支撑水浸数据采集服务</small>
+            <div class="hw-status">
+              <span class="hw-dot" :class="status.water?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
+              <span :class="status.water?.online === false ? 'text-danger' : 'text-safe'">{{ status.water?.online === false ? '离线' : '在线' }}</span>
+            </div>
+            <button class="hw-btn" :class="status.water?.online === false ? 'btn-enable' : 'btn-disable'" @click="toggleDevice('water', status.water?.online)">{{ status.water?.online === false ? '启用' : '禁用' }}</button>
+          </div>
+          <div class="hardware-item" :class="{ 'hardware-offline': status.intrusion?.online === false }">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <p>红外探测器</p>
+            <small>支撑红外人体检测服务</small>
+            <div class="hw-status">
+              <span class="hw-dot" :class="status.intrusion?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
+              <span :class="status.intrusion?.online === false ? 'text-danger' : 'text-safe'">{{ status.intrusion?.online === false ? '离线' : '在线' }}</span>
+            </div>
+            <button class="hw-btn" :class="status.intrusion?.online === false ? 'btn-enable' : 'btn-disable'" @click="toggleDevice('infrared', status.intrusion?.online)">{{ status.intrusion?.online === false ? '启用' : '禁用' }}</button>
+          </div>
+          <div class="hardware-item" :class="{ 'hardware-offline': status.gas?.online === false }">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18.5 8c.83 0 1.5-.67 1.5-1.5S19.33 5 18.5 5c-.17 0-.34.03-.5.08A2.5 2.5 0 0 0 16 3a2.5 2.5 0 0 0-2 4v.02A1.5 1.5 0 0 0 13 8.5c0 .83.67 1.5 1.5 1.5h4z"/><path d="M12 9V2"/></svg>
+            <p>有害气体探测器</p>
+            <small>支撑有害气体安全防护</small>
+            <div class="hw-status">
+              <span class="hw-dot" :class="status.gas?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
+              <span :class="status.gas?.online === false ? 'text-danger' : 'text-safe'">{{ status.gas?.online === false ? '离线' : '在线' }}</span>
+            </div>
+          </div>
           <div class="hardware-item">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
             <p>声光报警装置</p>
             <small>支撑声光报警服务</small>
-          </div>
-          <div class="hardware-item">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            <p>红外探测器</p>
-            <small>支撑红外人体检测服务</small>
-          </div>
-          <div class="hardware-item">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
-            <p>水浸传感器</p>
-            <small>支撑水浸数据采集服务</small>
-          </div>
-          <div class="hardware-item">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18.5 8c.83 0 1.5-.67 1.5-1.5S19.33 5 18.5 5c-.17 0-.34.03-.5.08A2.5 2.5 0 0 0 16 3a2.5 2.5 0 0 0-2 4v.02A1.5 1.5 0 0 0 13 8.5c0 .83.67 1.5 1.5 1.5h4z"/><path d="M12 9V2"/></svg>
-            <p>有害气体探测器</p>
-            <small>支撑有害气体安全防护</small>
           </div>
           <div class="hardware-item">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
@@ -255,9 +295,9 @@ const currentTime = ref("")
 
 interface SecurityStatus {
   system: { overallRisk: string; systemNormal: boolean; running: boolean }
-  water: { level: number; sensorState: number; risk: string; controlActive: boolean }
-  intrusion: { infraredState: number; radarState: number; risk: string }
-  gas: { concentration: number; risk: string; ventilationActive: boolean }
+  water: { level: number; sensorState: number; risk: string; controlActive: boolean; online: boolean }
+  intrusion: { infraredState: number; radarState: number; risk: string; online: boolean }
+  gas: { online: boolean; tvoc: { value: number; unit: string; online: boolean }; ch2o: { value: number; unit: string; online: boolean }; o3: { value: number; unit: string; online: boolean }; co2: { value: number; unit: string; online: boolean }; risk: string; ventilationActive: boolean }
   alarm: { soundActive: boolean; centerActive: boolean }
 }
 
@@ -270,9 +310,9 @@ interface LogEntry {
 
 const status = ref<SecurityStatus>({
   system: { overallRisk: "低风险", systemNormal: true, running: true },
-  water: { level: 0, sensorState: 0, risk: "低风险", controlActive: false },
-  intrusion: { infraredState: 0, radarState: 0, risk: "低风险" },
-  gas: { concentration: 0, risk: "低风险", ventilationActive: false },
+  water: { level: 0, sensorState: 0, risk: "低风险", controlActive: false, online: true },
+  intrusion: { infraredState: 0, radarState: 0, risk: "低风险", online: true },
+  gas: { online: true, tvoc: { value: 0, unit: "ppb", online: true }, ch2o: { value: 0, unit: "ppb", online: true }, o3: { value: 0, unit: "ppb", online: true }, co2: { value: 0, unit: "ppm", online: true }, risk: "低风险", ventilationActive: false },
   alarm: { soundActive: false, centerActive: false }
 })
 
@@ -295,6 +335,17 @@ function riskClass(risk?: string) {
   if (risk === "高风险") return "text-danger"
   if (risk === "中风险") return "text-warning"
   return "text-safe"
+}
+
+function gasItemClass(item?: { value: number; unit: string; online: boolean }, warnThreshold?: number) {
+  if (!item || item.online === false) return "text-unknown"
+  if (warnThreshold && item.value > warnThreshold) return "text-danger"
+  return ""
+}
+
+function gasItemText(item?: { value: number; unit: string; online: boolean }) {
+  if (!item || item.online === false) return "--"
+  return item.value + " " + item.unit
 }
 
 const updateTime = () => {
@@ -331,6 +382,21 @@ const doControl = async (target: string, action: string) => {
     }
     fetchStatus()
     fetchLogs()
+  } catch (e) {
+    ElMessage.error("网络请求失败")
+  }
+}
+
+const toggleDevice = async (device: string, currentOnline?: boolean) => {
+  try {
+    const action = currentOnline === false ? 'enable' : 'disable'
+    const res = await axios.get("/api/device/control", { params: { device, action } })
+    if (res.data.status === "success") {
+      ElMessage.success(action === 'enable' ? '设备已启用' : '设备已禁用')
+    } else {
+      ElMessage.warning("操作失败")
+    }
+    fetchStatus()
   } catch (e) {
     ElMessage.error("网络请求失败")
   }
@@ -573,6 +639,7 @@ onUnmounted(() => {
 .text-danger { color: #ef4444; }
 .text-warning { color: #f59e0b; }
 .text-safe { color: #34d399; }
+.text-unknown { color: #64748b; }
 
 /* ===== 操作按钮 ===== */
 .action-btn {
@@ -597,6 +664,22 @@ onUnmounted(() => {
 }
 .gas-btn {
   border-left: 3px solid #ef4444;
+}
+.btn-enable {
+  border-left: 3px solid #34d399;
+  color: #34d399;
+}
+.btn-enable:hover {
+  background: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.3);
+}
+.btn-disable {
+  border-left: 3px solid #ef4444;
+  color: #fca5a5;
+}
+.btn-disable:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
 /* ===== 服务状态 ===== */
@@ -698,6 +781,44 @@ onUnmounted(() => {
   font-size: 11px;
   color: #64748b;
   margin-top: 4px;
+}
+.hw-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.hw-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.hw-dot-on {
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
+}
+.hw-dot-off {
+  background: #aaa;
+}
+.hw-btn {
+  margin-top: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.hw-btn:hover {
+  background: rgba(148, 163, 184, 0.15);
+}
+.hardware-offline {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.05);
 }
 
 /* ===== 日志区域 ===== */

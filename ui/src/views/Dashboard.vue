@@ -124,14 +124,14 @@
               <span class="alarm-status" :class="data.smoke ? 'status-danger' : 'status-safe'">{{ data.smoke ? '报警' : '正常' }}</span>
             </div>
             <div class="alarm-item" :class="{ 'alarm-active': data.water }">
-              <div class="alarm-dot" :class="data.water ? 'dot-red' : 'dot-green'"></div>
+              <div class="alarm-dot" :class="securityStatus.water?.online === false ? 'dot-gray' : data.water ? 'dot-red' : 'dot-green'"></div>
               <span class="flex-1">积水检测</span>
-              <span class="alarm-status" :class="data.water ? 'status-danger' : 'status-safe'">{{ data.water ? '报警' : '正常' }}</span>
+              <span class="alarm-status" :class="securityStatus.water?.online === false ? 'status-offline' : data.water ? 'status-danger' : 'status-safe'">{{ securityStatus.water?.online === false ? '离线' : data.water ? '报警' : '正常' }}</span>
             </div>
             <div class="alarm-item" :class="{ 'alarm-active': data.ir }">
-              <div class="alarm-dot" :class="data.ir ? 'dot-red' : 'dot-green'"></div>
+              <div class="alarm-dot" :class="securityStatus.intrusion?.online === false ? 'dot-gray' : data.ir ? 'dot-red' : 'dot-green'"></div>
               <span class="flex-1">红外入侵</span>
-              <span class="alarm-status" :class="data.ir ? 'status-danger' : 'status-safe'">{{ data.ir ? '检测' : '正常' }}</span>
+              <span class="alarm-status" :class="securityStatus.intrusion?.online === false ? 'status-offline' : data.ir ? 'status-danger' : 'status-safe'">{{ securityStatus.intrusion?.online === false ? '离线' : data.ir ? '检测' : '正常' }}</span>
             </div>
             <div class="alarm-item" :class="{ 'alarm-active': data.radar }">
               <div class="alarm-dot" :class="data.radar ? 'dot-red' : 'dot-green'"></div>
@@ -268,6 +268,11 @@ const data = ref({
   purifier_power: 0, purifier_run_mode: 0
 })
 
+const securityStatus = ref<any>({
+  water: { online: true },
+  intrusion: { online: true }
+})
+
 const hasAlarm = computed(() => data.value.smoke || data.value.water || data.value.ir || data.value.radar)
 
 const targetHum = ref(50)
@@ -341,6 +346,13 @@ const handleLogout = () => {
   router.push({ name: "login" })
 }
 
+const fetchSecurityStatus = async () => {
+  try {
+    const res = await axios.get("/security/api/status")
+    securityStatus.value = res.data
+  } catch (e) {}
+}
+
 const fetchData = async () => {
   try {
     const res = await axios.get("/api/data")
@@ -396,7 +408,8 @@ onMounted(() => {
   updateTime()
   timeInterval = window.setInterval(updateTime, 1000)
   fetchData()
-  dataInterval = window.setInterval(fetchData, 2000)
+  fetchSecurityStatus()
+  dataInterval = window.setInterval(() => { fetchData(); fetchSecurityStatus() }, 2000)
 })
 
 onUnmounted(() => {
@@ -624,6 +637,10 @@ onUnmounted(() => {
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
   animation: blink-dot 1s infinite alternate;
 }
+.dot-gray {
+  background: #64748b;
+  box-shadow: 0 0 4px rgba(100, 116, 139, 0.3);
+}
 @keyframes blink-dot {
   0% { opacity: 1; box-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
   100% { opacity: 0.5; box-shadow: 0 0 14px rgba(239, 68, 68, 0.8); }
@@ -634,6 +651,7 @@ onUnmounted(() => {
 }
 .status-safe { color: #34d399; }
 .status-danger { color: #ef4444; }
+.status-offline { color: #64748b; }
 
 /* ===== 控制按钮 ===== */
 .ctrl-btn {

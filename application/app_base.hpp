@@ -21,6 +21,8 @@
 #include <atomic>
 #include <map>
 
+class AppLogger;  // 前向声明
+
 /**
  * @brief HTTP 请求信息
  */
@@ -103,7 +105,15 @@ public:
     {
     }
 
-    virtual ~AppBase() = default;
+    virtual ~AppBase();
+
+    /**
+     * @brief 初始化应用独立日志器
+     *        创建 {appName}_YYYYMMDD_HHMMSS.log 日志文件
+     * @param logDir 日志目录 (默认 "./logs")
+     * @return 0=成功, -1=失败
+     */
+    int initLogger(const std::string& logDir = "./logs");
 
     /* ============================================================
      * 属性访问
@@ -219,6 +229,7 @@ protected:
     std::string m_routePrefix;    // 路由前缀, 如 "/security"
     std::string m_description;    // 应用描述
     std::atomic<bool> m_running;  // 运行状态
+    AppLogger*  m_logger = nullptr; // 应用独立日志器
 
     // API 路由表
     std::vector<std::pair<std::string, ApiHandler>> m_apiRoutes;

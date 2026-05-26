@@ -43,6 +43,8 @@ public:
         std::lock_guard<std::mutex> lock(m_mutex);
         int failures = 0;
         for (auto& app : m_apps) {
+            // 先初始化应用日志器
+            app->initLogger();
             if (app->init() != 0) {
                 fprintf(stderr, "[AppManager] 应用 '%s' 初始化失败!\n",
                         app->getName().c_str());

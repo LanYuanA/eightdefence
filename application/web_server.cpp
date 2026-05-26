@@ -297,9 +297,27 @@ void* start_web_server(void *arg) {
                 "{\"status\":\"submitted\"}" : "{\"status\":\"failed\"}";
             send_response(new_socket, "200 OK", "application/json; charset=utf-8", msg, strlen(msg));
 
+        } else if (req.find("GET /api/device/control") == 0) {
+            std::string device = get_query_param(req, "device");
+            std::string action = get_query_param(req, "action");
+            bool ok = false;
+
+            if (device == "water") {
+                if (action == "enable") { dev_water.setOnline(true); ok = true; }
+                else if (action == "disable") { dev_water.setOnline(false); ok = true; }
+            } else if (device == "infrared") {
+                if (action == "enable") { dev_infrared.setOnline(true); ok = true; }
+                else if (action == "disable") { dev_infrared.setOnline(false); ok = true; }
+            }
+
+            const char* msg = ok ?
+                "{\"status\":\"success\"}" : "{\"status\":\"failed\"}";
+            send_response(new_socket, "200 OK", "application/json; charset=utf-8", msg, strlen(msg));
+
         } else if (req.find("GET /api/logs/list") == 0) {
-            DIR *dir = opendir("./logs");
             std::vector<std::string> files;
+            // 扫描主日志目录下的 .log 文件
+            DIR *dir = opendir("./logs");
             if (dir) {
                 struct dirent *entry;
                 while ((entry = readdir(dir)) != NULL) {
@@ -309,8 +327,39 @@ void* start_web_server(void *arg) {
                     }
                 }
                 closedir(dir);
-                std::sort(files.begin(), files.end(), std::greater<std::string>());
             }
+            // 扫描子目录 (如 logs/security/) 下的 .log 文件
+            DIR *dir2 = opendir("./logs");
+            if (dir2) {
+                struct dirent *entry;
+                while ((entry = readdir(dir2)) != NULL) {
+                    std::string name = entry->d_name;
+                    if (name == "." || name == "..") continue;
+                    std::string subdir = "./logs/" + name;
+                    struct stat st;
+                    if (stat(subdir.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+                        DIR *sub = opendir(subdir.c_str());
+                        if (sub) {
+                            struct dirent *subEntry;
+                            while ((subEntry = readdir(sub)) != NULL) {
+                                std::string subName = subEntry->d_name;
+                                if (subName.size() > 4 && subName.substr(subName.size()-4) == ".log") {
+                                    files.push_back(name + "/" + subName);
+                                }
+                            }
+                            closedir(sub);
+                        }
+                    }
+                }
+                closedir(dir2);
+            }
+            // 排序: gateway 日志优先 (实时), 然后按文件名降序
+            std::sort(files.begin(), files.end(), [](const std::string& a, const std::string& b) {
+                bool aGw = (a.find("gateway") == 0);
+                bool bGw = (b.find("gateway") == 0);
+                if (aGw != bGw) return aGw > bGw;  // gateway 排前面
+                return a > b;
+            });
             std::string json = "[";
             for (size_t i = 0; i < files.size(); i++) {
                 if (i > 0) json += ",";
@@ -320,21 +369,54 @@ void* start_web_server(void *arg) {
             send_response(new_socket, "200 OK", "application/json; charset=utf-8", json.c_str(), json.size());
 
         } else if (req.find("GET /api/logs/latest") == 0) {
-            DIR *dir = opendir("./logs");
             std::string latest;
+            std::string latestPath;
+            // 扫描主日志目录
+            DIR *dir = opendir("./logs");
             if (dir) {
                 struct dirent *entry;
                 while ((entry = readdir(dir)) != NULL) {
                     std::string name = entry->d_name;
                     if (name.size() > 4 && name.substr(name.size()-4) == ".log") {
-                        if (name > latest) latest = name;
+                        if (name > latest) {
+                            latest = name;
+                            latestPath = "./logs/" + name;
+                        }
                     }
                 }
                 closedir(dir);
             }
-            if (!latest.empty()) {
-                std::string path = "./logs/" + latest;
-                serve_file(new_socket, path);
+            // 扫描子目录
+            DIR *dir2 = opendir("./logs");
+            if (dir2) {
+                struct dirent *entry;
+                while ((entry = readdir(dir2)) != NULL) {
+                    std::string name = entry->d_name;
+                    if (name == "." || name == "..") continue;
+                    std::string subdir = "./logs/" + name;
+                    struct stat st;
+                    if (stat(subdir.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+                        DIR *sub = opendir(subdir.c_str());
+                        if (sub) {
+                            struct dirent *subEntry;
+                            while ((subEntry = readdir(sub)) != NULL) {
+                                std::string subName = subEntry->d_name;
+                                if (subName.size() > 4 && subName.substr(subName.size()-4) == ".log") {
+                                    std::string fullName = name + "/" + subName;
+                                    if (fullName > latest) {
+                                        latest = fullName;
+                                        latestPath = "./logs/" + fullName;
+                                    }
+                                }
+                            }
+                            closedir(sub);
+                        }
+                    }
+                }
+                closedir(dir2);
+            }
+            if (!latestPath.empty()) {
+                serve_file(new_socket, latestPath);
             } else {
                 const char *err = "[]";
                 send_response(new_socket, "200 OK", "application/json; charset=utf-8", err, strlen(err));
@@ -344,7 +426,7 @@ void* start_web_server(void *arg) {
             size_t start = 14;
             size_t end = req.find(" HTTP/");
             std::string filename = req.substr(start, end - start);
-            if (filename.find("..") != std::string::npos || filename.find("/") != std::string::npos) {
+            if (filename.find("..") != std::string::npos) {
                 const char *err = "403 Forbidden";
                 send_response(new_socket, "403 Forbidden", "text/plain", err, strlen(err));
             } else {

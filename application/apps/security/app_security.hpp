@@ -40,8 +40,12 @@ struct SecurityState {
     // 入侵（风险等级，由 evaluateRisk 根据设备数据计算）
     SecurityRiskLevel  intrusionRisk{SecurityRiskLevel::LOW};
 
-    // 气体（模拟值）
-    std::atomic<int>   gasConcentration{12};  // PPM
+    // 气体（云测仪真实传感器 + 模拟覆盖）
+    std::atomic<bool>  gasSimulated{false};
+    std::atomic<int>   simTvoc{0};
+    std::atomic<int>   simCh2o{0};
+    std::atomic<int>   simO3{0};
+    std::atomic<int>   simCo2{0};
     SecurityRiskLevel  gasRisk{SecurityRiskLevel::LOW};
 
     // 报警服务
@@ -91,7 +95,7 @@ private:
     void evaluateRisk(int waterState, int irState, int radarState);
     SecurityRiskLevel calcWaterRisk(float level, int sensorState);
     SecurityRiskLevel calcIntrusionRisk(int irState, int radarState);
-    SecurityRiskLevel calcGasRisk(int concentration);
+    SecurityRiskLevel calcSingleGasRisk(int value, int mediumThreshold, int highThreshold);
 
     // 日志
     struct LogEntry {

@@ -63,6 +63,11 @@ struct DeviceStatusCpp {
         std::lock_guard<std::mutex> lock(mtx);
         return online != 0;
     }
+
+    void forceOffline() {
+        std::lock_guard<std::mutex> lock(mtx);
+        online = 0;
+    }
 };
 
 /**

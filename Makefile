@@ -18,10 +18,10 @@ CXX_SRCS = service/modbus_service.cpp service/parse_service.cpp \
            devices/dev_cloud_sensors.cpp devices/dev_humidifier.cpp \
            devices/dev_air_conditioner.cpp devices/dev_air_purifier.cpp \
            devices/dev_alarm_device.cpp \
-           application/web_server.cpp \
+           application/web_server.cpp application/app_base.cpp \
            application/apps/security/app_security.cpp \
            core/serial_bus.cpp core/polling_manager.cpp \
-           core/logger.cpp core/command_queue.cpp \
+           core/logger.cpp core/app_logger.cpp core/command_queue.cpp \
            core/main.cpp
 CXX_OBJS = $(CXX_SRCS:.cpp=.o)
 

@@ -16,7 +16,8 @@ std::vector<DeviceTask> DevCloudPm25::getTasks() {
     return {{
         "PM2.5传感器 - PM2.5",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readValue(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); },
+        5000, 1000, DEV_CLOUD_ADDR
     }};
 }
 
@@ -44,7 +45,8 @@ std::vector<DeviceTask> DevCloudPm10::getTasks() {
     return {{
         "PM10传感器 - PM10",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readValue(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); },
+        5000, 1000, DEV_CLOUD_ADDR
     }};
 }
 
@@ -72,7 +74,8 @@ std::vector<DeviceTask> DevCloudHumidity::getTasks() {
     return {{
         "湿度传感器 - 湿度",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readValue(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); },
+        5000, 1000, DEV_CLOUD_ADDR
     }};
 }
 
@@ -100,7 +103,8 @@ std::vector<DeviceTask> DevCloudTemperature::getTasks() {
     return {{
         "温度传感器 - 温度",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readValue(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); },
+        5000, 1000, DEV_CLOUD_ADDR
     }};
 }
 
@@ -128,7 +132,8 @@ std::vector<DeviceTask> DevCloudTvoc::getTasks() {
     return {{
         "TVOC传感器 - TVOC",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readValue(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); },
+        5000, 1000, DEV_CLOUD_ADDR
     }};
 }
 
@@ -156,7 +161,8 @@ std::vector<DeviceTask> DevCloudCh2o::getTasks() {
     return {{
         "甲醛传感器 - 甲醛",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readValue(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); },
+        5000, 1000, DEV_CLOUD_ADDR
     }};
 }
 
@@ -184,7 +190,8 @@ std::vector<DeviceTask> DevCloudO3::getTasks() {
     return {{
         "臭氧传感器 - 臭氧",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readValue(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); },
+        5000, 1000, DEV_CLOUD_ADDR
     }};
 }
 
@@ -212,7 +219,8 @@ std::vector<DeviceTask> DevCloudCo2::getTasks() {
     return {{
         "CO2传感器 - CO2",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readValue(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procValue(r, l, rc); },
+        5000, 1000, DEV_CLOUD_ADDR
     }};
 }
 

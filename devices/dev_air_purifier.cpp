@@ -22,17 +22,20 @@ std::vector<DeviceTask> DevAirPurifier::getTasks() {
     tasks.push_back({
         "霉菌空气净化机 - 环境数据",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readEnvData(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procEnvData(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procEnvData(r, l, rc); },
+        5000, 1000, DEV_PURIFIER_ADDR
     });
     tasks.push_back({
         "霉菌空气净化机 - 运行模式",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readRunMode(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procRunMode(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procRunMode(r, l, rc); },
+        5000, 1000, DEV_PURIFIER_ADDR
     });
     tasks.push_back({
         "霉菌空气净化机 - 电源状态",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readPowerState(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procPowerState(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procPowerState(r, l, rc); },
+        5000, 1000, DEV_PURIFIER_ADDR
     });
 
     return tasks;

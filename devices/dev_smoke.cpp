@@ -25,7 +25,8 @@ std::vector<DeviceTask> DevSmoke::getTasks() {
         },
         [this](const uint8_t *resp, size_t resp_len, int rc) {
             this->procSmoke(resp, resp_len, rc);
-        }
+        },
+        5000, 1000, DEV_SMOKE_ADDR, 1
     });
     return tasks;
 }

@@ -24,7 +24,8 @@ std::vector<DeviceTask> DevLight::getTasks() {
         },
         [this](const uint8_t *resp, size_t resp_len, int rc) {
             this->procLight(resp, resp_len, rc);
-        }
+        },
+        5000, 1000, DEV_LIGHT_ADDR
     });
     return tasks;
 }

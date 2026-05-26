@@ -19,6 +19,7 @@ static speed_t baud_to_termios(int baud) {
 		case 57600: return B57600;
 		case 115200: return B115200;
 		default: return 0;
+	}
 }
 
 static int hex_char_to_val(char c) {

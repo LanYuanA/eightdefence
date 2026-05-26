@@ -24,14 +24,15 @@ std::vector<DeviceTask> DevWater::getTasks() {
         },
         [this](const uint8_t *resp, size_t resp_len, int rc) {
             this->procWater(resp, resp_len, rc);
-        }
+        },
+        5000, 1000, DEV_WATER_ADDR, 1
     });
     return tasks;
 }
 
 int DevWater::readWater(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.readCoil(DEV_WATER_ADDR, REG_WATER_STATUS, REG_WATER_DATA,
-                         resp, 512, resp_len);
+    return svc.readReg(DEV_WATER_ADDR, REG_WATER_STATUS, REG_WATER_DATA,
+                        resp, 512, resp_len);
 }
 
 void DevWater::procWater(const uint8_t *resp, size_t resp_len, int rc) {
@@ -41,9 +42,9 @@ void DevWater::procWater(const uint8_t *resp, size_t resp_len, int rc) {
     }
     status_.onSuccess();
 
-    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_WATER_ADDR, 0x01, 0);
+    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_WATER_ADDR, 0x03, 0);
     if (parse_rc == ParseService::OK) {
-        uint16_t data = static_cast<uint16_t>(ParseService::extractBool(resp, 0));
+        uint16_t data = ParseService::extractU16(resp, 0);
         water_state_.store((data != 0) ? 1 : 0);
 
         if (data == 0x0000) {

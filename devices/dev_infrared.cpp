@@ -26,7 +26,8 @@ std::vector<DeviceTask> DevInfrared::getTasks() {
         },
         [this](const uint8_t *resp, size_t resp_len, int rc) {
             this->procInfrared(resp, resp_len, rc);
-        }
+        },
+        5000, 1000, DEV_INFRARED_ADDR, 1
     });
 
     tasks.push_back({
@@ -36,15 +37,16 @@ std::vector<DeviceTask> DevInfrared::getTasks() {
         },
         [this](const uint8_t *resp, size_t resp_len, int rc) {
             this->procRadar(resp, resp_len, rc);
-        }
+        },
+        5000, 1000, DEV_INFRARED_ADDR, 1
     });
 
     return tasks;
 }
 
 int DevInfrared::readInfrared(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.readCoil(DEV_INFRARED_ADDR, REG_INFRARED_STATE, REG_INFRARED_DATA,
-                         resp, 512, resp_len);
+    return svc.readReg(DEV_INFRARED_ADDR, REG_INFRARED_STATE, REG_INFRARED_DATA,
+                        resp, 512, resp_len);
 }
 
 void DevInfrared::procInfrared(const uint8_t *resp, size_t resp_len, int rc) {
@@ -54,9 +56,9 @@ void DevInfrared::procInfrared(const uint8_t *resp, size_t resp_len, int rc) {
     }
     status_.onSuccess();
 
-    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_INFRARED_ADDR, 0x01, 0);
+    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_INFRARED_ADDR, 0x03, 0);
     if (parse_rc == ParseService::OK) {
-        uint16_t data = static_cast<uint16_t>(ParseService::extractBool(resp, 0));
+        uint16_t data = ParseService::extractU16(resp, 0);
         infrared_state_.store((data != 0) ? 1 : 0);
 
         if (data == 0x0000) {
@@ -72,8 +74,8 @@ void DevInfrared::procInfrared(const uint8_t *resp, size_t resp_len, int rc) {
 }
 
 int DevInfrared::readRadar(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.readCoil(DEV_INFRARED_ADDR, REG_RADAR_STATE, REG_INFRARED_DATA,
-                         resp, 512, resp_len);
+    return svc.readReg(DEV_INFRARED_ADDR, REG_RADAR_STATE, REG_INFRARED_DATA,
+                        resp, 512, resp_len);
 }
 
 void DevInfrared::procRadar(const uint8_t *resp, size_t resp_len, int rc) {
@@ -83,9 +85,9 @@ void DevInfrared::procRadar(const uint8_t *resp, size_t resp_len, int rc) {
     }
     status_.onSuccess();
 
-    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_INFRARED_ADDR, 0x01, 0);
+    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_INFRARED_ADDR, 0x03, 0);
     if (parse_rc == ParseService::OK) {
-        uint16_t data = static_cast<uint16_t>(ParseService::extractBool(resp, 0));
+        uint16_t data = ParseService::extractU16(resp, 0);
         radar_state_.store((data != 0) ? 1 : 0);
 
         if (data == 0x0000) {

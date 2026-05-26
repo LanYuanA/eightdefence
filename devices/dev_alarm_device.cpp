@@ -21,7 +21,8 @@ std::vector<DeviceTask> DevAlarmDevice::getTasks() {
     tasks.push_back({
         "报警装置 - 状态",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readState(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procState(r, l, rc); }
+        [this](const uint8_t *r, size_t l, int rc) { procState(r, l, rc); },
+        5000, 1000, DEV_ALARM_ADDR
     });
 
     return tasks;

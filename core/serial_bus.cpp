@@ -265,37 +265,31 @@ int SerialBus::transact(const uint8_t *request, size_t request_len,
                         size_t *response_len, int timeout_ms) {
     auto start = std::chrono::steady_clock::now();
 
-    int local_fd;
+    // 持锁覆盖整个事务: RS-485 是半双工总线, send+recv 必须原子
+    std::unique_lock<std::recursive_mutex> lock(mtx_, std::defer_lock);
+    auto lock_start = std::chrono::steady_clock::now();
+    lock.lock();
+    auto lock_end = std::chrono::steady_clock::now();
+    double lock_wait_ms = std::chrono::duration<double, std::milli>(lock_end - lock_start).count();
 
-    // 短暂持锁: 检查 fd、重连、记录争用
-    {
-        std::unique_lock<std::recursive_mutex> lock(mtx_, std::defer_lock);
-        auto lock_start = std::chrono::steady_clock::now();
-        lock.lock();
-        auto lock_end = std::chrono::steady_clock::now();
-        double lock_wait_ms = std::chrono::duration<double, std::milli>(lock_end - lock_start).count();
+    if (lock_wait_ms > 100.0) {
+        stats_.busContentionCount++;
+    }
 
-        if (lock_wait_ms > 100.0) {
-            stats_.busContentionCount++;
-        }
+    stats_.totalTransactions++;
 
-        stats_.totalTransactions++;
-
-        if (fd_ < 0) {
-            if (auto_reconnect_) {
-                int rc = const_cast<SerialBus *>(this)->open();
-                if (rc != 0) {
-                    stats_.totalErrors++;
-                    return -100;
-                }
-            } else {
+    if (fd_ < 0) {
+        if (auto_reconnect_) {
+            int rc = const_cast<SerialBus *>(this)->open();
+            if (rc != 0) {
                 stats_.totalErrors++;
-                return -101;
+                return -100;
             }
+        } else {
+            stats_.totalErrors++;
+            return -101;
         }
-
-        local_fd = fd_;
-    }  // 释放锁, I/O 不持锁
+    }
 
     // 帧间延时 (Modbus RTU 3.5字符时间)
     if (inter_frame_delay_us_ > 0) {
@@ -303,14 +297,11 @@ int SerialBus::transact(const uint8_t *request, size_t request_len,
     }
 
     // 清空残留数据
-    if (local_fd >= 0) {
-        tcflush(local_fd, TCIOFLUSH);
-    }
+    tcflush(fd_, TCIOFLUSH);
 
     // 发送请求
     int rc = rawSend(request, request_len);
     if (rc != 0) {
-        std::lock_guard<std::recursive_mutex> lock(mtx_);
         stats_.totalErrors++;
         if (auto_reconnect_) {
             ::close(fd_);
@@ -322,13 +313,11 @@ int SerialBus::transact(const uint8_t *request, size_t request_len,
     // 接收响应
     rc = rawRecv(response, response_cap, response_len, timeout_ms);
     if (rc != 0) {
-        std::lock_guard<std::recursive_mutex> lock(mtx_);
         stats_.totalErrors++;
         return -300;
     }
 
     if (*response_len == 0) {
-        std::lock_guard<std::recursive_mutex> lock(mtx_);
         stats_.totalErrors++;
         return -400;  // 超时无响应
     }

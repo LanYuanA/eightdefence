@@ -12,8 +12,8 @@
 void DevAirPurifier::init() {
     status_.reset();
     env_ = EnvDataCpp{};
-    run_mode_ = 0;
-    power_status_ = 0;
+    run_mode_.store(0);
+    power_status_.store(0);
 }
 
 std::vector<DeviceTask> DevAirPurifier::getTasks() {
@@ -60,7 +60,10 @@ void DevAirPurifier::procEnvData(const uint8_t *resp, size_t resp_len, int rc) {
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_PURIFIER_ADDR, 0x03, 2);
     if (parse_rc == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
-        env_.co2 = val;
+        {
+            std::lock_guard<std::mutex> lock(env_.mtx);
+            env_.co2 = val;
+        }
         printf("  => [📊 净化机环境]: CO2=%d\n", val);
     } else {
         printf("  => [❌ 解析失败]: 净化机环境数据 响应格式不符合预期协议\n");
@@ -74,7 +77,7 @@ void DevAirPurifier::procRunMode(const uint8_t *resp, size_t resp_len, int rc) {
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_PURIFIER_ADDR, 0x03, 2);
     if (parse_rc == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
-        run_mode_ = val;
+        run_mode_.store(val);
         printf("  => [🔄 净化机模式]: 运行模式=%d\n", val);
     }
 }
@@ -86,7 +89,7 @@ void DevAirPurifier::procPowerState(const uint8_t *resp, size_t resp_len, int rc
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_PURIFIER_ADDR, 0x03, 2);
     if (parse_rc == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
-        power_status_ = val;
+        power_status_.store(val);
         printf("  => [⚡ 净化机电源]: %s\n", val ? "开机" : "关机");
     }
 }

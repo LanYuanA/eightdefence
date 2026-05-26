@@ -61,10 +61,16 @@ static speed_t baud_to_termios(int baud) {
  * 构造/析构
  * ============================================================ */
 SerialBus::SerialBus(const char *device, int baud)
-    : device_(device), baud_(baud) {}
+    : device_(device), baud_(baud) {
+    pipe(shutdown_pipe_);
+    fcntl(shutdown_pipe_[0], F_SETFL, O_NONBLOCK);
+    fcntl(shutdown_pipe_[1], F_SETFL, O_NONBLOCK);
+}
 
 SerialBus::~SerialBus() {
     close();
+    if (shutdown_pipe_[0] >= 0) { ::close(shutdown_pipe_[0]); shutdown_pipe_[0] = -1; }
+    if (shutdown_pipe_[1] >= 0) { ::close(shutdown_pipe_[1]); shutdown_pipe_[1] = -1; }
 }
 
 /* ============================================================
@@ -134,6 +140,11 @@ int SerialBus::open() {
 }
 
 void SerialBus::close() {
+    // 先写管道唤醒所有阻塞在 select() 上的线程
+    if (shutdown_pipe_[1] >= 0) {
+        char c = 'X';
+        write(shutdown_pipe_[1], &c, 1);
+    }
     std::lock_guard<std::recursive_mutex> lock(mtx_);
     if (fd_ >= 0) {
         ::close(fd_);
@@ -146,7 +157,8 @@ void SerialBus::close() {
  * 内部: 发送/接收/刷新
  * ============================================================ */
 int SerialBus::rawSend(const uint8_t *data, size_t len) {
-    ssize_t written = write(fd_, data, len);
+    int fd = fd_;
+    ssize_t written = write(fd, data, len);
     if (written < 0) {
         fprintf(stderr, "[SerialBus] 发送失败: %s\n", strerror(errno));
         return -1;
@@ -155,12 +167,15 @@ int SerialBus::rawSend(const uint8_t *data, size_t len) {
         fprintf(stderr, "[SerialBus] 发送不完整: %zd/%zu\n", written, len);
         return -2;
     }
-    tcdrain(fd_);  // 等待数据发送完成
+    tcdrain(fd);  // 等待数据发送完成
     stats_.totalBytesSent += len;
     return 0;
 }
 
 int SerialBus::rawRecv(uint8_t *buf, size_t buf_cap, size_t *recv_len, int timeout_ms) {
+    int fd = fd_;
+    int pipe_fd = shutdown_pipe_[0];
+    int nfds = (fd > pipe_fd ? fd : pipe_fd) + 1;
     size_t total_read = 0;
 
     while (total_read < buf_cap) {
@@ -168,12 +183,13 @@ int SerialBus::rawRecv(uint8_t *buf, size_t buf_cap, size_t *recv_len, int timeo
         struct timeval tv;
 
         FD_ZERO(&readfds);
-        FD_SET(fd_, &readfds);
+        FD_SET(fd, &readfds);
+        if (pipe_fd >= 0) FD_SET(pipe_fd, &readfds);
 
         tv.tv_sec = timeout_ms / 1000;
         tv.tv_usec = (timeout_ms % 1000) * 1000;
 
-        int sel = select(fd_ + 1, &readfds, NULL, NULL, &tv);
+        int sel = select(nfds, &readfds, NULL, NULL, &tv);
         if (sel < 0) {
             if (errno == EINTR) continue;
             fprintf(stderr, "[SerialBus] select失败: %s\n", strerror(errno));
@@ -183,7 +199,12 @@ int SerialBus::rawRecv(uint8_t *buf, size_t buf_cap, size_t *recv_len, int timeo
             break;  // 超时
         }
 
-        ssize_t n = read(fd_, buf + total_read, buf_cap - total_read);
+        // shutdown pipe 可读 → 正在关闭
+        if (pipe_fd >= 0 && FD_ISSET(pipe_fd, &readfds)) {
+            return -1;
+        }
+
+        ssize_t n = read(fd, buf + total_read, buf_cap - total_read);
         if (n < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
             fprintf(stderr, "[SerialBus] 读取失败: %s\n", strerror(errno));
@@ -199,12 +220,14 @@ int SerialBus::rawRecv(uint8_t *buf, size_t buf_cap, size_t *recv_len, int timeo
             fd_set checkfds;
             struct timeval short_tv;
             FD_ZERO(&checkfds);
-            FD_SET(fd_, &checkfds);
+            FD_SET(fd, &checkfds);
+            if (pipe_fd >= 0) FD_SET(pipe_fd, &checkfds);
             short_tv.tv_sec = 0;
             short_tv.tv_usec = 50000;  // 50ms 无新数据则认为帧结束
 
-            int s2 = select(fd_ + 1, &checkfds, NULL, NULL, &short_tv);
+            int s2 = select(nfds, &checkfds, NULL, NULL, &short_tv);
             if (s2 <= 0) break;  // 超时或错误，认为帧结束
+            if (pipe_fd >= 0 && FD_ISSET(pipe_fd, &checkfds)) break;
         }
     }
 
@@ -242,33 +265,37 @@ int SerialBus::transact(const uint8_t *request, size_t request_len,
                         size_t *response_len, int timeout_ms) {
     auto start = std::chrono::steady_clock::now();
 
-    // 尝试获取锁，如果等待超过 5 秒则报告争用
-    std::unique_lock<std::recursive_mutex> lock(mtx_, std::defer_lock);
-    auto lock_start = std::chrono::steady_clock::now();
-    lock.lock();
-    auto lock_end = std::chrono::steady_clock::now();
-    double lock_wait_ms = std::chrono::duration<double, std::milli>(lock_end - lock_start).count();
+    int local_fd;
 
-    // 如果锁等待超过 100ms，记录为总线争用
-    if (lock_wait_ms > 100.0) {
-        stats_.busContentionCount++;
-    }
+    // 短暂持锁: 检查 fd、重连、记录争用
+    {
+        std::unique_lock<std::recursive_mutex> lock(mtx_, std::defer_lock);
+        auto lock_start = std::chrono::steady_clock::now();
+        lock.lock();
+        auto lock_end = std::chrono::steady_clock::now();
+        double lock_wait_ms = std::chrono::duration<double, std::milli>(lock_end - lock_start).count();
 
-    stats_.totalTransactions++;
-
-    // 检查串口是否可用
-    if (fd_ < 0) {
-        if (auto_reconnect_) {
-            int rc = const_cast<SerialBus *>(this)->open();
-            if (rc != 0) {
-                stats_.totalErrors++;
-                return -100;
-            }
-        } else {
-            stats_.totalErrors++;
-            return -101;
+        if (lock_wait_ms > 100.0) {
+            stats_.busContentionCount++;
         }
-    }
+
+        stats_.totalTransactions++;
+
+        if (fd_ < 0) {
+            if (auto_reconnect_) {
+                int rc = const_cast<SerialBus *>(this)->open();
+                if (rc != 0) {
+                    stats_.totalErrors++;
+                    return -100;
+                }
+            } else {
+                stats_.totalErrors++;
+                return -101;
+            }
+        }
+
+        local_fd = fd_;
+    }  // 释放锁, I/O 不持锁
 
     // 帧间延时 (Modbus RTU 3.5字符时间)
     if (inter_frame_delay_us_ > 0) {
@@ -276,13 +303,15 @@ int SerialBus::transact(const uint8_t *request, size_t request_len,
     }
 
     // 清空残留数据
-    flushBuffers();
+    if (local_fd >= 0) {
+        tcflush(local_fd, TCIOFLUSH);
+    }
 
     // 发送请求
     int rc = rawSend(request, request_len);
     if (rc != 0) {
+        std::lock_guard<std::recursive_mutex> lock(mtx_);
         stats_.totalErrors++;
-        // 发送失败，尝试重连
         if (auto_reconnect_) {
             ::close(fd_);
             fd_ = -1;
@@ -293,11 +322,13 @@ int SerialBus::transact(const uint8_t *request, size_t request_len,
     // 接收响应
     rc = rawRecv(response, response_cap, response_len, timeout_ms);
     if (rc != 0) {
+        std::lock_guard<std::recursive_mutex> lock(mtx_);
         stats_.totalErrors++;
         return -300;
     }
 
     if (*response_len == 0) {
+        std::lock_guard<std::recursive_mutex> lock(mtx_);
         stats_.totalErrors++;
         return -400;  // 超时无响应
     }

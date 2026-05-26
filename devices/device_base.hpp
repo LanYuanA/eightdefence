@@ -66,7 +66,7 @@ struct DeviceStatusCpp {
 };
 
 /**
- * @brief 环境数据公共结构
+ * @brief 环境数据公共结构（线程安全）
  */
 struct EnvDataCpp {
     int pm25        = 0;
@@ -77,6 +77,26 @@ struct EnvDataCpp {
     int ch2o        = 0;
     int co2         = 0;
     int o3          = 0;
+    mutable std::mutex mtx;
+
+    EnvDataCpp() = default;
+    EnvDataCpp(const EnvDataCpp &other) {
+        std::lock_guard<std::mutex> lock(other.mtx);
+        pm25 = other.pm25; pm10 = other.pm10;
+        humidity = other.humidity; temperature = other.temperature;
+        tvoc = other.tvoc; ch2o = other.ch2o;
+        co2 = other.co2; o3 = other.o3;
+    }
+    EnvDataCpp& operator=(const EnvDataCpp &other) {
+        if (this != &other) {
+            std::scoped_lock lock(mtx, other.mtx);
+            pm25 = other.pm25; pm10 = other.pm10;
+            humidity = other.humidity; temperature = other.temperature;
+            tvoc = other.tvoc; ch2o = other.ch2o;
+            co2 = other.co2; o3 = other.o3;
+        }
+        return *this;
+    }
 };
 
 /**

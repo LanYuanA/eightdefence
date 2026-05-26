@@ -8,6 +8,7 @@
 
 #include "device_base.hpp"
 #include "service/parse_service.hpp"
+#include <atomic>
 
 class DevInfrared : public DeviceBase {
 public:
@@ -21,14 +22,14 @@ public:
     int readRadar(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procRadar(const uint8_t *resp, size_t resp_len, int rc);
 
-    int getInfraredState() const { return infrared_state_; }
-    int getRadarState() const { return radar_state_; }
+    int getInfraredState() const { return infrared_state_.load(); }
+    int getRadarState() const { return radar_state_.load(); }
     bool isOnline() { return status_.isOnline(); }
 
 private:
     DeviceStatusCpp status_;
-    int infrared_state_ = 0;
-    int radar_state_    = 0;
+    std::atomic<int> infrared_state_{0};
+    std::atomic<int> radar_state_{0};
 };
 
 #endif /* DEV_INFRARED_HPP */

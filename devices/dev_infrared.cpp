@@ -12,8 +12,8 @@
 
 void DevInfrared::init() {
     status_.reset();
-    infrared_state_ = 0;
-    radar_state_ = 0;
+    infrared_state_.store(0);
+    radar_state_.store(0);
 }
 
 std::vector<DeviceTask> DevInfrared::getTasks() {
@@ -57,7 +57,7 @@ void DevInfrared::procInfrared(const uint8_t *resp, size_t resp_len, int rc) {
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_INFRARED_ADDR, 0x01, 0);
     if (parse_rc == ParseService::OK) {
         uint16_t data = static_cast<uint16_t>(ParseService::extractBool(resp, 0));
-        infrared_state_ = (data != 0) ? 1 : 0;
+        infrared_state_.store((data != 0) ? 1 : 0);
 
         if (data == 0x0000) {
             printf("  => [✅ 红外状态]: 正常，未检测到人体\n");
@@ -86,7 +86,7 @@ void DevInfrared::procRadar(const uint8_t *resp, size_t resp_len, int rc) {
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_INFRARED_ADDR, 0x01, 0);
     if (parse_rc == ParseService::OK) {
         uint16_t data = static_cast<uint16_t>(ParseService::extractBool(resp, 0));
-        radar_state_ = (data != 0) ? 1 : 0;
+        radar_state_.store((data != 0) ? 1 : 0);
 
         if (data == 0x0000) {
             printf("  => [✅ 雷达状态]: 正常，未检测到移动\n");

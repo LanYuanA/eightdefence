@@ -16,6 +16,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <csignal>
+#include <ctime>
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/select.h>
 #include <pthread.h>
 #include <unistd.h>
 
@@ -69,14 +73,19 @@ DevAlarmDevice      dev_alarm;
 ModbusService*      g_modbus = nullptr;
 SerialBus*          g_serial_bus = nullptr;
 CommandQueue*       g_cmd_queue = nullptr;
+volatile bool       g_web_running = true;
 
-/* 全局运行标志 */
-static volatile bool g_running = true;
+// 信号通知管道 (self-pipe trick)
+static int g_signal_pipe[2] = {-1, -1};
 
 static void signal_handler(int sig) {
     (void)sig;
-    g_running = false;
-    LOG_INFO("收到退出信号 (sig=%d), 正在停止...", sig);
+    g_web_running = false;
+    // 写一个字节到管道, 唤醒 select()/read()
+    char c = 'X';
+    write(g_signal_pipe[1], &c, 1);
+    const char msg[] = "[SIGNAL] caught\n";
+    write(STDERR_FILENO, msg, sizeof(msg) - 1);
 }
 
 /* ============================================================
@@ -140,9 +149,22 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /* 注册信号处理 */
-    signal(SIGINT, signal_handler);
-    signal(SIGTERM, signal_handler);
+    /* 创建信号通知管道 (self-pipe trick) */
+    if (pipe(g_signal_pipe) != 0) {
+        fprintf(stderr, "创建信号管道失败!\n");
+        return 1;
+    }
+    // 设置读端为非阻塞
+    fcntl(g_signal_pipe[0], F_SETFL, O_NONBLOCK);
+
+    /* 注册信号处理 (使用 sigaction 确保不设置 SA_RESTART) */
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;  // 不设置 SA_RESTART, 让 select/nanosleep 被中断
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
 
     /* 初始化日志系统 */
     Logger::instance().init("./logs", 50, LogLevel::INFO);
@@ -304,15 +326,26 @@ int main(int argc, char *argv[]) {
     poller.addTasks(all_tasks);
     poller.start();
 
+    printf("[MAIN] poller.start() 已返回, 进入主循环\n"); fflush(stdout);
     LOG_INFO("多线程轮询已启动, 按 Ctrl+C 退出");
 
     /* ============================================================
      * 主循环: 定期打印统计信息
+     * (使用 select 监听信号管道, 10秒超时打印统计)
      * ============================================================ */
-    while (g_running) {
-        sleep(10);
-
-        if (!g_running) break;
+    while (g_web_running) {
+        // select 等待信号管道可读, 超时10秒
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(g_signal_pipe[0], &rfds);
+        struct timeval tv = {1, 0};
+        int sel_rc = select(g_signal_pipe[0] + 1, &rfds, NULL, NULL, &tv);
+        // Drain the signal pipe if readable
+        if (sel_rc > 0 && FD_ISSET(g_signal_pipe[0], &rfds)) {
+            char buf[16];
+            while (read(g_signal_pipe[0], buf, sizeof(buf)) > 0) {}
+        }
+        if (!g_web_running) break;
 
         /* 打印总线统计 */
         const BusStats &stats = serialBus.getStats();
@@ -356,17 +389,21 @@ int main(int argc, char *argv[]) {
     /* ============================================================
      * 清理退出
      * ============================================================ */
+    LOG_INFO("正在停止 Web 服务器...");
+    pthread_join(web_tid, NULL);
+
     LOG_INFO("正在停止所有应用...");
     appMgr.stopAll();
 
     LOG_INFO("正在停止命令队列...");
     cmdQueue.stop();
 
-    LOG_INFO("正在停止轮询...");
-    poller.stop();
-
+    // 关闭串口 (写 shutdown_pipe 唤醒阻塞在 select() 上的轮询线程)
     LOG_INFO("正在关闭串口...");
     serialBus.close();
+
+    LOG_INFO("正在停止轮询...");
+    poller.stop();
 
     /* 打印最终统计 */
     const BusStats &finalStats = serialBus.getStats();

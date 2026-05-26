@@ -12,7 +12,7 @@
 
 void DevAlarmDevice::init() {
     status_.reset();
-    state_ = 0;
+    state_.store(0);
 }
 
 std::vector<DeviceTask> DevAlarmDevice::getTasks() {
@@ -44,7 +44,7 @@ void DevAlarmDevice::procState(const uint8_t *resp, size_t resp_len, int rc) {
     /* 线圈读取响应: 字节3为数据字节, bit0表示线圈状态 */
     if (resp_len >= 4) {
         int state = resp[3] & 0x01;
-        state_ = state;
+        state_.store(state);
         printf("  => [🔔 报警装置]: 当前状态为 %s\n",
                state ? "开启(继电器吸合)" : "关闭(继电器断开)");
     } else {

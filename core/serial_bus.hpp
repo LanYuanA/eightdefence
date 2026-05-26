@@ -165,6 +165,7 @@ private:
     uint32_t    inter_frame_delay_us_ = 5000;  // 帧间延时 5ms
     BusStats    stats_;
     bool        auto_reconnect_ = true;
+    int         shutdown_pipe_[2] = {-1, -1};  // 用于中断 select() 的管道
 };
 
 #endif /* SERIAL_BUS_HPP */

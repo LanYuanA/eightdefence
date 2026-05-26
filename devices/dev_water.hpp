@@ -8,6 +8,7 @@
 
 #include "device_base.hpp"
 #include "service/parse_service.hpp"
+#include <atomic>
 
 class DevWater : public DeviceBase {
 public:
@@ -18,12 +19,12 @@ public:
     int readWater(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procWater(const uint8_t *resp, size_t resp_len, int rc);
 
-    int getWaterState() const { return water_state_; }
+    int getWaterState() const { return water_state_.load(); }
     bool isOnline() { return status_.isOnline(); }
 
 private:
     DeviceStatusCpp status_;
-    int water_state_ = 0;
+    std::atomic<int> water_state_{0};
 };
 
 #endif /* DEV_WATER_HPP */

@@ -8,6 +8,7 @@
 
 #include "device_base.hpp"
 #include "service/parse_service.hpp"
+#include <atomic>
 
 class DevHumidifier : public DeviceBase {
 public:
@@ -31,15 +32,16 @@ public:
     int setPurify(ModbusService &svc, uint16_t val, uint8_t *resp, size_t *resp_len);
     int setConstHum(ModbusService &svc, uint16_t val, uint8_t *resp, size_t *resp_len);
 
-    int getPowerState() const { return power_state_; }
-    int getFaultState() const { return fault_state_; }
+    int getPowerState() const { return power_state_.load(); }
+    int getFaultState() const { return fault_state_.load(); }
     bool isOnline() { return status_.isOnline(); }
+    EnvDataCpp getEnvData() const { return env_; }
 
 private:
     DeviceStatusCpp status_;
     EnvDataCpp      env_;
-    int power_state_  = 0;
-    int fault_state_  = 0;
+    std::atomic<int> power_state_{0};
+    std::atomic<int> fault_state_{0};
 };
 
 #endif /* DEV_HUMIDIFIER_HPP */

@@ -33,17 +33,14 @@ enum class SecurityRiskLevel {
  * @brief 安防系统状态
  */
 struct SecurityState {
-    // 水浸
+    // 水浸（模拟值，用于无硬件演示）
     std::atomic<float> waterLevel{0.2f};
-    std::atomic<int>   waterSensorState{0};   // 0=正常
     SecurityRiskLevel  waterRisk{SecurityRiskLevel::LOW};
 
-    // 入侵
-    std::atomic<int>   infraredState{0};      // 0=无入侵
-    std::atomic<int>   radarState{0};         // 雷达状态
+    // 入侵（风险等级，由 evaluateRisk 根据设备数据计算）
     SecurityRiskLevel  intrusionRisk{SecurityRiskLevel::LOW};
 
-    // 气体
+    // 气体（模拟值）
     std::atomic<int>   gasConcentration{12};  // PPM
     SecurityRiskLevel  gasRisk{SecurityRiskLevel::LOW};
 
@@ -90,14 +87,11 @@ private:
     HttpResponse handlePostControl(const HttpRequest& req);
     HttpResponse handleGetLogs(const HttpRequest& req);
 
-    // 业务线程
-    void pollingThread();
-
-    // 风险评估
-    void evaluateRisk();
-    void updateWaterRisk();
-    void updateIntrusionRisk();
-    void updateGasRisk();
+    // 风险评估（实时从设备读取数据）
+    void evaluateRisk(int waterState, int irState, int radarState);
+    SecurityRiskLevel calcWaterRisk(float level, int sensorState);
+    SecurityRiskLevel calcIntrusionRisk(int irState, int radarState);
+    SecurityRiskLevel calcGasRisk(int concentration);
 
     // 日志
     struct LogEntry {
@@ -109,12 +103,8 @@ private:
     void addLog(const std::string& level, const std::string& event, const std::string& details);
 
     SecurityState m_state;
-    std::thread   m_pollThread;
     std::vector<LogEntry> m_logs;
     mutable std::mutex m_logMutex;
-
-    // 模拟模式 (用于无硬件环境的演示)
-    bool m_simulationMode = false;
 };
 
 #endif // APP_SECURITY_HPP

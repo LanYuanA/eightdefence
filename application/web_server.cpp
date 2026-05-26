@@ -1,5 +1,6 @@
 #include "web_server.h"
 #include "core/global_devices.hpp"
+#include "core/device_config.h"
 #include "application/app_manager.hpp"
 
 #include <stdio.h>
@@ -185,10 +186,18 @@ void* start_web_server(void *arg) {
         perror("listen");
         return NULL;
     }
+
+    // 设置 accept 超时，使 Web 服务器线程可以响应退出信号
+    struct timeval tv;
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
+    setsockopt(server_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
     printf("🌐 [HTTP 服务器] 运行在 http://localhost:%d\n", PORT);
 
-    while(1) {
+    while(g_web_running) {
         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0) {
+            if (!g_web_running) break;
             continue;
         }
 
@@ -252,28 +261,40 @@ void* start_web_server(void *arg) {
             std::string value_str = get_query_param(req, "val");
             uint16_t val = value_str.empty() ? 0 : std::stoi(value_str);
 
-            uint8_t resp[512];
-            size_t resp_len = 0;
-            int rc = -1;
-
-            if (device == "ac" && g_modbus != nullptr) {
-                if (action == "cool_on") rc = dev_ac.setCoolOn(*g_modbus, resp, &resp_len);
-                else if (action == "cool_off") rc = dev_ac.setCoolOff(*g_modbus, resp, &resp_len);
-                else if (action == "heat_on") rc = dev_ac.setHeatOn(*g_modbus, resp, &resp_len);
-                else if (action == "heat_off") rc = dev_ac.setHeatOff(*g_modbus, resp, &resp_len);
-            } else if (device == "humidifier" && g_modbus != nullptr) {
-                if (action == "power") rc = dev_humidifier.setPower(*g_modbus, val, resp, &resp_len);
-                else if (action == "dehumidify") rc = dev_humidifier.setDehumidify(*g_modbus, val, resp, &resp_len);
-                else if (action == "humidify") rc = dev_humidifier.setHumidify(*g_modbus, val, resp, &resp_len);
-                else if (action == "purify") rc = dev_humidifier.setPurify(*g_modbus, val, resp, &resp_len);
-                else if (action == "const_hum") rc = dev_humidifier.setConstHum(*g_modbus, val, resp, &resp_len);
-            } else if (device == "purifier" && g_modbus != nullptr) {
-                if (action == "power") rc = dev_purifier.setPower(*g_modbus, val, resp, &resp_len);
-                else if (action == "run_mode") rc = dev_purifier.setRunMode(*g_modbus, val, resp, &resp_len);
-                else if (action == "manual") rc = dev_purifier.setManual(*g_modbus, val, resp, &resp_len);
+            bool submitted = false;
+            if (g_cmd_queue != nullptr) {
+                if (device == "ac") {
+                    if (action == "cool_on")
+                        submitted = g_cmd_queue->writeRegister(DEV_AC_ADDR, REG_AC_COOL_ON, 1) > 0;
+                    else if (action == "cool_off")
+                        submitted = g_cmd_queue->writeRegister(DEV_AC_ADDR, REG_AC_COOL_OFF, 1) > 0;
+                    else if (action == "heat_on")
+                        submitted = g_cmd_queue->writeRegister(DEV_AC_ADDR, REG_AC_HEAT_ON, 1) > 0;
+                    else if (action == "heat_off")
+                        submitted = g_cmd_queue->writeRegister(DEV_AC_ADDR, REG_AC_HEAT_OFF, 1) > 0;
+                } else if (device == "humidifier") {
+                    if (action == "power")
+                        submitted = g_cmd_queue->writeRegister(DEV_HUMIDIFIER_ADDR, REG_HUM_CTRL_POWER, val) > 0;
+                    else if (action == "dehumidify")
+                        submitted = g_cmd_queue->writeRegister(DEV_HUMIDIFIER_ADDR, REG_HUM_CTRL_DEHUMIDIFY, val) > 0;
+                    else if (action == "humidify")
+                        submitted = g_cmd_queue->writeRegister(DEV_HUMIDIFIER_ADDR, REG_HUM_CTRL_HUMIDIFY, val) > 0;
+                    else if (action == "purify")
+                        submitted = g_cmd_queue->writeRegister(DEV_HUMIDIFIER_ADDR, REG_HUM_CTRL_PURIFY, val) > 0;
+                    else if (action == "const_hum")
+                        submitted = g_cmd_queue->writeRegister(DEV_HUMIDIFIER_ADDR, REG_HUM_CTRL_CONST_HUM, val) > 0;
+                } else if (device == "purifier") {
+                    if (action == "power")
+                        submitted = g_cmd_queue->writeRegister(DEV_PURIFIER_ADDR, REG_PUR_CTRL_POWER, val) > 0;
+                    else if (action == "run_mode")
+                        submitted = g_cmd_queue->writeRegister(DEV_PURIFIER_ADDR, REG_PUR_CTRL_RUN_MODE, val) > 0;
+                    else if (action == "manual")
+                        submitted = g_cmd_queue->writeRegister(DEV_PURIFIER_ADDR, REG_PUR_CTRL_MANUAL, val) > 0;
+                }
             }
 
-            const char* msg = (rc == 0) ? "{\"status\":\"success\"}" : "{\"status\":\"failed\"}";
+            const char* msg = submitted ?
+                "{\"status\":\"submitted\"}" : "{\"status\":\"failed\"}";
             send_response(new_socket, "200 OK", "application/json; charset=utf-8", msg, strlen(msg));
 
         } else if (req.find("GET /api/logs/list") == 0) {
@@ -450,5 +471,8 @@ void* start_web_server(void *arg) {
 
         close(new_socket);
     }
+
+    close(server_fd);
+    printf("🌐 [HTTP 服务器] 已停止\n");
     return NULL;
 }

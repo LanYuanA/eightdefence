@@ -12,7 +12,7 @@
 
 void DevLight::init() {
     status_.reset();
-    illuminance_ = 0;
+    illuminance_.store(0);
 }
 
 std::vector<DeviceTask> DevLight::getTasks() {
@@ -43,8 +43,9 @@ void DevLight::procLight(const uint8_t *resp, size_t resp_len, int rc) {
 
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_LIGHT_ADDR, 0x03, 0);
     if (parse_rc == ParseService::OK) {
-        illuminance_ = ParseService::extractU16(resp, 0);
-        printf("  => [💡 光照度]: %d Lux\n", illuminance_);
+        uint16_t val = ParseService::extractU16(resp, 0);
+        illuminance_.store(val);
+        printf("  => [💡 光照度]: %d Lux\n", val);
     } else {
         logParseError(parse_rc, "弱光检测传感器", "光照数据");
     }

@@ -8,6 +8,7 @@
 
 #include "device_base.hpp"
 #include "service/parse_service.hpp"
+#include <atomic>
 
 class DevAirPurifier : public DeviceBase {
 public:
@@ -30,15 +31,16 @@ public:
     int setManual(ModbusService &svc, uint16_t val, uint8_t *resp, size_t *resp_len);
     int setTiming(ModbusService &svc, uint16_t val, uint8_t *resp, size_t *resp_len);
 
-    int getRunMode() const { return run_mode_; }
-    int getPowerStatus() const { return power_status_; }
+    int getRunMode() const { return run_mode_.load(); }
+    int getPowerStatus() const { return power_status_.load(); }
     bool isOnline() { return status_.isOnline(); }
+    EnvDataCpp getEnvData() const { return env_; }
 
 private:
     DeviceStatusCpp status_;
     EnvDataCpp      env_;
-    int run_mode_      = 0;
-    int power_status_  = 0;
+    std::atomic<int> run_mode_{0};
+    std::atomic<int> power_status_{0};
 };
 
 #endif /* DEV_AIR_PURIFIER_HPP */

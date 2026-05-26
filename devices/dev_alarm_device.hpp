@@ -8,6 +8,7 @@
 
 #include "device_base.hpp"
 #include "service/parse_service.hpp"
+#include <atomic>
 
 class DevAlarmDevice : public DeviceBase {
 public:
@@ -23,11 +24,11 @@ public:
     int setAlarmOff(ModbusService &svc, uint8_t *resp, size_t *resp_len);
 
     bool isOnline() { return status_.isOnline(); }
-    int getState() { return state_; }
+    int getState() const { return state_.load(); }
 
 private:
     DeviceStatusCpp status_;
-    int state_ = 0;  // 0=关闭, 1=开启
+    std::atomic<int> state_{0};  // 0=关闭, 1=开启
 };
 
 #endif /* DEV_ALARM_DEVICE_HPP */

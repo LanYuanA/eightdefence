@@ -37,4 +37,7 @@ extern ModbusService*      g_modbus;
 extern SerialBus*          g_serial_bus;
 extern CommandQueue*       g_cmd_queue;
 
+// 全局退出标志 (Web 服务器和主线程共享)
+extern volatile bool       g_web_running;
+
 #endif // GLOBAL_DEVICES_HPP

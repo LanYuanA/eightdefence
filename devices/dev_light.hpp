@@ -8,6 +8,7 @@
 
 #include "device_base.hpp"
 #include "service/parse_service.hpp"
+#include <atomic>
 
 class DevLight : public DeviceBase {
 public:
@@ -18,12 +19,12 @@ public:
     int readLight(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procLight(const uint8_t *resp, size_t resp_len, int rc);
 
-    uint16_t getIlluminance() const { return illuminance_; }
+    uint16_t getIlluminance() const { return illuminance_.load(); }
     bool isOnline() { return status_.isOnline(); }
 
 private:
     DeviceStatusCpp status_;
-    uint16_t illuminance_ = 0;
+    std::atomic<uint16_t> illuminance_{0};
 };
 
 #endif /* DEV_LIGHT_HPP */

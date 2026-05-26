@@ -8,6 +8,7 @@
 
 #include "device_base.hpp"
 #include "service/parse_service.hpp"
+#include <atomic>
 
 class DevSmoke : public DeviceBase {
 public:
@@ -18,12 +19,12 @@ public:
     int readSmoke(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procSmoke(const uint8_t *resp, size_t resp_len, int rc);
 
-    int getAlarmState() const { return alarm_state_; }
+    int getAlarmState() const { return alarm_state_.load(); }
     bool isOnline() { return status_.isOnline(); }
 
 private:
     DeviceStatusCpp status_;
-    int alarm_state_ = 0;
+    std::atomic<int> alarm_state_{0};
 };
 
 #endif /* DEV_SMOKE_HPP */

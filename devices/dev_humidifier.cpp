@@ -13,8 +13,8 @@
 void DevHumidifier::init() {
     status_.reset();
     env_ = EnvDataCpp{};
-    power_state_ = 0;
-    fault_state_ = 0;
+    power_state_.store(0);
+    fault_state_.store(0);
 }
 
 std::vector<DeviceTask> DevHumidifier::getTasks() {
@@ -60,13 +60,18 @@ void DevHumidifier::procEnvData(const uint8_t *resp, size_t resp_len, int rc) {
 
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_HUMIDIFIER_ADDR, 0x03, 10);
     if (parse_rc == ParseService::OK) {
-        env_.co2   = ParseService::extractU16(resp, 0);
-        env_.ch2o  = ParseService::extractU16(resp, 1);
-        env_.tvoc  = ParseService::extractU16(resp, 2);
-        env_.pm25  = ParseService::extractU16(resp, 3);
-        env_.pm10  = ParseService::extractU16(resp, 4);
+        int co2  = ParseService::extractU16(resp, 0);
+        int ch2o = ParseService::extractU16(resp, 1);
+        int tvoc = ParseService::extractU16(resp, 2);
+        int pm25 = ParseService::extractU16(resp, 3);
+        int pm10 = ParseService::extractU16(resp, 4);
+        {
+            std::lock_guard<std::mutex> lock(env_.mtx);
+            env_.co2 = co2; env_.ch2o = ch2o;
+            env_.tvoc = tvoc; env_.pm25 = pm25; env_.pm10 = pm10;
+        }
         printf("  => [📊 恒湿机环境]: CO2=%d, 甲醛=%d, TVOC=%d, PM2.5=%d, PM10=%d\n",
-               env_.co2, env_.ch2o, env_.tvoc, env_.pm25, env_.pm10);
+               co2, ch2o, tvoc, pm25, pm10);
     } else {
         printf("  => [❌ 解析失败]: 恒湿机环境数据 响应格式不符合预期协议\n");
     }
@@ -79,7 +84,7 @@ void DevHumidifier::procPowerState(const uint8_t *resp, size_t resp_len, int rc)
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_HUMIDIFIER_ADDR, 0x03, 2);
     if (parse_rc == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
-        power_state_ = val;
+        power_state_.store(val);
         printf("  => [⚡ 恒湿机电源]: %s\n", val ? "开机" : "关机");
     }
 }
@@ -91,7 +96,7 @@ void DevHumidifier::procFaultState(const uint8_t *resp, size_t resp_len, int rc)
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_HUMIDIFIER_ADDR, 0x03, 2);
     if (parse_rc == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
-        fault_state_ = val;
+        fault_state_.store(val);
         if (val == 0) {
             printf("  => [✅ 恒湿机故障]: 正常，无故障\n");
         } else {

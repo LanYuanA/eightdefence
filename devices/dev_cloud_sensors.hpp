@@ -15,24 +15,25 @@
 
 #include "device_base.hpp"
 #include "service/parse_service.hpp"
+#include <atomic>
 
 /* ============================================================
  * PM2.5 传感器
  * ============================================================ */
 class DevCloudPm25 : public DeviceBase {
 public:
-    void init() override { status_.reset(); value_ = 0; }
+    void init() override { status_.reset(); value_.store(0); }
     std::vector<DeviceTask> getTasks() override;
     std::string getName() const override { return "PM2.5传感器"; }
 
     int readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procValue(const uint8_t *resp, size_t resp_len, int rc);
     bool isOnline() { return status_.isOnline(); }
-    uint16_t getValue() const { return value_; }
+    uint16_t getValue() const { return value_.load(); }
 
 private:
     DeviceStatusCpp status_;
-    uint16_t value_ = 0;
+    std::atomic<uint16_t> value_{0};
 };
 
 /* ============================================================
@@ -40,18 +41,18 @@ private:
  * ============================================================ */
 class DevCloudPm10 : public DeviceBase {
 public:
-    void init() override { status_.reset(); value_ = 0; }
+    void init() override { status_.reset(); value_.store(0); }
     std::vector<DeviceTask> getTasks() override;
     std::string getName() const override { return "PM10传感器"; }
 
     int readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procValue(const uint8_t *resp, size_t resp_len, int rc);
     bool isOnline() { return status_.isOnline(); }
-    uint16_t getValue() const { return value_; }
+    uint16_t getValue() const { return value_.load(); }
 
 private:
     DeviceStatusCpp status_;
-    uint16_t value_ = 0;
+    std::atomic<uint16_t> value_{0};
 };
 
 /* ============================================================
@@ -59,18 +60,18 @@ private:
  * ============================================================ */
 class DevCloudHumidity : public DeviceBase {
 public:
-    void init() override { status_.reset(); value_ = 0; }
+    void init() override { status_.reset(); value_.store(0); }
     std::vector<DeviceTask> getTasks() override;
     std::string getName() const override { return "湿度传感器"; }
 
     int readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procValue(const uint8_t *resp, size_t resp_len, int rc);
     bool isOnline() { return status_.isOnline(); }
-    uint16_t getValue() const { return value_; }
+    uint16_t getValue() const { return value_.load(); }
 
 private:
     DeviceStatusCpp status_;
-    uint16_t value_ = 0;
+    std::atomic<uint16_t> value_{0};
 };
 
 /* ============================================================
@@ -78,18 +79,18 @@ private:
  * ============================================================ */
 class DevCloudTemperature : public DeviceBase {
 public:
-    void init() override { status_.reset(); value_ = 0; }
+    void init() override { status_.reset(); value_.store(0); }
     std::vector<DeviceTask> getTasks() override;
     std::string getName() const override { return "温度传感器"; }
 
     int readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procValue(const uint8_t *resp, size_t resp_len, int rc);
     bool isOnline() { return status_.isOnline(); }
-    int16_t getValue() const { return value_; }
+    int16_t getValue() const { return value_.load(); }
 
 private:
     DeviceStatusCpp status_;
-    int16_t value_ = 0;
+    std::atomic<int16_t> value_{0};
 };
 
 /* ============================================================
@@ -97,18 +98,18 @@ private:
  * ============================================================ */
 class DevCloudTvoc : public DeviceBase {
 public:
-    void init() override { status_.reset(); value_ = 0; }
+    void init() override { status_.reset(); value_.store(0); }
     std::vector<DeviceTask> getTasks() override;
     std::string getName() const override { return "TVOC传感器"; }
 
     int readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procValue(const uint8_t *resp, size_t resp_len, int rc);
     bool isOnline() { return status_.isOnline(); }
-    uint16_t getValue() const { return value_; }
+    uint16_t getValue() const { return value_.load(); }
 
 private:
     DeviceStatusCpp status_;
-    uint16_t value_ = 0;
+    std::atomic<uint16_t> value_{0};
 };
 
 /* ============================================================
@@ -116,18 +117,18 @@ private:
  * ============================================================ */
 class DevCloudCh2o : public DeviceBase {
 public:
-    void init() override { status_.reset(); value_ = 0; }
+    void init() override { status_.reset(); value_.store(0); }
     std::vector<DeviceTask> getTasks() override;
     std::string getName() const override { return "甲醛传感器"; }
 
     int readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procValue(const uint8_t *resp, size_t resp_len, int rc);
     bool isOnline() { return status_.isOnline(); }
-    uint16_t getValue() const { return value_; }
+    uint16_t getValue() const { return value_.load(); }
 
 private:
     DeviceStatusCpp status_;
-    uint16_t value_ = 0;
+    std::atomic<uint16_t> value_{0};
 };
 
 /* ============================================================
@@ -135,18 +136,18 @@ private:
  * ============================================================ */
 class DevCloudO3 : public DeviceBase {
 public:
-    void init() override { status_.reset(); value_ = 0; }
+    void init() override { status_.reset(); value_.store(0); }
     std::vector<DeviceTask> getTasks() override;
     std::string getName() const override { return "臭氧传感器"; }
 
     int readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procValue(const uint8_t *resp, size_t resp_len, int rc);
     bool isOnline() { return status_.isOnline(); }
-    uint16_t getValue() const { return value_; }
+    uint16_t getValue() const { return value_.load(); }
 
 private:
     DeviceStatusCpp status_;
-    uint16_t value_ = 0;
+    std::atomic<uint16_t> value_{0};
 };
 
 /* ============================================================
@@ -154,18 +155,18 @@ private:
  * ============================================================ */
 class DevCloudCo2 : public DeviceBase {
 public:
-    void init() override { status_.reset(); value_ = 0; }
+    void init() override { status_.reset(); value_.store(0); }
     std::vector<DeviceTask> getTasks() override;
     std::string getName() const override { return "CO2传感器"; }
 
     int readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procValue(const uint8_t *resp, size_t resp_len, int rc);
     bool isOnline() { return status_.isOnline(); }
-    uint16_t getValue() const { return value_; }
+    uint16_t getValue() const { return value_.load(); }
 
 private:
     DeviceStatusCpp status_;
-    uint16_t value_ = 0;
+    std::atomic<uint16_t> value_{0};
 };
 
 #endif /* DEV_CLOUD_SENSORS_HPP */

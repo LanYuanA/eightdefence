@@ -13,7 +13,7 @@
 
 void DevSmoke::init() {
     status_.reset();
-    alarm_state_ = 0;
+    alarm_state_.store(0);
 }
 
 std::vector<DeviceTask> DevSmoke::getTasks() {
@@ -45,7 +45,7 @@ void DevSmoke::procSmoke(const uint8_t *resp, size_t resp_len, int rc) {
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_SMOKE_ADDR, 0x03, 0);
     if (parse_rc == ParseService::OK) {
         uint16_t data = ParseService::extractU16(resp, 0);
-        alarm_state_ = (data != 0) ? 1 : 0;
+        alarm_state_.store((data != 0) ? 1 : 0);
 
         if (data == 0x0000) {
             printf("  => [✅ 烟雾状态]: 正常，未发现烟雾\n");

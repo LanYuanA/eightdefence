@@ -61,12 +61,8 @@ void DevInfrared::procInfrared(const uint8_t *resp, size_t resp_len, int rc) {
         uint16_t data = ParseService::extractU16(resp, 0);
         infrared_state_.store((data != 0) ? 1 : 0);
 
-        if (data == 0x0000) {
-            printf("  => [✅ 红外状态]: 正常，未检测到人体\n");
-        } else if (data == 0x0001) {
-            printf("  => [🚨 红外报警]: 检测到有人体入侵！\n");
-        } else {
-            printf("  => [⚠️ 未知状态]: 收到非标准红外状态码: %d\n", data);
+        if (data != 0x0000) {
+            printf("  => [🚨 红外报警]: 状态码 %d\n", data);
         }
     } else {
         logParseError(parse_rc, "红外探测器", "红外数据");
@@ -90,12 +86,8 @@ void DevInfrared::procRadar(const uint8_t *resp, size_t resp_len, int rc) {
         uint16_t data = ParseService::extractU16(resp, 0);
         radar_state_.store((data != 0) ? 1 : 0);
 
-        if (data == 0x0000) {
-            printf("  => [✅ 雷达状态]: 正常，未检测到移动\n");
-        } else if (data == 0x0001) {
-            printf("  => [🚨 雷达报警]: 检测到有移动入侵！\n");
-        } else {
-            printf("  => [⚠️ 未知状态]: 收到非标准雷达状态码: %d\n", data);
+        if (data != 0x0000) {
+            printf("  => [🚨 雷达报警]: 状态码 %d\n", data);
         }
     } else {
         logParseError(parse_rc, "红外探测器", "雷达数据");

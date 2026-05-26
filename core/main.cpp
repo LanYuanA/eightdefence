@@ -347,12 +347,13 @@ int main(int argc, char *argv[]) {
      * 主循环: 定期打印统计信息
      * (使用 select 监听信号管道, 10秒超时打印统计)
      * ============================================================ */
+    int statsCounter = 0;
     while (g_web_running) {
         // select 等待信号管道可读, 超时10秒
         fd_set rfds;
         FD_ZERO(&rfds);
         FD_SET(g_signal_pipe[0], &rfds);
-        struct timeval tv = {1, 0};
+        struct timeval tv = {10, 0};
         int sel_rc = select(g_signal_pipe[0] + 1, &rfds, NULL, NULL, &tv);
         // Drain the signal pipe if readable
         if (sel_rc > 0 && FD_ISSET(g_signal_pipe[0], &rfds)) {
@@ -360,6 +361,10 @@ int main(int argc, char *argv[]) {
             while (read(g_signal_pipe[0], buf, sizeof(buf)) > 0) {}
         }
         if (!g_web_running) break;
+
+        /* 每30秒打印一次统计 */
+        if (++statsCounter < 3) continue;
+        statsCounter = 0;
 
         /* 打印总线统计 */
         const BusStats &stats = serialBus.getStats();

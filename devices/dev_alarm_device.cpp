@@ -46,8 +46,6 @@ void DevAlarmDevice::procState(const uint8_t *resp, size_t resp_len, int rc) {
     if (resp_len >= 4) {
         int state = resp[3] & 0x01;
         state_.store(state);
-        printf("  => [🔔 报警装置]: 当前状态为 %s\n",
-               state ? "开启(继电器吸合)" : "关闭(继电器断开)");
     } else {
         printf("  => [❌ 解析失败]: 报警装置响应数据长度不足\n");
     }

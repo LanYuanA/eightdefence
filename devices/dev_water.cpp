@@ -47,12 +47,8 @@ void DevWater::procWater(const uint8_t *resp, size_t resp_len, int rc) {
         uint16_t data = ParseService::extractU16(resp, 0);
         water_state_.store((data != 0) ? 1 : 0);
 
-        if (data == 0x0000) {
-            printf("  => [✅ 水浸状态]: 正常，未检测到水浸\n");
-        } else if (data == 0x0001) {
-            printf("  => [🚨 水浸报警]: 检测到有水浸入侵！\n");
-        } else {
-            printf("  => [⚠️ 未知状态]: 收到非标准水浸状态码: %d\n", data);
+        if (data != 0x0000) {
+            printf("  => [🚨 水浸报警]: 状态码 %d\n", data);
         }
     } else {
         logParseError(parse_rc, "水浸传感器", "水浸数据");

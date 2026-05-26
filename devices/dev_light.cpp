@@ -46,7 +46,6 @@ void DevLight::procLight(const uint8_t *resp, size_t resp_len, int rc) {
     if (parse_rc == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         illuminance_.store(val);
-        printf("  => [💡 光照度]: %d Lux\n", val);
     } else {
         logParseError(parse_rc, "弱光检测传感器", "光照数据");
     }

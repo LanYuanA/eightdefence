@@ -48,12 +48,8 @@ void DevSmoke::procSmoke(const uint8_t *resp, size_t resp_len, int rc) {
         uint16_t data = ParseService::extractU16(resp, 0);
         alarm_state_.store((data != 0) ? 1 : 0);
 
-        if (data == 0x0000) {
-            printf("  => [✅ 烟雾状态]: 正常，未发现烟雾\n");
-        } else if (data == 0x0001) {
-            printf("  => [🚨 烟雾报警]: 检测到有烟雾入侵！\n");
-        } else {
-            printf("  => [⚠️ 未知状态]: 收到非标准烟雾状态码: %d\n", data);
+        if (data != 0x0000) {
+            printf("  => [🚨 烟雾报警]: 状态码 %d\n", data);
         }
     } else {
         logParseError(parse_rc, "烟雾报警器", "烟雾数据");

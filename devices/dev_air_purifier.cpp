@@ -67,7 +67,6 @@ void DevAirPurifier::procEnvData(const uint8_t *resp, size_t resp_len, int rc) {
             std::lock_guard<std::mutex> lock(env_.mtx);
             env_.co2 = val;
         }
-        printf("  => [📊 净化机环境]: CO2=%d\n", val);
     } else {
         printf("  => [❌ 解析失败]: 净化机环境数据 响应格式不符合预期协议\n");
     }
@@ -81,7 +80,6 @@ void DevAirPurifier::procRunMode(const uint8_t *resp, size_t resp_len, int rc) {
     if (parse_rc == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         run_mode_.store(val);
-        printf("  => [🔄 净化机模式]: 运行模式=%d\n", val);
     }
 }
 
@@ -93,7 +91,6 @@ void DevAirPurifier::procPowerState(const uint8_t *resp, size_t resp_len, int rc
     if (parse_rc == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         power_status_.store(val);
-        printf("  => [⚡ 净化机电源]: %s\n", val ? "开机" : "关机");
     }
 }
 

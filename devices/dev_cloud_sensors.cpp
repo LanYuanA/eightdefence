@@ -32,7 +32,6 @@ void DevCloudPm25::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (r == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         value_.store(val);
-        printf("  => [📊 PM2.5]: %d µg/m³\n", val);
     } else {
         logParseError(r, "PM2.5传感器", "PM2.5");
     }
@@ -61,7 +60,6 @@ void DevCloudPm10::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (r == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         value_.store(val);
-        printf("  => [📊 PM10]: %d µg/m³\n", val);
     } else {
         logParseError(r, "PM10传感器", "PM10");
     }
@@ -90,7 +88,6 @@ void DevCloudHumidity::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (r == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         value_.store(val);
-        printf("  => [💧 湿度]: %d%%\n", val);
     } else {
         logParseError(r, "湿度传感器", "湿度");
     }
@@ -119,7 +116,6 @@ void DevCloudTemperature::procValue(const uint8_t *resp, size_t resp_len, int rc
     if (r == ParseService::OK) {
         int16_t val = ParseService::extractS16(resp, 0);
         value_.store(val);
-        printf("  => [🌡️ 温度]: %d°C\n", val);
     } else {
         logParseError(r, "温度传感器", "温度");
     }
@@ -148,7 +144,6 @@ void DevCloudTvoc::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (r == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         value_.store(val);
-        printf("  => [🧪 TVOC]: %d ppb\n", val);
     } else {
         logParseError(r, "TVOC传感器", "TVOC");
     }
@@ -177,7 +172,6 @@ void DevCloudCh2o::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (r == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         value_.store(val);
-        printf("  => [🧪 甲醛]: %d ppb\n", val);
     } else {
         logParseError(r, "甲醛传感器", "甲醛");
     }
@@ -206,7 +200,6 @@ void DevCloudO3::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (r == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         value_.store(val);
-        printf("  => [🧪 臭氧]: %d ppb\n", val);
     } else {
         logParseError(r, "臭氧传感器", "臭氧");
     }
@@ -235,7 +228,6 @@ void DevCloudCo2::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (r == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         value_.store(val);
-        printf("  => [🧪 CO2]: %d ppm\n", val);
     } else {
         logParseError(r, "CO2传感器", "CO2");
     }

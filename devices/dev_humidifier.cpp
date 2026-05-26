@@ -73,8 +73,6 @@ void DevHumidifier::procEnvData(const uint8_t *resp, size_t resp_len, int rc) {
             env_.co2 = co2; env_.ch2o = ch2o;
             env_.tvoc = tvoc; env_.pm25 = pm25; env_.pm10 = pm10;
         }
-        printf("  => [📊 恒湿机环境]: CO2=%d, 甲醛=%d, TVOC=%d, PM2.5=%d, PM10=%d\n",
-               co2, ch2o, tvoc, pm25, pm10);
     } else {
         printf("  => [❌ 解析失败]: 恒湿机环境数据 响应格式不符合预期协议\n");
     }
@@ -88,7 +86,6 @@ void DevHumidifier::procPowerState(const uint8_t *resp, size_t resp_len, int rc)
     if (parse_rc == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         power_state_.store(val);
-        printf("  => [⚡ 恒湿机电源]: %s\n", val ? "开机" : "关机");
     }
 }
 
@@ -100,9 +97,7 @@ void DevHumidifier::procFaultState(const uint8_t *resp, size_t resp_len, int rc)
     if (parse_rc == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         fault_state_.store(val);
-        if (val == 0) {
-            printf("  => [✅ 恒湿机故障]: 正常，无故障\n");
-        } else {
+        if (val != 0) {
             printf("  => [🚨 恒湿机故障]: 故障码 0x%04X\n", val);
         }
     }

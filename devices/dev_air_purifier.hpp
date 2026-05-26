@@ -1,6 +1,6 @@
 /**
  * @file dev_air_purifier.hpp
- * @brief 设备抽象层 - 霉菌空气净化机 (C++)
+ * @brief 设备抽象层 - 霉菌空气净化机 (C++) — 执行器 + 可选读取
  */
 
 #ifndef DEV_AIR_PURIFIER_HPP
@@ -16,6 +16,7 @@ public:
     std::vector<DeviceTask> getTasks() override;
     std::string getName() const override { return "霉菌空气净化机"; }
 
+    // 读取指令（封装但暂不轮询）
     int readEnvData(ModbusService &svc, uint8_t *resp, size_t *resp_len);
     void procEnvData(const uint8_t *resp, size_t resp_len, int rc);
 

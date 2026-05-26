@@ -20,19 +20,19 @@ std::vector<DeviceTask> DevAirConditioner::getTasks() {
 }
 
 int DevAirConditioner::setCoolOn(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.writeReg(DEV_AC_ADDR, REG_AC_COOL_ON, 0x0001, resp, 512, resp_len);
+    return svc.readReg(DEV_AC_ADDR, REG_AC_COOL_ON, REG_AC_DATA, resp, 512, resp_len);
 }
 
 int DevAirConditioner::setCoolOff(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.writeReg(DEV_AC_ADDR, REG_AC_COOL_OFF, 0x0001, resp, 512, resp_len);
+    return svc.readReg(DEV_AC_ADDR, REG_AC_COOL_OFF, REG_AC_DATA, resp, 512, resp_len);
 }
 
 int DevAirConditioner::setHeatOn(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.writeReg(DEV_AC_ADDR, REG_AC_HEAT_ON, 0x0001, resp, 512, resp_len);
+    return svc.readReg(DEV_AC_ADDR, REG_AC_HEAT_ON, REG_AC_DATA, resp, 512, resp_len);
 }
 
 int DevAirConditioner::setHeatOff(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.writeReg(DEV_AC_ADDR, REG_AC_HEAT_OFF, 0x0001, resp, 512, resp_len);
+    return svc.readReg(DEV_AC_ADDR, REG_AC_HEAT_OFF, REG_AC_DATA, resp, 512, resp_len);
 }
 
 void DevAirConditioner::procACResponse(const uint8_t *resp, size_t resp_len,
@@ -45,7 +45,7 @@ void DevAirConditioner::procACResponse(const uint8_t *resp, size_t resp_len,
     }
     status_.onSuccess();
 
-    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_AC_ADDR, 0x06, 0);
+    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_AC_ADDR, 0x03, 0);
     if (parse_rc == ParseService::OK) {
         printf("  => [❄️ 空调控制]: %s 操作成功\n", action);
     } else {

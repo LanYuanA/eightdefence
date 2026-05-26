@@ -1,6 +1,6 @@
 /**
  * @file dev_humidifier.cpp
- * @brief 设备抽象层 - 恒湿净化一体机实现 (C++)
+ * @brief 设备抽象层 - 恒湿净化一体机实现 (C++) — 执行器 + 可选读取
  */
 
 #include "dev_humidifier.hpp"
@@ -18,14 +18,8 @@ void DevHumidifier::init() {
 }
 
 std::vector<DeviceTask> DevHumidifier::getTasks() {
+    // 仅轮询电源状态和故障状态，环境数据不轮询
     std::vector<DeviceTask> tasks;
-
-    tasks.push_back({
-        "恒湿净化一体机 - 环境数据",
-        [this](ModbusService &s, uint8_t *r, size_t *l) { return readEnvData(s, r, l); },
-        [this](const uint8_t *r, size_t l, int rc) { procEnvData(r, l, rc); },
-        5000, 1000, DEV_HUMIDIFIER_ADDR
-    });
     tasks.push_back({
         "恒湿净化一体机 - 电源状态",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readPowerState(s, r, l); },
@@ -38,62 +32,52 @@ std::vector<DeviceTask> DevHumidifier::getTasks() {
         [this](const uint8_t *r, size_t l, int rc) { procFaultState(r, l, rc); },
         5000, 1000, DEV_HUMIDIFIER_ADDR
     });
-
     return tasks;
 }
 
+// --- 读取指令（封装但暂不轮询） ---
+
 int DevHumidifier::readEnvData(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.readReg(DEV_HUMIDIFIER_ADDR, REG_HUM_CO2, REG_HUM_READ_COUNT,
-                        resp, 512, resp_len);
-}
-
-int DevHumidifier::readPowerState(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.readReg(DEV_HUMIDIFIER_ADDR, REG_HUM_POWER_STATE, 1,
-                        resp, 512, resp_len);
-}
-
-int DevHumidifier::readFaultState(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.readReg(DEV_HUMIDIFIER_ADDR, REG_HUM_FAULT_STATE, 1,
-                        resp, 512, resp_len);
+    return svc.readReg(DEV_HUMIDIFIER_ADDR, REG_HUM_CO2, REG_HUM_READ_COUNT, resp, 512, resp_len);
 }
 
 void DevHumidifier::procEnvData(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "恒湿净化一体机"); return; }
     status_.onSuccess();
-
-    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_HUMIDIFIER_ADDR, 0x03, 10);
+    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_HUMIDIFIER_ADDR, 0x03, 0);
     if (parse_rc == ParseService::OK) {
         int co2  = ParseService::extractU16(resp, 0);
         int ch2o = ParseService::extractU16(resp, 1);
         int tvoc = ParseService::extractU16(resp, 2);
         int pm25 = ParseService::extractU16(resp, 3);
         int pm10 = ParseService::extractU16(resp, 4);
-        {
-            std::lock_guard<std::mutex> lock(env_.mtx);
-            env_.co2 = co2; env_.ch2o = ch2o;
-            env_.tvoc = tvoc; env_.pm25 = pm25; env_.pm10 = pm10;
-        }
-    } else {
-        printf("  => [❌ 解析失败]: 恒湿机环境数据 响应格式不符合预期协议\n");
+        std::lock_guard<std::mutex> lock(env_.mtx);
+        env_.co2 = co2; env_.ch2o = ch2o;
+        env_.tvoc = tvoc; env_.pm25 = pm25; env_.pm10 = pm10;
     }
+}
+
+int DevHumidifier::readPowerState(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
+    return svc.readReg(DEV_HUMIDIFIER_ADDR, REG_HUM_POWER_STATE, 1, resp, 512, resp_len);
 }
 
 void DevHumidifier::procPowerState(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "恒湿净化一体机"); return; }
     status_.onSuccess();
-
-    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_HUMIDIFIER_ADDR, 0x03, 2);
+    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_HUMIDIFIER_ADDR, 0x03, 0);
     if (parse_rc == ParseService::OK) {
-        uint16_t val = ParseService::extractU16(resp, 0);
-        power_state_.store(val);
+        power_state_.store(ParseService::extractU16(resp, 0));
     }
+}
+
+int DevHumidifier::readFaultState(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
+    return svc.readReg(DEV_HUMIDIFIER_ADDR, REG_HUM_FAULT_STATE, 1, resp, 512, resp_len);
 }
 
 void DevHumidifier::procFaultState(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "恒湿净化一体机"); return; }
     status_.onSuccess();
-
-    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_HUMIDIFIER_ADDR, 0x03, 2);
+    int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_HUMIDIFIER_ADDR, 0x03, 0);
     if (parse_rc == ParseService::OK) {
         uint16_t val = ParseService::extractU16(resp, 0);
         fault_state_.store(val);
@@ -102,6 +86,8 @@ void DevHumidifier::procFaultState(const uint8_t *resp, size_t resp_len, int rc)
         }
     }
 }
+
+// --- 控制命令 ---
 
 int DevHumidifier::setPower(ModbusService &svc, uint16_t val, uint8_t *resp, size_t *resp_len) {
     return svc.writeReg(DEV_HUMIDIFIER_ADDR, REG_HUM_CTRL_POWER, val, resp, 512, resp_len);

@@ -119,9 +119,9 @@
           </div>
           <div class="flex flex-col gap-2.5 mt-3">
             <div class="alarm-item" :class="{ 'alarm-active': data.smoke }">
-              <div class="alarm-dot" :class="data.smoke ? 'dot-red' : 'dot-green'"></div>
+              <div class="alarm-dot" :class="data.smoke_online === 0 ? 'dot-gray' : data.smoke ? 'dot-red' : 'dot-green'"></div>
               <span class="flex-1">烟雾探测</span>
-              <span class="alarm-status" :class="data.smoke ? 'status-danger' : 'status-safe'">{{ data.smoke ? '报警' : '正常' }}</span>
+              <span class="alarm-status" :class="data.smoke_online === 0 ? 'status-offline' : data.smoke ? 'status-danger' : 'status-safe'">{{ data.smoke_online === 0 ? '离线' : data.smoke ? '报警' : '正常' }}</span>
             </div>
             <div class="alarm-item" :class="{ 'alarm-active': data.water }">
               <div class="alarm-dot" :class="securityStatus.water?.online === false ? 'dot-gray' : data.water ? 'dot-red' : 'dot-green'"></div>
@@ -134,9 +134,9 @@
               <span class="alarm-status" :class="securityStatus.intrusion?.online === false ? 'status-offline' : data.ir ? 'status-danger' : 'status-safe'">{{ securityStatus.intrusion?.online === false ? '离线' : data.ir ? '检测' : '正常' }}</span>
             </div>
             <div class="alarm-item" :class="{ 'alarm-active': data.radar }">
-              <div class="alarm-dot" :class="data.radar ? 'dot-red' : 'dot-green'"></div>
+              <div class="alarm-dot" :class="data.ir_online === 0 ? 'dot-gray' : data.radar ? 'dot-red' : 'dot-green'"></div>
               <span class="flex-1">雷达微波</span>
-              <span class="alarm-status" :class="data.radar ? 'status-danger' : 'status-safe'">{{ data.radar ? '检测' : '正常' }}</span>
+              <span class="alarm-status" :class="data.ir_online === 0 ? 'status-offline' : data.radar ? 'status-danger' : 'status-safe'">{{ data.ir_online === 0 ? '离线' : data.radar ? '检测' : '正常' }}</span>
             </div>
           </div>
         </div>
@@ -264,6 +264,7 @@ const data = ref({
   temperature: 0, humidity: 0, pm25: 0, pm10: 0,
   tvoc: 0, ch2o: 0, co2: 0, lux: 0,
   smoke: 0, water: 0, ir: 0, radar: 0,
+  smoke_online: 1, water_online: 1, ir_online: 1,
   humidifier_power: 0, humidifier_fault: 0,
   purifier_power: 0, purifier_run_mode: 0
 })

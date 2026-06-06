@@ -60,7 +60,8 @@ public:
      */
     int buildAndSend(uint8_t dev_addr, uint8_t func_code,
                      const uint8_t *data, size_t data_len,
-                     uint8_t *resp, size_t resp_max, size_t *resp_len);
+                     uint8_t *resp, size_t resp_max, size_t *resp_len,
+                     bool isWrite = false);
 
     /* ============================================================
      * 寄存器操作 (0x03读/0x06写)

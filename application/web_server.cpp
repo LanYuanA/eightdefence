@@ -75,7 +75,7 @@ void parse_request_path(const std::string& req, std::string& path, std::string& 
 }
 
 void serve_file(int client_socket, const std::string& filepath) {
-    FILE *f = fopen(filepath.c_str(), "r");
+    FILE *f = fopen(filepath.c_str(), "rb");
     if (!f) {
         const char *err = "404 Not Found";
         send_response(client_socket, "404 Not Found", "text/plain", err, strlen(err));

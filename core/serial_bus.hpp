@@ -15,7 +15,7 @@
 
 #include <cstdint>
 #include <cstddef>
-#include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <atomic>
 #include <chrono>
@@ -31,6 +31,7 @@ struct BusStats {
     std::atomic<double>   avgLatencyMs{0.0};
     std::atomic<double>   maxLatencyMs{0.0};
     std::atomic<uint64_t> busContentionCount{0};  // 总线争用次数
+    std::atomic<uint64_t> writePreemptCount{0};   // 写指令抢占次数
 
     void reset() {
         totalTransactions = 0;
@@ -40,6 +41,7 @@ struct BusStats {
         avgLatencyMs = 0.0;
         maxLatencyMs = 0.0;
         busContentionCount = 0;
+        writePreemptCount = 0;
     }
 };
 
@@ -83,12 +85,14 @@ public:
     /**
      * @brief 线程安全的 Modbus 事务 (发送请求 + 接收响应)
      *
-     * 整个事务在 mutex 保护下原子执行:
-     *   1. 获取互斥锁
+     * 整个事务在 shared_mutex 保护下原子执行:
+     *   1. 获取锁 (写操作用独占锁, 读操作用共享锁)
      *   2. 清空接收缓冲区 (丢弃残留数据)
      *   3. 发送请求帧
      *   4. 等待响应 (带超时)
-     *   5. 释放互斥锁
+     *   5. 释放锁
+     *
+     * 写操作优先: std::shared_mutex 天然偏向写者, 写等待时新到的读会被阻塞。
      *
      * @param request      请求数据 (含CRC)
      * @param request_len  请求数据长度
@@ -96,18 +100,21 @@ public:
      * @param response_cap 响应缓冲区容量
      * @param response_len 实际接收的响应长度
      * @param timeout_ms   接收超时 (毫秒)
+     * @param isWrite      是否为写操作 (写操作获得独占锁, 优先于读)
      * @return 0=成功, 负值=失败
      */
     int transact(const uint8_t *request, size_t request_len,
                  uint8_t *response, size_t response_cap,
-                 size_t *response_len, int timeout_ms);
+                 size_t *response_len, int timeout_ms,
+                 bool isWrite = false);
 
     /**
      * @brief 带HEX字符串的事务接口 (兼容现有代码)
      */
     int transactHex(const char *hex_cmd,
                     uint8_t *response, size_t response_cap,
-                    size_t *response_len, int timeout_ms);
+                    size_t *response_len, int timeout_ms,
+                    bool isWrite = false);
 
     /**
      * @brief 获取通信统计
@@ -161,7 +168,7 @@ private:
     std::string device_;
     int         baud_;
     int         fd_ = -1;
-    std::recursive_mutex mtx_;  // 使用 recursive_mutex 防止重入死锁
+    std::shared_mutex mtx_;  // shared_mutex: 读共享, 写独占且优先
     uint32_t    inter_frame_delay_us_ = 5000;  // 帧间延时 5ms
     BusStats    stats_;
     bool        auto_reconnect_ = true;

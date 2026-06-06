@@ -66,7 +66,7 @@
             <span class="status-dot" :class="status.alarm?.soundActive || status.alarm?.centerActive ? 'dot-alert' : 'dot-normal'"></span>
             <span class="status-text">{{ status.alarm?.soundActive || status.alarm?.centerActive ? '报警中' : '待机中' }}</span>
           </div>
-          <p class="status-desc">{{ status.alarm?.soundActive || status.alarm?.centerActive ? '声光/指挥中心报警已激活' : '无当前报警' }}</p>
+          <p class="status-desc">{{ status.alarm?.soundActive || status.alarm?.centerActive ? '声音/指挥中心报警已激活' : '无当前报警' }}</p>
         </div>
         <div class="status-card">
           <h3>防护处置状态</h3>
@@ -182,29 +182,122 @@
         </div>
       </div>
 
-      <!-- 服务状态 -->
-      <div class="services-grid mb-5">
-        <div class="service-card">
-          <h3 class="service-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            报警服务
-          </h3>
-          <ul class="service-list">
-            <li :class="{ 'alarm-active': status.alarm?.soundActive }">声光报警服务：{{ status.alarm?.soundActive ? '激活中' : '待机状态' }}</li>
-            <li :class="{ 'alarm-active': status.alarm?.centerActive }">指挥中心报警服务：{{ status.alarm?.centerActive ? '警报已发送' : '待机状态' }}</li>
-          </ul>
-          <p class="service-hint"><strong>触发条件：</strong>安防风险评估 / 红外人体检测 / 水浸数据采集 / 时间状态判断</p>
-        </div>
-        <div class="service-card">
-          <h3 class="service-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            防护处置服务
-          </h3>
-          <ul class="service-list">
-            <li :class="{ 'alarm-active': status.gas?.ventilationActive }">通风设备服务：{{ status.gas?.ventilationActive ? '运行中' : '待机状态' }}</li>
-            <li :class="{ 'alarm-active': status.water?.controlActive }">水浸联动服务：{{ status.water?.controlActive ? '排水/阀门控制中' : '待机状态' }}</li>
-          </ul>
-          <p class="service-hint"><strong>触发条件：</strong>安防风险评估 / 水浸数据采集 / 有害气体检测</p>
+      <!-- 联动服务状态 -->
+      <div class="services-section mb-5">
+        <h3 class="section-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          联动服务状态
+        </h3>
+        <p class="section-desc">当安防风险评估达到高风险时，系统自动触发以下联动服务</p>
+
+        <div class="services-grid">
+          <!-- 声光报警 -->
+          <div class="service-card" :class="{ 'service-active': status.alarm?.soundActive }">
+            <div class="service-header">
+              <span class="service-icon alarm-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              </span>
+              <div>
+                <h4>声音报警服务</h4>
+                <span class="service-status" :class="status.alarm?.soundActive ? 'status-on' : 'status-off'">{{ status.alarm?.soundActive ? '激活中' : '待机' }}</span>
+              </div>
+            </div>
+            <div class="service-body">
+              <div class="service-detail">
+                <span class="detail-label">触发条件</span>
+                <span class="detail-value">水浸/入侵/气体任一达到高风险</span>
+              </div>
+              <div class="service-detail">
+                <span class="detail-label">执行动作</span>
+                <span class="detail-value">驱动报警器蜂鸣</span>
+              </div>
+              <div class="service-detail">
+                <span class="detail-label">停止条件</span>
+                <span class="detail-value">所有风险项恢复低风险</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 指挥中心报警 -->
+          <div class="service-card" :class="{ 'service-active': status.alarm?.centerActive }">
+            <div class="service-header">
+              <span class="service-icon center-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              </span>
+              <div>
+                <h4>指挥中心报警</h4>
+                <span class="service-status" :class="status.alarm?.centerActive ? 'status-on' : 'status-off'">{{ status.alarm?.centerActive ? '警报中' : '待机' }}</span>
+              </div>
+            </div>
+            <div class="service-body">
+              <div class="service-detail">
+                <span class="detail-label">触发条件</span>
+                <span class="detail-value">水浸/入侵/气体任一达到高风险</span>
+              </div>
+              <div class="service-detail">
+                <span class="detail-label">执行动作</span>
+                <span class="detail-value">记录告警事件 + 写入系统日志</span>
+              </div>
+              <div class="service-detail">
+                <span class="detail-label">停止条件</span>
+                <span class="detail-value">所有风险项恢复低风险</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 通风设备 / 净化器 -->
+          <div class="service-card" :class="{ 'service-active': status.gas?.ventilationActive }">
+            <div class="service-header">
+              <span class="service-icon vent-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+              </span>
+              <div>
+                <h4>通风净化服务</h4>
+                <span class="service-status" :class="status.gas?.ventilationActive ? 'status-on' : 'status-off'">{{ status.gas?.ventilationActive ? '运行中' : '待机' }}</span>
+              </div>
+            </div>
+            <div class="service-body">
+              <div class="service-detail">
+                <span class="detail-label">触发条件</span>
+                <span class="detail-value">有害气体(TVOC/CH2O/O3/CO2)超标</span>
+              </div>
+              <div class="service-detail">
+                <span class="detail-label">执行动作</span>
+                <span class="detail-value">开启空气净化器 + 恒湿机净化模式</span>
+              </div>
+              <div class="service-detail">
+                <span class="detail-label">停止条件</span>
+                <span class="detail-value">气体浓度全部恢复正常</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 水浸联动 / 排水 -->
+          <div class="service-card" :class="{ 'service-active': status.water?.controlActive }">
+            <div class="service-header">
+              <span class="service-icon water-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>
+              </span>
+              <div>
+                <h4>排水联动服务</h4>
+                <span class="service-status" :class="status.water?.controlActive ? 'status-on' : 'status-off'">{{ status.water?.controlActive ? '控制中' : '待机' }}</span>
+              </div>
+            </div>
+            <div class="service-body">
+              <div class="service-detail">
+                <span class="detail-label">触发条件</span>
+                <span class="detail-value">水浸传感器检测到水位超限(>3cm)</span>
+              </div>
+              <div class="service-detail">
+                <span class="detail-label">执行动作</span>
+                <span class="detail-value">启动排水泵 + 关闭水源阀门(模拟)</span>
+              </div>
+              <div class="service-detail">
+                <span class="detail-label">停止条件</span>
+                <span class="detail-value">水位恢复正常(<1cm)</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -242,7 +335,7 @@
           </div>
           <div class="hardware-item" :class="{ 'hardware-offline': status.devices?.alarm?.online === false }">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-            <p>声光报警装置</p>
+            <p>声音报警装置</p>
             <div class="hw-status">
               <span class="hw-dot" :class="status.devices?.alarm?.online === false ? 'hw-dot-off' : 'hw-dot-on'"></span>
               <span :class="status.devices?.alarm?.online === false ? 'text-danger' : 'text-safe'">{{ status.devices?.alarm?.online === false ? '离线' : '在线' }}</span>
@@ -673,18 +766,108 @@ onUnmounted(() => {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
-/* ===== 服务状态 ===== */
-.services-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-}
-.service-card {
+/* ===== 联动服务状态 ===== */
+.services-section {
   background: rgba(30, 41, 59, 0.6);
   border: 1px solid rgba(148, 163, 184, 0.08);
   border-radius: 12px;
-  padding: 20px;
+  padding: 24px;
   backdrop-filter: blur(8px);
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin-bottom: 8px;
+}
+.section-title svg {
+  color: #6366f1;
+}
+.section-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.service-card {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.08);
+  border-radius: 10px;
+  padding: 18px;
+  transition: all 0.3s;
+}
+.service-card.service-active {
+  border-color: rgba(239, 68, 68, 0.4);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.1);
+}
+.service-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+.service-header h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0;
+}
+.service-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.alarm-icon { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.center-icon { background: rgba(99, 102, 241, 0.15); color: #6366f1; }
+.vent-icon { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.water-icon { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.service-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.status-on {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+.status-off {
+  background: rgba(100, 116, 139, 0.2);
+  color: #94a3b8;
+}
+.service-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.service-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.detail-label {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  min-width: 56px;
+}
+.detail-value {
+  font-size: 12px;
+  color: #cbd5e1;
+  text-align: right;
 }
 .service-title {
   display: flex;
@@ -699,30 +882,6 @@ onUnmounted(() => {
 }
 .service-title svg {
   color: #6366f1;
-}
-.service-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.service-list li {
-  padding: 10px 14px;
-  margin-bottom: 8px;
-  background: rgba(15, 23, 42, 0.5);
-  border-radius: 8px;
-  border-left: 3px solid rgba(99, 102, 241, 0.4);
-  font-size: 13px;
-  color: #e2e8f0;
-  transition: all 0.3s;
-}
-.service-list li.alarm-active {
-  border-left-color: #ef4444;
-  animation: pulse-border 1.5s infinite;
-}
-.service-hint {
-  font-size: 12px;
-  color: #64748b;
-  margin-top: 12px;
 }
 
 /* ===== 硬件层 ===== */
@@ -880,7 +1039,7 @@ onUnmounted(() => {
 /* ===== 响应式 ===== */
 @media (max-width: 1024px) {
   .app-grid { grid-template-columns: 1fr; }
-  .services-grid { grid-template-columns: 1fr; }
+  .services-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
   .overview-bar { flex-direction: column; }

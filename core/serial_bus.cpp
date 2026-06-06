@@ -77,7 +77,7 @@ SerialBus::~SerialBus() {
  * 打开/关闭串口
  * ============================================================ */
 int SerialBus::open() {
-    std::lock_guard<std::recursive_mutex> lock(mtx_);
+    std::unique_lock<std::shared_mutex> lock(mtx_);
 
     if (fd_ >= 0) {
         return 0;  // 已经打开
@@ -145,7 +145,7 @@ void SerialBus::close() {
         char c = 'X';
         write(shutdown_pipe_[1], &c, 1);
     }
-    std::lock_guard<std::recursive_mutex> lock(mtx_);
+    std::unique_lock<std::shared_mutex> lock(mtx_);
     if (fd_ >= 0) {
         ::close(fd_);
         fd_ = -1;
@@ -262,18 +262,28 @@ void SerialBus::updateLatencyStats(double latency_ms) {
  * ============================================================ */
 int SerialBus::transact(const uint8_t *request, size_t request_len,
                         uint8_t *response, size_t response_cap,
-                        size_t *response_len, int timeout_ms) {
+                        size_t *response_len, int timeout_ms,
+                        bool isWrite) {
     auto start = std::chrono::steady_clock::now();
 
     // 持锁覆盖整个事务: RS-485 是半双工总线, send+recv 必须原子
-    std::unique_lock<std::recursive_mutex> lock(mtx_, std::defer_lock);
+    // 写操作用独占锁 (优先), 读操作用共享锁 (写等待时让步)
     auto lock_start = std::chrono::steady_clock::now();
-    lock.lock();
+    std::unique_lock<std::shared_mutex> write_lock;
+    std::shared_lock<std::shared_mutex> read_lock;
+    if (isWrite) {
+        write_lock = std::unique_lock<std::shared_mutex>(mtx_);
+    } else {
+        read_lock = std::shared_lock<std::shared_mutex>(mtx_);
+    }
     auto lock_end = std::chrono::steady_clock::now();
     double lock_wait_ms = std::chrono::duration<double, std::milli>(lock_end - lock_start).count();
 
     if (lock_wait_ms > 100.0) {
         stats_.busContentionCount++;
+    }
+    if (isWrite && lock_wait_ms > 10.0) {
+        stats_.writePreemptCount++;
     }
 
     stats_.totalTransactions++;
@@ -332,7 +342,8 @@ int SerialBus::transact(const uint8_t *request, size_t request_len,
 
 int SerialBus::transactHex(const char *hex_cmd,
                            uint8_t *response, size_t response_cap,
-                           size_t *response_len, int timeout_ms) {
+                           size_t *response_len, int timeout_ms,
+                           bool isWrite) {
     uint8_t request[512];
     size_t request_len = 0;
 
@@ -350,5 +361,5 @@ int SerialBus::transactHex(const char *hex_cmd,
         return -11;
     }
 
-    return transact(request, request_len, response, response_cap, response_len, timeout_ms);
+    return transact(request, request_len, response, response_cap, response_len, timeout_ms, isWrite);
 }

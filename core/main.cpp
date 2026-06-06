@@ -154,6 +154,21 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    /* 切换工作目录到程序所在目录 (确保静态资源路径正确) */
+    {
+        char exe_path[1024] = {0};
+        ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+        if (len > 0) {
+            exe_path[len] = '\0';
+            char *last_slash = strrchr(exe_path, '/');
+            if (last_slash) {
+                *last_slash = '\0';
+                chdir(exe_path);
+                printf("工作目录: %s\n", exe_path);
+            }
+        }
+    }
+
     /* 创建信号通知管道 (self-pipe trick) */
     if (pipe(g_signal_pipe) != 0) {
         fprintf(stderr, "创建信号管道失败!\n");

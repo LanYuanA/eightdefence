@@ -282,7 +282,7 @@ HttpResponse AppSecurity::handlePostControl(const HttpRequest& req) {
             addLog("alarm", "人员入侵警报",
                 "红外探测器识别非法闯入行为, 触发安防风险评估(高风险)");
             addLog("warning", "报警服务启动",
-                "声光报警: 现场警示; 指挥中心报警: 通知管理员紧急处置");
+                "声音报警: 现场警示; 指挥中心报警: 通知管理员紧急处置");
             return HttpResponse::json("{\"status\":\"success\",\"message\":\"入侵模拟已触发\"}");
         } else if (action == "reset") {
             if (m_svcSoundLight) m_svcSoundLight->deactivate();
@@ -483,7 +483,7 @@ void AppSecurity::setServices(SvcSoundLightAlarm* a1, SvcDrainage* a2,
 void AppSecurity::handleRiskResponse() {
     bool anyHigh = false;
 
-    // 水浸高风险: 声光报警 + 排水 + 指挥中心告警
+    // 水浸高风险: 声音报警 + 排水 + 指挥中心告警
     if (m_state.waterRisk >= SecurityRiskLevel::HIGH) {
         anyHigh = true;
         if (m_svcSoundLight) m_svcSoundLight->activate();
@@ -493,7 +493,7 @@ void AppSecurity::handleRiskResponse() {
         m_state.alarmCenterActive.store(true);
         m_state.waterControlActive.store(true);
         if (m_prevWaterRisk < SecurityRiskLevel::HIGH) {
-            addLog("alarm", "水浸风险警报", "检测到水位异常, 触发安防风险评估(高风险), 联动声光报警+排水+指挥中心");
+            addLog("alarm", "水浸风险警报", "检测到水位异常, 触发安防风险评估(高风险), 联动声音报警+排水+指挥中心");
         }
     } else {
         if (m_svcDrainage) m_svcDrainage->deactivate();
@@ -503,7 +503,7 @@ void AppSecurity::handleRiskResponse() {
         }
     }
 
-    // 入侵高风险: 声光报警 + 指挥中心告警
+    // 入侵高风险: 声音报警 + 指挥中心告警
     if (m_state.intrusionRisk >= SecurityRiskLevel::HIGH) {
         anyHigh = true;
         if (m_svcSoundLight) m_svcSoundLight->activate();
@@ -511,13 +511,13 @@ void AppSecurity::handleRiskResponse() {
         m_state.alarmSoundActive.store(true);
         m_state.alarmCenterActive.store(true);
         if (m_prevIntrusionRisk < SecurityRiskLevel::HIGH) {
-            addLog("alarm", "入侵警报", "检测到非法入侵, 触发安防风险评估(高风险), 联动声光报警+指挥中心");
+            addLog("alarm", "入侵警报", "检测到非法入侵, 触发安防风险评估(高风险), 联动声音报警+指挥中心");
         }
     } else if (m_prevIntrusionRisk >= SecurityRiskLevel::HIGH) {
         addLog("normal", "入侵警报解除", "入侵风险降低, 报警服务关闭");
     }
 
-    // 气体高风险: 净化器 + 声光报警 + 指挥中心告警
+    // 气体高风险: 净化器 + 声音报警 + 指挥中心告警
     if (m_state.gasRisk >= SecurityRiskLevel::HIGH) {
         anyHigh = true;
         if (m_svcSoundLight) m_svcSoundLight->activate();
@@ -527,7 +527,7 @@ void AppSecurity::handleRiskResponse() {
         m_state.alarmCenterActive.store(true);
         m_state.ventilationActive.store(true);
         if (m_prevGasRisk < SecurityRiskLevel::HIGH) {
-            addLog("alarm", "有害气体警报", "有害气体浓度超限, 触发安防风险评估(高风险), 联动声光报警+净化器+指挥中心");
+            addLog("alarm", "有害气体警报", "有害气体浓度超限, 触发安防风险评估(高风险), 联动声音报警+净化器+指挥中心");
         }
     } else {
         if (m_svcGasResp) m_svcGasResp->deactivate();
@@ -537,7 +537,7 @@ void AppSecurity::handleRiskResponse() {
         }
     }
 
-    // 无高风险时关闭声光报警
+    // 无高风险时关闭声音报警
     if (!anyHigh) {
         if (m_svcSoundLight) m_svcSoundLight->deactivate();
         m_state.alarmSoundActive.store(false);

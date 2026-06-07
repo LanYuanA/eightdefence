@@ -26,6 +26,9 @@ std::vector<DeviceTask> DevSmoke::getTasks() {
         [this](const uint8_t *resp, size_t resp_len, int rc) {
             this->procSmoke(resp, resp_len, rc);
         },
+        [](uint8_t *data, size_t cap, size_t *len) -> int {
+            return ModbusService::buildReadRegFrame(DEV_SMOKE_ADDR, REG_SMOKE_ALARM, REG_SMOKE_DATA, data, cap, len);
+        },
         5000, 1000, DEV_SMOKE_ADDR, 1
     });
     return tasks;

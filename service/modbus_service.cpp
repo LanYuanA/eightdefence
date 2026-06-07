@@ -117,3 +117,72 @@ int ModbusService::writeCoil(uint8_t dev_addr, uint16_t coil_addr, bool value,
         return modbus_build_and_send(device_.c_str(), baud_, dev_addr, 0x05, coil_addr, coil_val, resp, resp_max, resp_len, 1000);
     }
 }
+
+/* ============================================================
+ * 帧构建静态方法 (只构建 Modbus RTU 帧, 不发送)
+ * ============================================================ */
+
+int ModbusService::buildReadRegFrame(uint8_t devAddr, uint16_t regAddr, uint16_t count,
+                                      uint8_t *frame, size_t frameCap, size_t *frameLen) {
+    if (frameCap < 8) return -1;
+    frame[0] = devAddr;
+    frame[1] = 0x03;
+    frame[2] = (regAddr >> 8) & 0xFF;
+    frame[3] = regAddr & 0xFF;
+    frame[4] = (count >> 8) & 0xFF;
+    frame[5] = count & 0xFF;
+    uint16_t crc = crc16_modbus(frame, 6);
+    frame[6] = crc & 0xFF;
+    frame[7] = (crc >> 8) & 0xFF;
+    *frameLen = 8;
+    return 0;
+}
+
+int ModbusService::buildWriteRegFrame(uint8_t devAddr, uint16_t regAddr, uint16_t value,
+                                       uint8_t *frame, size_t frameCap, size_t *frameLen) {
+    if (frameCap < 8) return -1;
+    frame[0] = devAddr;
+    frame[1] = 0x06;
+    frame[2] = (regAddr >> 8) & 0xFF;
+    frame[3] = regAddr & 0xFF;
+    frame[4] = (value >> 8) & 0xFF;
+    frame[5] = value & 0xFF;
+    uint16_t crc = crc16_modbus(frame, 6);
+    frame[6] = crc & 0xFF;
+    frame[7] = (crc >> 8) & 0xFF;
+    *frameLen = 8;
+    return 0;
+}
+
+int ModbusService::buildReadCoilFrame(uint8_t devAddr, uint16_t coilAddr, uint16_t count,
+                                       uint8_t *frame, size_t frameCap, size_t *frameLen) {
+    if (frameCap < 8) return -1;
+    frame[0] = devAddr;
+    frame[1] = 0x01;
+    frame[2] = (coilAddr >> 8) & 0xFF;
+    frame[3] = coilAddr & 0xFF;
+    frame[4] = (count >> 8) & 0xFF;
+    frame[5] = count & 0xFF;
+    uint16_t crc = crc16_modbus(frame, 6);
+    frame[6] = crc & 0xFF;
+    frame[7] = (crc >> 8) & 0xFF;
+    *frameLen = 8;
+    return 0;
+}
+
+int ModbusService::buildWriteCoilFrame(uint8_t devAddr, uint16_t coilAddr, bool value,
+                                        uint8_t *frame, size_t frameCap, size_t *frameLen) {
+    if (frameCap < 8) return -1;
+    uint16_t coil_val = value ? 0xFF00 : 0x0000;
+    frame[0] = devAddr;
+    frame[1] = 0x05;
+    frame[2] = (coilAddr >> 8) & 0xFF;
+    frame[3] = coilAddr & 0xFF;
+    frame[4] = (coil_val >> 8) & 0xFF;
+    frame[5] = coil_val & 0xFF;
+    uint16_t crc = crc16_modbus(frame, 6);
+    frame[6] = crc & 0xFF;
+    frame[7] = (crc >> 8) & 0xFF;
+    *frameLen = 8;
+    return 0;
+}

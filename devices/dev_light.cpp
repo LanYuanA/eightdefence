@@ -25,6 +25,9 @@ std::vector<DeviceTask> DevLight::getTasks() {
         [this](const uint8_t *resp, size_t resp_len, int rc) {
             this->procLight(resp, resp_len, rc);
         },
+        [](uint8_t *data, size_t cap, size_t *len) -> int {
+            return ModbusService::buildReadRegFrame(DEV_LIGHT_ADDR, REG_LIGHT_ILLUMIN, REG_LIGHT_DATA, data, cap, len);
+        },
         5000, 1000, DEV_LIGHT_ADDR
     });
     return tasks;

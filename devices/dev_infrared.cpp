@@ -27,6 +27,9 @@ std::vector<DeviceTask> DevInfrared::getTasks() {
         [this](const uint8_t *resp, size_t resp_len, int rc) {
             this->procInfrared(resp, resp_len, rc);
         },
+        [](uint8_t *data, size_t cap, size_t *len) -> int {
+            return ModbusService::buildReadRegFrame(DEV_INFRARED_ADDR, REG_INFRARED_STATE, REG_INFRARED_DATA, data, cap, len);
+        },
         5000, 1000, DEV_INFRARED_ADDR, 1
     });
 
@@ -37,6 +40,9 @@ std::vector<DeviceTask> DevInfrared::getTasks() {
         },
         [this](const uint8_t *resp, size_t resp_len, int rc) {
             this->procRadar(resp, resp_len, rc);
+        },
+        [](uint8_t *data, size_t cap, size_t *len) -> int {
+            return ModbusService::buildReadRegFrame(DEV_INFRARED_ADDR, REG_RADAR_STATE, REG_INFRARED_DATA, data, cap, len);
         },
         5000, 1000, DEV_INFRARED_ADDR, 1
     });

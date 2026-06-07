@@ -24,12 +24,14 @@ std::vector<DeviceTask> DevHumidifier::getTasks() {
         "恒湿净化一体机 - 电源状态",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readPowerState(s, r, l); },
         [this](const uint8_t *r, size_t l, int rc) { procPowerState(r, l, rc); },
+        [](uint8_t *d, size_t c, size_t *l) -> int { return ModbusService::buildReadRegFrame(DEV_HUMIDIFIER_ADDR, REG_HUM_POWER_STATE, 1, d, c, l); },
         5000, 1000, DEV_HUMIDIFIER_ADDR
     });
     tasks.push_back({
         "恒湿净化一体机 - 故障状态",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readFaultState(s, r, l); },
         [this](const uint8_t *r, size_t l, int rc) { procFaultState(r, l, rc); },
+        [](uint8_t *d, size_t c, size_t *l) -> int { return ModbusService::buildReadRegFrame(DEV_HUMIDIFIER_ADDR, REG_HUM_FAULT_STATE, 1, d, c, l); },
         5000, 1000, DEV_HUMIDIFIER_ADDR
     });
     return tasks;

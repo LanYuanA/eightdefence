@@ -23,6 +23,7 @@ std::vector<DeviceTask> DevAirPurifier::getTasks() {
         "霉菌空气净化机 - 电源状态",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readPowerState(s, r, l); },
         [this](const uint8_t *r, size_t l, int rc) { procPowerState(r, l, rc); },
+        [](uint8_t *d, size_t c, size_t *l) -> int { return ModbusService::buildReadRegFrame(DEV_PURIFIER_ADDR, REG_PUR_POWER_STATUS, 1, d, c, l); },
         5000, 1000, DEV_PURIFIER_ADDR
     });
     return tasks;

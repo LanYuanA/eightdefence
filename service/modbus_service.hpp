@@ -100,6 +100,23 @@ public:
      */
     bool usesSerialBus() const { return bus_ != nullptr; }
 
+    /* ============================================================
+     * 帧构建静态方法 (只构建 Modbus RTU 帧, 不发送)
+     * 用于 AsyncBus 等异步场景
+     * ============================================================ */
+
+    static int buildReadRegFrame(uint8_t devAddr, uint16_t regAddr, uint16_t count,
+                                  uint8_t *frame, size_t frameCap, size_t *frameLen);
+
+    static int buildWriteRegFrame(uint8_t devAddr, uint16_t regAddr, uint16_t value,
+                                   uint8_t *frame, size_t frameCap, size_t *frameLen);
+
+    static int buildReadCoilFrame(uint8_t devAddr, uint16_t coilAddr, uint16_t count,
+                                   uint8_t *frame, size_t frameCap, size_t *frameLen);
+
+    static int buildWriteCoilFrame(uint8_t devAddr, uint16_t coilAddr, bool value,
+                                    uint8_t *frame, size_t frameCap, size_t *frameLen);
+
 private:
     std::string device_;
     int         baud_;

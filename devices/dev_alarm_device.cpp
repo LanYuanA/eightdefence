@@ -22,6 +22,9 @@ std::vector<DeviceTask> DevAlarmDevice::getTasks() {
         "报警装置 - 状态",
         [this](ModbusService &s, uint8_t *r, size_t *l) { return readState(s, r, l); },
         [this](const uint8_t *r, size_t l, int rc) { procState(r, l, rc); },
+        [](uint8_t *data, size_t cap, size_t *len) -> int {
+            return ModbusService::buildReadCoilFrame(DEV_ALARM_ADDR, REG_ALARM_COIL, REG_ALARM_DATA, data, cap, len);
+        },
         5000, 1000, DEV_ALARM_ADDR
     });
 

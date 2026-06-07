@@ -25,6 +25,9 @@ std::vector<DeviceTask> DevWater::getTasks() {
         [this](const uint8_t *resp, size_t resp_len, int rc) {
             this->procWater(resp, resp_len, rc);
         },
+        [](uint8_t *data, size_t cap, size_t *len) -> int {
+            return ModbusService::buildReadRegFrame(DEV_WATER_ADDR, REG_WATER_STATUS, REG_WATER_DATA, data, cap, len);
+        },
         5000, 1000, DEV_WATER_ADDR, 1
     });
     return tasks;

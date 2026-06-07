@@ -29,6 +29,7 @@ extern "C" {
 }
 
 #include "serial_bus.hpp"
+#include "async_bus.hpp"
 #include "polling_manager.hpp"
 #include "pressure_test.hpp"
 #include "command_queue.hpp"
@@ -232,12 +233,16 @@ int main(int argc, char *argv[]) {
     ModbusService modbusService(&serialBus);
     g_modbus = &modbusService;
 
+    /* 创建异步总线 */
+    AsyncBus asyncBus(&serialBus);
+    asyncBus.start();
+
     /* 创建并启动命令队列 */
-    CommandQueue cmdQueue(&serialBus, &modbusService, 1);
+    CommandQueue cmdQueue(&asyncBus, &modbusService);
     g_cmd_queue = &cmdQueue;
     cmdQueue.start();
 
-    LOG_INFO("串口总线已就绪, 工作线程数: %d", worker_threads);
+    LOG_INFO("异步总线已就绪");
 
     /* ============================================================
      * 压力测试模式
@@ -346,12 +351,9 @@ int main(int argc, char *argv[]) {
     }
 
     /* ============================================================
-     * 启动多线程轮询管理器
+     * 启动异步轮询管理器
      * ============================================================ */
-    PollingConfig pollCfg;
-    pollCfg.maxConcurrentGroups = worker_threads;
-
-    PollingManager poller(&serialBus, &modbusService, pollCfg);
+    PollingManager poller(&asyncBus);
     poller.addTasks(all_tasks);
     poller.start();
 
@@ -407,17 +409,24 @@ int main(int argc, char *argv[]) {
             LOG_INFO("  成功率:       %.1f%%",
                      100.0 * totalOk / (totalOk + totalFail));
         }
+        /* 异步总线统计 */
+        const auto &asyncStats = asyncBus.getStats();
+        LOG_INFO("======== 异步总线统计 ========");
+        LOG_INFO("  已提交: %lu  成功: %lu  失败: %lu  重试: %lu",
+                 (unsigned long)asyncStats.totalSubmitted.load(),
+                 (unsigned long)asyncStats.totalSuccess.load(),
+                 (unsigned long)asyncStats.totalFailed.load(),
+                 (unsigned long)asyncStats.totalRetries.load());
+        LOG_INFO("  队列大小: %lu  平均事务: %.1fms",
+                 (unsigned long)asyncBus.getQueueSize(),
+                 asyncStats.avgTransactMs.load());
         /* 命令队列统计 */
         const auto &cmdStats = cmdQueue.getStats();
         LOG_INFO("======== 命令队列统计 ========");
-        LOG_INFO("  已提交: %lu  已执行: %lu  成功: %lu  失败: %lu",
+        LOG_INFO("  已提交: %lu  成功: %lu  失败: %lu",
                  (unsigned long)cmdStats.totalSubmitted.load(),
-                 (unsigned long)cmdStats.totalExecuted.load(),
                  (unsigned long)cmdStats.totalSuccess.load(),
                  (unsigned long)cmdStats.totalFailed.load());
-        LOG_INFO("  队列大小: %lu  平均耗时: %.1fms",
-                 (unsigned long)cmdStats.currentQueueSize.load(),
-                 cmdStats.avgExecTimeMs.load());
     }
 
     /* ============================================================
@@ -432,12 +441,15 @@ int main(int argc, char *argv[]) {
     LOG_INFO("正在停止命令队列...");
     cmdQueue.stop();
 
-    // 关闭串口 (写 shutdown_pipe 唤醒阻塞在 select() 上的轮询线程)
-    LOG_INFO("正在关闭串口...");
-    serialBus.close();
-
     LOG_INFO("正在停止轮询...");
     poller.stop();
+
+    LOG_INFO("正在停止异步总线...");
+    asyncBus.stop();
+
+    // 关闭串口
+    LOG_INFO("正在关闭串口...");
+    serialBus.close();
 
     /* 打印最终统计 */
     const BusStats &finalStats = serialBus.getStats();

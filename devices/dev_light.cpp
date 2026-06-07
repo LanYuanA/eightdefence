@@ -40,13 +40,14 @@ void DevLight::procLight(const uint8_t *resp, size_t resp_len, int rc) {
         handleFailure(status_, "弱光检测传感器");
         return;
     }
-    status_.onSuccess();
 
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_LIGHT_ADDR, 0x03, 0);
-    if (parse_rc == ParseService::OK) {
-        uint16_t val = ParseService::extractU16(resp, 0);
-        illuminance_.store(val);
-    } else {
-        logParseError(parse_rc, "弱光检测传感器", "光照数据");
+    if (parse_rc != ParseService::OK) {
+        logParseError(parse_rc, "弱光检测传感器", "光照数据", resp, resp_len, DEV_LIGHT_ADDR);
+        return;
     }
+
+    status_.onSuccess();
+    uint16_t val = ParseService::extractU16(resp, 0);
+    illuminance_.store(val);
 }

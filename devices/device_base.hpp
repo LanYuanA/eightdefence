@@ -154,13 +154,35 @@ protected:
     }
 
     /**
-     * @brief 通用的解析失败日志输出
+     * @brief 通用的解析失败日志输出 (含原始数据 hex dump)
      */
-    void logParseError(int parse_rc, const std::string &devName, const std::string &dataName) {
-        if (parse_rc == ParseService::ERR_CRC) {
-            printf("  => [❌ 解析失败]: %s %s CRC校验位错误\n", devName.c_str(), dataName.c_str());
-        } else {
-            printf("  => [❌ 解析失败]: %s %s 响应格式不符合预期协议\n", devName.c_str(), dataName.c_str());
+    void logParseError(int parse_rc, const std::string &devName, const std::string &dataName,
+                       const uint8_t *resp, size_t resp_len, uint8_t expectAddr) {
+        const char *reason = "未知错误";
+        switch (parse_rc) {
+            case ParseService::ERR_CRC:    reason = "CRC校验错误"; break;
+            case ParseService::ERR_ADDR:   reason = "设备地址不匹配"; break;
+            case ParseService::ERR_FUNC:   reason = "功能码不匹配"; break;
+            case ParseService::ERR_LEN:    reason = "数据长度不足"; break;
+            case ParseService::ERR_FORMAT: reason = "格式错误"; break;
+        }
+        printf("  => [❌ 解析失败]: %s %s - %s (期望地址0x%02X)\n",
+               devName.c_str(), dataName.c_str(), reason, expectAddr);
+        // 打印收到的原始数据
+        if (resp_len > 0) {
+            printf("     原始数据[%zu字节]: ", resp_len);
+            size_t dump_len = resp_len > 32 ? 32 : resp_len;
+            for (size_t i = 0; i < dump_len; i++) {
+                printf("%02X ", resp[i]);
+            }
+            if (resp_len > 32) printf("...");
+            printf("\n");
+            if (resp_len >= 1) {
+                printf("     响应地址=0x%02X", resp[0]);
+                if (resp_len >= 2) printf(" 功能码=0x%02X", resp[1]);
+                if (resp_len >= 3) printf(" 字节数=%d", resp[2]);
+                printf("\n");
+            }
         }
     }
 };

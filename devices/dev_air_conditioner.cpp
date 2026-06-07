@@ -43,12 +43,19 @@ void DevAirConditioner::procACResponse(const uint8_t *resp, size_t resp_len,
         }
         return;
     }
-    status_.onSuccess();
 
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_AC_ADDR, 0x03, 0);
-    if (parse_rc == ParseService::OK) {
-        printf("  => [❄️ 空调控制]: %s 操作成功\n", action);
-    } else {
-        printf("  => [❌ 空调控制]: %s 操作失败\n", action);
+    if (parse_rc != ParseService::OK) {
+        printf("  => [❌ 空调控制]: %s 操作失败 (期望地址0x%02X)\n", action, DEV_AC_ADDR);
+        if (resp_len > 0) {
+            printf("     原始数据[%zu字节]: ", resp_len);
+            size_t dump_len = resp_len > 32 ? 32 : resp_len;
+            for (size_t i = 0; i < dump_len; i++) printf("%02X ", resp[i]);
+            printf("\n");
+        }
+        return;
     }
+
+    status_.onSuccess();
+    printf("  => [❄️ 空调控制]: %s 操作成功\n", action);
 }

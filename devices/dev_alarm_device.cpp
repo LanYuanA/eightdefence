@@ -40,14 +40,19 @@ void DevAlarmDevice::procState(const uint8_t *resp, size_t resp_len, int rc) {
         }
         return;
     }
-    status_.onSuccess();
 
     /* 线圈读取响应: 字节3为数据字节, bit0表示线圈状态 */
-    if (resp_len >= 4) {
+    if (resp_len >= 4 && resp[0] == DEV_ALARM_ADDR) {
+        status_.onSuccess();
         int state = resp[3] & 0x01;
         state_.store(state);
     } else {
-        printf("  => [❌ 解析失败]: 报警装置响应数据长度不足\n");
+        printf("  => [❌ 解析失败]: 报警装置响应数据异常 (期望地址0x%02X)\n", DEV_ALARM_ADDR);
+        printf("     原始数据[%zu字节]: ", resp_len);
+        size_t dump_len = resp_len > 32 ? 32 : resp_len;
+        for (size_t i = 0; i < dump_len; i++) printf("%02X ", resp[i]);
+        printf("\n");
+        if (resp_len >= 1) printf("     响应地址=0x%02X\n", resp[0]);
     }
 }
 

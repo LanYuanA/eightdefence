@@ -41,17 +41,18 @@ void DevSmoke::procSmoke(const uint8_t *resp, size_t resp_len, int rc) {
         handleFailure(status_, "烟雾报警器");
         return;
     }
-    status_.onSuccess();
 
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_SMOKE_ADDR, 0x03, 0);
-    if (parse_rc == ParseService::OK) {
-        uint16_t data = ParseService::extractU16(resp, 0);
-        alarm_state_.store((data != 0) ? 1 : 0);
+    if (parse_rc != ParseService::OK) {
+        logParseError(parse_rc, "烟雾报警器", "烟雾数据", resp, resp_len, DEV_SMOKE_ADDR);
+        return;
+    }
 
-        if (data != 0x0000) {
-            printf("  => [🚨 烟雾报警]: 状态码 %d\n", data);
-        }
-    } else {
-        logParseError(parse_rc, "烟雾报警器", "烟雾数据");
+    status_.onSuccess();
+    uint16_t data = ParseService::extractU16(resp, 0);
+    alarm_state_.store((data != 0) ? 1 : 0);
+
+    if (data != 0x0000) {
+        printf("  => [🚨 烟雾报警]: 状态码 %d\n", data);
     }
 }

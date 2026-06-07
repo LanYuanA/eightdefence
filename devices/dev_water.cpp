@@ -40,17 +40,18 @@ void DevWater::procWater(const uint8_t *resp, size_t resp_len, int rc) {
         handleFailure(status_, "水浸传感器");
         return;
     }
-    status_.onSuccess();
 
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_WATER_ADDR, 0x03, 0);
-    if (parse_rc == ParseService::OK) {
-        uint16_t data = ParseService::extractU16(resp, 0);
-        water_state_.store((data != 0) ? 1 : 0);
+    if (parse_rc != ParseService::OK) {
+        logParseError(parse_rc, "水浸传感器", "水浸数据", resp, resp_len, DEV_WATER_ADDR);
+        return;
+    }
 
-        if (data != 0x0000) {
-            printf("  => [🚨 水浸报警]: 状态码 %d\n", data);
-        }
-    } else {
-        logParseError(parse_rc, "水浸传感器", "水浸数据");
+    status_.onSuccess();
+    uint16_t data = ParseService::extractU16(resp, 0);
+    water_state_.store((data != 0) ? 1 : 0);
+
+    if (data != 0x0000) {
+        printf("  => [🚨 水浸报警]: 状态码 %d\n", data);
     }
 }

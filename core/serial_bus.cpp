@@ -77,7 +77,7 @@ SerialBus::~SerialBus() {
  * 打开/关闭串口
  * ============================================================ */
 int SerialBus::open() {
-    std::unique_lock<std::shared_mutex> lock(mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
 
     if (fd_ >= 0) {
         return 0;  // 已经打开
@@ -145,7 +145,7 @@ void SerialBus::close() {
         char c = 'X';
         write(shutdown_pipe_[1], &c, 1);
     }
-    std::unique_lock<std::shared_mutex> lock(mtx_);
+    std::lock_guard<std::mutex> lock(mtx_);
     if (fd_ >= 0) {
         ::close(fd_);
         fd_ = -1;
@@ -266,24 +266,30 @@ int SerialBus::transact(const uint8_t *request, size_t request_len,
                         bool isWrite) {
     auto start = std::chrono::steady_clock::now();
 
-    // 持锁覆盖整个事务: RS-485 是半双工总线, send+recv 必须原子
-    // 写操作用独占锁 (优先), 读操作用共享锁 (写等待时让步)
-    auto lock_start = std::chrono::steady_clock::now();
-    std::unique_lock<std::shared_mutex> write_lock;
-    std::shared_lock<std::shared_mutex> read_lock;
+    // 写优先: 写操作先设置标志, 读操作检测到时主动让步
     if (isWrite) {
-        write_lock = std::unique_lock<std::shared_mutex>(mtx_);
-    } else {
-        read_lock = std::shared_lock<std::shared_mutex>(mtx_);
+        writePendingCount_.fetch_add(1);
+    } else if (writePendingCount_.load() > 0) {
+        // 有写操作在等待, 读操作让步最多 50ms (每 10ms 检查一次)
+        for (int i = 0; i < 5 && writePendingCount_.load() > 0; i++) {
+            usleep(10000);  // 10ms
+        }
+        if (writePendingCount_.load() > 0) {
+            stats_.writePreemptCount++;
+        }
     }
+
+    // 持锁覆盖整个事务: RS-485 是半双工总线, send+recv 必须原子
+    auto lock_start = std::chrono::steady_clock::now();
+    std::unique_lock<std::mutex> lock(mtx_);
     auto lock_end = std::chrono::steady_clock::now();
     double lock_wait_ms = std::chrono::duration<double, std::milli>(lock_end - lock_start).count();
 
     if (lock_wait_ms > 100.0) {
         stats_.busContentionCount++;
     }
-    if (isWrite && lock_wait_ms > 10.0) {
-        stats_.writePreemptCount++;
+    if (isWrite) {
+        writePendingCount_.fetch_sub(1);
     }
 
     stats_.totalTransactions++;

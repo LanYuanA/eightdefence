@@ -27,14 +27,10 @@ int DevCloudPm25::readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len)
 
 void DevCloudPm25::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "PM2.5传感器"); return; }
-    status_.onSuccess();
     int r = ParseService::parseDeviceData(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 0);
-    if (r == ParseService::OK) {
-        uint16_t val = ParseService::extractU16(resp, 0);
-        value_.store(val);
-    } else {
-        logParseError(r, "PM2.5传感器", "PM2.5");
-    }
+    if (r != ParseService::OK) { logParseError(r, "PM2.5传感器", "PM2.5", resp, resp_len, DEV_CLOUD_ADDR); return; }
+    status_.onSuccess();
+    value_.store(ParseService::extractU16(resp, 0));
 }
 
 /* ============================================================
@@ -55,14 +51,10 @@ int DevCloudPm10::readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len)
 
 void DevCloudPm10::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "PM10传感器"); return; }
-    status_.onSuccess();
     int r = ParseService::parseDeviceData(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 0);
-    if (r == ParseService::OK) {
-        uint16_t val = ParseService::extractU16(resp, 0);
-        value_.store(val);
-    } else {
-        logParseError(r, "PM10传感器", "PM10");
-    }
+    if (r != ParseService::OK) { logParseError(r, "PM10传感器", "PM10", resp, resp_len, DEV_CLOUD_ADDR); return; }
+    status_.onSuccess();
+    value_.store(ParseService::extractU16(resp, 0));
 }
 
 /* ============================================================
@@ -83,14 +75,10 @@ int DevCloudHumidity::readValue(ModbusService &svc, uint8_t *resp, size_t *resp_
 
 void DevCloudHumidity::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "湿度传感器"); return; }
-    status_.onSuccess();
     int r = ParseService::parseDeviceData(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 0);
-    if (r == ParseService::OK) {
-        uint16_t val = ParseService::extractU16(resp, 0);
-        value_.store(val);
-    } else {
-        logParseError(r, "湿度传感器", "湿度");
-    }
+    if (r != ParseService::OK) { logParseError(r, "湿度传感器", "湿度", resp, resp_len, DEV_CLOUD_ADDR); return; }
+    status_.onSuccess();
+    value_.store(ParseService::extractU16(resp, 0));
 }
 
 /* ============================================================
@@ -111,14 +99,10 @@ int DevCloudTemperature::readValue(ModbusService &svc, uint8_t *resp, size_t *re
 
 void DevCloudTemperature::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "温度传感器"); return; }
-    status_.onSuccess();
     int r = ParseService::parseDeviceData(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 0);
-    if (r == ParseService::OK) {
-        int16_t val = ParseService::extractS16(resp, 0);
-        value_.store(val);
-    } else {
-        logParseError(r, "温度传感器", "温度");
-    }
+    if (r != ParseService::OK) { logParseError(r, "温度传感器", "温度", resp, resp_len, DEV_CLOUD_ADDR); return; }
+    status_.onSuccess();
+    value_.store(ParseService::extractS16(resp, 0));
 }
 
 /* ============================================================
@@ -139,14 +123,10 @@ int DevCloudTvoc::readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len)
 
 void DevCloudTvoc::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "TVOC传感器"); return; }
-    status_.onSuccess();
     int r = ParseService::parseDeviceData(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 0);
-    if (r == ParseService::OK) {
-        uint16_t val = ParseService::extractU16(resp, 0);
-        value_.store(val);
-    } else {
-        logParseError(r, "TVOC传感器", "TVOC");
-    }
+    if (r != ParseService::OK) { logParseError(r, "TVOC传感器", "TVOC", resp, resp_len, DEV_CLOUD_ADDR); return; }
+    status_.onSuccess();
+    value_.store(ParseService::extractU16(resp, 0));
 }
 
 /* ============================================================
@@ -167,14 +147,10 @@ int DevCloudCh2o::readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len)
 
 void DevCloudCh2o::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "甲醛传感器"); return; }
-    status_.onSuccess();
     int r = ParseService::parseDeviceData(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 0);
-    if (r == ParseService::OK) {
-        uint16_t val = ParseService::extractU16(resp, 0);
-        value_.store(val);
-    } else {
-        logParseError(r, "甲醛传感器", "甲醛");
-    }
+    if (r != ParseService::OK) { logParseError(r, "甲醛传感器", "甲醛", resp, resp_len, DEV_CLOUD_ADDR); return; }
+    status_.onSuccess();
+    value_.store(ParseService::extractU16(resp, 0));
 }
 
 /* ============================================================
@@ -195,14 +171,10 @@ int DevCloudO3::readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
 
 void DevCloudO3::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "臭氧传感器"); return; }
-    status_.onSuccess();
     int r = ParseService::parseDeviceData(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 0);
-    if (r == ParseService::OK) {
-        uint16_t val = ParseService::extractU16(resp, 0);
-        value_.store(val);
-    } else {
-        logParseError(r, "臭氧传感器", "臭氧");
-    }
+    if (r != ParseService::OK) { logParseError(r, "臭氧传感器", "臭氧", resp, resp_len, DEV_CLOUD_ADDR); return; }
+    status_.onSuccess();
+    value_.store(ParseService::extractU16(resp, 0));
 }
 
 /* ============================================================
@@ -223,12 +195,8 @@ int DevCloudCo2::readValue(ModbusService &svc, uint8_t *resp, size_t *resp_len) 
 
 void DevCloudCo2::procValue(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "CO2传感器"); return; }
-    status_.onSuccess();
     int r = ParseService::parseDeviceData(resp, resp_len, DEV_CLOUD_ADDR, 0x03, 0);
-    if (r == ParseService::OK) {
-        uint16_t val = ParseService::extractU16(resp, 0);
-        value_.store(val);
-    } else {
-        logParseError(r, "CO2传感器", "CO2");
-    }
+    if (r != ParseService::OK) { logParseError(r, "CO2传感器", "CO2", resp, resp_len, DEV_CLOUD_ADDR); return; }
+    status_.onSuccess();
+    value_.store(ParseService::extractU16(resp, 0));
 }

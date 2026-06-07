@@ -63,11 +63,10 @@ int DevHumidifier::readPowerState(ModbusService &svc, uint8_t *resp, size_t *res
 
 void DevHumidifier::procPowerState(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "恒湿净化一体机"); return; }
-    status_.onSuccess();
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_HUMIDIFIER_ADDR, 0x03, 0);
-    if (parse_rc == ParseService::OK) {
-        power_state_.store(ParseService::extractU16(resp, 0));
-    }
+    if (parse_rc != ParseService::OK) { logParseError(parse_rc, "恒湿净化一体机", "电源状态", resp, resp_len, DEV_HUMIDIFIER_ADDR); return; }
+    status_.onSuccess();
+    power_state_.store(ParseService::extractU16(resp, 0));
 }
 
 int DevHumidifier::readFaultState(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
@@ -76,14 +75,13 @@ int DevHumidifier::readFaultState(ModbusService &svc, uint8_t *resp, size_t *res
 
 void DevHumidifier::procFaultState(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "恒湿净化一体机"); return; }
-    status_.onSuccess();
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_HUMIDIFIER_ADDR, 0x03, 0);
-    if (parse_rc == ParseService::OK) {
-        uint16_t val = ParseService::extractU16(resp, 0);
-        fault_state_.store(val);
-        if (val != 0) {
-            printf("  => [🚨 恒湿机故障]: 故障码 0x%04X\n", val);
-        }
+    if (parse_rc != ParseService::OK) { logParseError(parse_rc, "恒湿净化一体机", "故障状态", resp, resp_len, DEV_HUMIDIFIER_ADDR); return; }
+    status_.onSuccess();
+    uint16_t val = ParseService::extractU16(resp, 0);
+    fault_state_.store(val);
+    if (val != 0) {
+        printf("  => [🚨 恒湿机故障]: 故障码 0x%04X\n", val);
     }
 }
 

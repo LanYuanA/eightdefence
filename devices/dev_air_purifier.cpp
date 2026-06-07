@@ -64,11 +64,10 @@ int DevAirPurifier::readPowerState(ModbusService &svc, uint8_t *resp, size_t *re
 
 void DevAirPurifier::procPowerState(const uint8_t *resp, size_t resp_len, int rc) {
     if (rc != 0) { handleFailure(status_, "霉菌空气净化机"); return; }
-    status_.onSuccess();
     int parse_rc = ParseService::parseDeviceData(resp, resp_len, DEV_PURIFIER_ADDR, 0x03, 0);
-    if (parse_rc == ParseService::OK) {
-        power_status_.store(ParseService::extractU16(resp, 0));
-    }
+    if (parse_rc != ParseService::OK) { logParseError(parse_rc, "霉菌空气净化机", "电源状态", resp, resp_len, DEV_PURIFIER_ADDR); return; }
+    status_.onSuccess();
+    power_status_.store(ParseService::extractU16(resp, 0));
 }
 
 // --- 控制命令 ---

@@ -61,6 +61,18 @@ struct TaskGroup {
 };
 
 /**
+ * @brief 轮询组配置 (用于 API 查询)
+ */
+struct GroupConfig {
+    std::string name;
+    uint8_t     devAddr;
+    int         pollIntervalMs;
+    int         timeoutMs;
+    int         priority;
+    int         taskCount;
+};
+
+/**
  * @brief 异步轮询管理器
  */
 class PollingManager {
@@ -85,6 +97,8 @@ public:
     std::map<std::string, TaskStatsSnapshot> getGroupStatsSnapshot() const;
     void printStatus() const;
     int setGroupInterval(const std::string &groupName, int intervalMs);
+    int setGroupTimeout(const std::string &groupName, int timeoutMs);
+    std::vector<GroupConfig> getGroupConfig() const;
     size_t getGroupCount() const { return groups_.size(); }
 
 private:

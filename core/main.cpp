@@ -79,6 +79,7 @@ DevAlarmDevice      dev_alarm;
 ModbusService*      g_modbus = nullptr;
 SerialBus*          g_serial_bus = nullptr;
 CommandQueue*       g_cmd_queue = nullptr;
+PollingManager*     g_poller = nullptr;
 volatile bool       g_web_running = true;
 
 // 信号通知管道 (self-pipe trick)
@@ -354,6 +355,7 @@ int main(int argc, char *argv[]) {
      * 启动异步轮询管理器
      * ============================================================ */
     PollingManager poller(&asyncBus);
+    g_poller = &poller;
     poller.addTasks(all_tasks);
     poller.start();
 

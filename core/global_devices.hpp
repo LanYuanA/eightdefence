@@ -36,6 +36,7 @@ extern DevAlarmDevice      dev_alarm;
 extern ModbusService*      g_modbus;
 extern SerialBus*          g_serial_bus;
 extern CommandQueue*       g_cmd_queue;
+extern PollingManager*     g_poller;
 
 // 全局退出标志 (Web 服务器和主线程共享)
 extern volatile bool       g_web_running;

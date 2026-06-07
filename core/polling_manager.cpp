@@ -222,6 +222,7 @@ void PollingManager::printStatus() const {
 int PollingManager::setGroupInterval(const std::string &groupName, int intervalMs) {
     for (auto &g : groups_) {
         if (g.name == groupName) {
+            if (intervalMs < 100) intervalMs = 100;  // 最小 100ms
             printf("[PollingManager] 修改组 '%s' 轮询间隔: %dms -> %dms\n",
                    g.name.c_str(), g.pollIntervalMs, intervalMs);
             g.pollIntervalMs = intervalMs;
@@ -229,4 +230,35 @@ int PollingManager::setGroupInterval(const std::string &groupName, int intervalM
         }
     }
     return -1;
+}
+
+int PollingManager::setGroupTimeout(const std::string &groupName, int timeoutMs) {
+    for (auto &g : groups_) {
+        if (g.name == groupName) {
+            if (timeoutMs < 100) timeoutMs = 100;  // 最小 100ms
+            printf("[PollingManager] 修改组 '%s' 超时: %dms -> %dms\n",
+                   g.name.c_str(), g.tasks.empty() ? 0 : g.tasks[0].timeoutMs, timeoutMs);
+            for (auto &t : g.tasks) {
+                t.timeoutMs = timeoutMs;
+            }
+            return 0;
+        }
+    }
+    return -1;
+}
+
+std::vector<GroupConfig> PollingManager::getGroupConfig() const {
+    std::vector<GroupConfig> result;
+    for (size_t i = 0; i < groups_.size(); i++) {
+        const auto &g = groups_[i];
+        GroupConfig cfg;
+        cfg.name = g.name;
+        cfg.devAddr = g.devAddr;
+        cfg.pollIntervalMs = g.pollIntervalMs;
+        cfg.timeoutMs = g.tasks.empty() ? 1000 : g.tasks[0].timeoutMs;
+        cfg.priority = g.priority;
+        cfg.taskCount = static_cast<int>(g.tasks.size());
+        result.push_back(cfg);
+    }
+    return result;
 }

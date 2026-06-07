@@ -44,14 +44,37 @@ void send_http_response(int client_socket, const HttpResponse& resp) {
                   resp.body.c_str(), resp.body.size());
 }
 
-// 提取查询参数
+// URL 解码 (%XX → 字符)
+std::string url_decode(const std::string& str) {
+    std::string result;
+    for (size_t i = 0; i < str.size(); i++) {
+        if (str[i] == '%' && i + 2 < str.size()) {
+            int val = 0;
+            for (int j = 1; j <= 2; j++) {
+                char c = str[i + j];
+                if (c >= '0' && c <= '9') val = val * 16 + (c - '0');
+                else if (c >= 'A' && c <= 'F') val = val * 16 + (c - 'A' + 10);
+                else if (c >= 'a' && c <= 'f') val = val * 16 + (c - 'a' + 10);
+            }
+            result += static_cast<char>(val);
+            i += 2;
+        } else if (str[i] == '+') {
+            result += ' ';
+        } else {
+            result += str[i];
+        }
+    }
+    return result;
+}
+
+// 提取查询参数 (自动 URL 解码)
 std::string get_query_param(const std::string& url, const std::string& key) {
     size_t pos = url.find(key + "=");
     if (pos == std::string::npos) return "";
     pos += key.length() + 1;
     size_t end = url.find('&', pos);
     if (end == std::string::npos) end = url.find(' ', pos);
-    return url.substr(pos, end - pos);
+    return url_decode(url.substr(pos, end - pos));
 }
 
 // 从 HTTP 请求行中提取路径和查询字符串
@@ -518,18 +541,62 @@ void* start_web_server(void *arg) {
                 const auto &stats = g_cmd_queue->getStats();
                 char json[512];
                 snprintf(json, sizeof(json),
-                    "{\"submitted\":%lu,\"executed\":%lu,\"success\":%lu,\"failed\":%lu,"
-                    "\"queueSize\":%lu,\"avgExecTimeMs\":%.1f}",
+                    "{\"submitted\":%lu,\"success\":%lu,\"failed\":%lu}",
                     (unsigned long)stats.totalSubmitted.load(),
-                    (unsigned long)stats.totalExecuted.load(),
                     (unsigned long)stats.totalSuccess.load(),
-                    (unsigned long)stats.totalFailed.load(),
-                    (unsigned long)stats.currentQueueSize.load(),
-                    stats.avgExecTimeMs.load()
+                    (unsigned long)stats.totalFailed.load()
                 );
                 send_response(new_socket, "200 OK", "application/json; charset=utf-8", json, strlen(json));
             } else {
                 const char *err = "{}";
+                send_response(new_socket, "200 OK", "application/json; charset=utf-8", err, strlen(err));
+            }
+
+        // --- 轮询配置 API ---
+        } else if (req.find("GET /api/polling/config") == 0) {
+            if (g_poller) {
+                auto configs = g_poller->getGroupConfig();
+                std::string json = "[";
+                for (size_t i = 0; i < configs.size(); i++) {
+                    const auto &c = configs[i];
+                    char item[512];
+                    snprintf(item, sizeof(item),
+                        "%s{\"name\":\"%s\",\"devAddr\":\"0x%02X\","
+                        "\"pollIntervalMs\":%d,\"timeoutMs\":%d,"
+                        "\"priority\":%d,\"taskCount\":%d}",
+                        (i > 0 ? "," : ""),
+                        c.name.c_str(), c.devAddr,
+                        c.pollIntervalMs, c.timeoutMs,
+                        c.priority, c.taskCount);
+                    json += item;
+                }
+                json += "]";
+                send_response(new_socket, "200 OK", "application/json; charset=utf-8",
+                              json.c_str(), json.size());
+            } else {
+                const char *err = "[]";
+                send_response(new_socket, "200 OK", "application/json; charset=utf-8", err, strlen(err));
+            }
+
+        } else if (req.find("GET /api/polling/set") == 0) {
+            if (g_poller) {
+                std::string group = get_query_param(req, "group");
+                std::string intervalStr = get_query_param(req, "interval");
+                std::string timeoutStr = get_query_param(req, "timeout");
+                int rc = 0;
+                if (!group.empty() && !intervalStr.empty()) {
+                    int interval = atoi(intervalStr.c_str());
+                    rc |= g_poller->setGroupInterval(group, interval);
+                }
+                if (!group.empty() && !timeoutStr.empty()) {
+                    int timeout = atoi(timeoutStr.c_str());
+                    rc |= g_poller->setGroupTimeout(group, timeout);
+                }
+                char json[128];
+                snprintf(json, sizeof(json), "{\"ok\":%s}", rc == 0 ? "true" : "false");
+                send_response(new_socket, "200 OK", "application/json; charset=utf-8", json, strlen(json));
+            } else {
+                const char *err = "{\"ok\":false,\"error\":\"poller not ready\"}";
                 send_response(new_socket, "200 OK", "application/json; charset=utf-8", err, strlen(err));
             }
 

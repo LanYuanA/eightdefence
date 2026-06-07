@@ -202,6 +202,60 @@
               </div>
             </div>
           </div>
+
+          <!-- 轮询配置 -->
+          <div class="card">
+            <div class="card-header">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>轮询配置</span>
+            </div>
+            <div class="mt-3 overflow-x-auto">
+              <table class="poll-table">
+                <thead>
+                  <tr>
+                    <th>设备组</th>
+                    <th>地址</th>
+                    <th>轮询间隔</th>
+                    <th>超时</th>
+                    <th>任务数</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="cfg in pollingConfig" :key="cfg.name">
+                    <td class="font-medium text-slate-200">{{ cfg.name }}</td>
+                    <td class="font-mono text-indigo-300">{{ cfg.devAddr }}</td>
+                    <td>
+                      <template v-if="editingGroup === cfg.name">
+                        <input v-model.number="editInterval" type="number" class="poll-input" min="100" step="100" /> ms
+                      </template>
+                      <template v-else>
+                        <span class="font-mono text-amber-300">{{ cfg.pollIntervalMs }}</span> ms
+                      </template>
+                    </td>
+                    <td>
+                      <template v-if="editingGroup === cfg.name">
+                        <input v-model.number="editTimeout" type="number" class="poll-input" min="100" step="100" /> ms
+                      </template>
+                      <template v-else>
+                        <span class="font-mono text-purple-300">{{ cfg.timeoutMs }}</span> ms
+                      </template>
+                    </td>
+                    <td class="text-slate-400">{{ cfg.taskCount }}</td>
+                    <td>
+                      <template v-if="editingGroup === cfg.name">
+                        <button class="poll-btn save" @click="savePollingConfig(cfg.name)">保存</button>
+                        <button class="poll-btn cancel" @click="cancelEdit()">取消</button>
+                      </template>
+                      <template v-else>
+                        <button class="poll-btn edit" @click="startEdit(cfg)">修改</button>
+                      </template>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </template>
 
         <!-- 未选择设备 -->
@@ -242,6 +296,10 @@ const activeCategory = ref('all')
 const valueHistory = ref<number[]>([])
 const busStats = ref<any>({})
 const cmdStats = ref<any>({})
+const pollingConfig = ref<any[]>([])
+const editingGroup = ref<string | null>(null)
+const editInterval = ref(5000)
+const editTimeout = ref(1000)
 
 let timeInterval = 0
 let dataInterval = 0
@@ -353,15 +411,44 @@ function selectDevice(dev: DeviceInfo) {
   if (hasChart.value) valueHistory.value.push(dev.value)
 }
 
+async function fetchPollingConfig() {
+  try {
+    const res = await axios.get('/api/polling/config')
+    pollingConfig.value = res.data || []
+  } catch (e) {}
+}
+
+function startEdit(group: any) {
+  editingGroup.value = group.name
+  editInterval.value = group.pollIntervalMs
+  editTimeout.value = group.timeoutMs
+}
+
+function cancelEdit() {
+  editingGroup.value = null
+}
+
+async function savePollingConfig(groupName: string) {
+  try {
+    await axios.get('/api/polling/set', {
+      params: { group: groupName, interval: editInterval.value, timeout: editTimeout.value }
+    })
+    editingGroup.value = null
+    fetchPollingConfig()
+  } catch (e) {}
+}
+
 onMounted(() => {
   updateTime()
   timeInterval = window.setInterval(updateTime, 1000)
   fetchDevices()
   fetchBusStats()
+  fetchPollingConfig()
   dataInterval = window.setInterval(() => {
     fetchDevices()
     fetchBusStats()
   }, 2000)
+  window.setInterval(fetchPollingConfig, 5000)
 })
 
 onUnmounted(() => {
@@ -490,6 +577,44 @@ onUnmounted(() => {
   width: 80px; height: 80px; border-radius: 20px;
   background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(148, 163, 184, 0.08);
 }
+
+/* ===== 轮询配置表格 ===== */
+.poll-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.poll-table th {
+  text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 600;
+  color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+.poll-table td {
+  padding: 8px 10px; border-bottom: 1px solid rgba(148, 163, 184, 0.05);
+  color: #cbd5e1;
+}
+.poll-table tr:hover td { background: rgba(99, 102, 241, 0.04); }
+.poll-input {
+  width: 80px; padding: 4px 8px; font-size: 13px; font-family: monospace;
+  background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(99, 102, 241, 0.4);
+  border-radius: 6px; color: #e2e8f0; outline: none;
+}
+.poll-input:focus { border-color: rgba(99, 102, 241, 0.8); box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15); }
+.poll-btn {
+  padding: 3px 10px; font-size: 11px; font-weight: 600; border-radius: 6px;
+  cursor: pointer; transition: all 0.15s; border: 1px solid transparent;
+}
+.poll-btn.edit {
+  background: rgba(99, 102, 241, 0.1); color: #a5b4fc; border-color: rgba(99, 102, 241, 0.25);
+}
+.poll-btn.edit:hover { background: rgba(99, 102, 241, 0.2); }
+.poll-btn.save {
+  background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3);
+  margin-right: 4px;
+}
+.poll-btn.save:hover { background: rgba(16, 185, 129, 0.25); }
+.poll-btn.cancel {
+  background: rgba(148, 163, 184, 0.08); color: #94a3b8; border-color: rgba(148, 163, 184, 0.15);
+}
+.poll-btn.cancel:hover { background: rgba(148, 163, 184, 0.15); }
 
 /* ===== 滚动条 ===== */
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }

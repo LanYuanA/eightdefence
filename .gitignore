@@ -3,3 +3,54 @@ doc/
 .claude/
 logs/*
 *.o
+
+# AI 模型文件
+*.rkllm
+*.rknn
+*.pt
+*.pth
+*.bin
+*.onnx
+*.safetensors
+*.gguf
+*.ggml
+*.tflite
+*.caffemodel
+
+# 模型目录
+model/rknn-llm/
+**/weights/
+**/checkpoints/
+
+# 压缩包
+*.tar.gz
+*.tar.bz2
+*.zip
+*.rar
+*.7z
+*.deb
+*.rpm
+
+# 安装包
+*.sh
+!scripts/*.sh
+!model/my_demo/*.sh
+
+# 大型二进制
+*.so
+*.a
+*.dylib
+*.dll
+*.exe
+
+# 正点原子程序源码（第三方代码）
+model/正点原子程序源码/
+model/1、程序源码/
+
+# 模型目录
+model/deepseek-1.5b/
+model/deepseek-7b/
+model/rknn-llm/
+
+# 库文件目录
+model/my_demo/lib/

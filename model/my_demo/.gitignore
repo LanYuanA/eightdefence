@@ -1,0 +1,27 @@
+# 编译输出
+build/
+
+# 模型文件（大文件）
+model/*.rkllm
+model/*.bin
+model/*.onnx
+
+# 库文件（大文件）
+lib/*.so
+lib/*.so.*
+lib/*.a
+
+# 编译临时文件
+*.o
+*.d
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# IDE 文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

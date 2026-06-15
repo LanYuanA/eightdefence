@@ -1,6 +1,8 @@
 /**
  * @file svc_sound_light_alarm.cpp
  * @brief 声音报警服务实现
+ *
+ * 设备离线时跳过指令，不占用总线时间。
  */
 
 #include "svc_sound_light_alarm.hpp"
@@ -10,6 +12,13 @@
 
 void SvcSoundLightAlarm::activate() {
     if (active_.exchange(true)) return;  // 已激活
+
+    if (!dev_alarm.isOnline()) {
+        printf("  => [SvcSoundLightAlarm] 报警器离线, 跳过激活指令\n");
+        Logger::instance().log(LogLevel::WARNING, __FILE__, __LINE__,
+            "[声音报警服务] 报警器离线, 跳过激活指令");
+        return;
+    }
 
     uint8_t resp[64];
     size_t resp_len = 0;
@@ -27,6 +36,11 @@ void SvcSoundLightAlarm::activate() {
 
 void SvcSoundLightAlarm::deactivate() {
     if (!active_.exchange(false)) return;  // 已关闭
+
+    if (!dev_alarm.isOnline()) {
+        printf("  => [SvcSoundLightAlarm] 报警器离线, 跳过关闭指令\n");
+        return;
+    }
 
     uint8_t resp[64];
     size_t resp_len = 0;

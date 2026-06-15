@@ -4,6 +4,8 @@ import Dashboard from '../views/Dashboard.vue'
 import LogViewer from '../views/LogViewer.vue'
 import Devices from '../views/Devices.vue'
 import Security from '../views/Security.vue'
+import Environment from '../views/Environment.vue'
+import FireFighting from '../views/FireFighting.vue'
 
 const router = createRouter({
   history: createWebHistory('/'),
@@ -32,6 +34,16 @@ const router = createRouter({
       path: '/security',
       name: 'security',
       component: Security
+    },
+    {
+      path: '/environment',
+      name: 'environment',
+      component: Environment
+    },
+    {
+      path: '/fire',
+      name: 'fire',
+      component: FireFighting
     }
   ]
 })

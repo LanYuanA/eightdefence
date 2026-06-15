@@ -2,4 +2,6 @@
 doc/
 .claude/
 logs/*
+model/
 *.o
+app_gateway

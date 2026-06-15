@@ -47,11 +47,17 @@ extern "C" {
 #include "global_devices.hpp"
 #include "application/app_manager.hpp"
 #include "application/apps/security/app_security.hpp"
+#include "application/apps/environment/app_environment.hpp"
+#include "application/apps/fire_fighting/app_fire_fighting.hpp"
 #include "service/atomic/svc_sound_light_alarm.hpp"
 #include "service/atomic/svc_drainage.hpp"
 #include "service/atomic/svc_temp_humidity_control.hpp"
 #include "service/atomic/svc_gas_response.hpp"
 #include "service/atomic/svc_command_center.hpp"
+#include "service/atomic/svc_air_quality_alert.hpp"
+#include "service/atomic/svc_ventilation.hpp"
+#include "service/atomic/svc_fire_suppression.hpp"
+#include "service/atomic/svc_evacuation.hpp"
 
 /* ============================================================
  * 设备实例
@@ -203,12 +209,29 @@ int main(int argc, char *argv[]) {
     SvcTempHumidityControl svcTempHumid;
     SvcGasResponse         svcGasResp;
     SvcCommandCenter       svcCmdCenter;
+    SvcAirQualityAlert     svcAirQuality;
+    SvcVentilation         svcVentilation;
+    SvcFireSuppression     svcFireSupp;
+    SvcEvacuation          svcEvacuation;
 
     /* 注册应用到 AppManager, 注入服务 */
     auto& appMgr = AppManager::instance();
+
+    // 安防应用
     auto securityApp = std::make_shared<AppSecurity>();
     securityApp->setServices(&svcSoundLight, &svcDrainage, &svcTempHumid, &svcGasResp, &svcCmdCenter);
     appMgr.registerApp(securityApp);
+
+    // 环境监测应用
+    auto envApp = std::make_shared<AppEnvironment>();
+    envApp->setServices(&svcTempHumid, &svcGasResp, &svcAirQuality, &svcVentilation, &svcCmdCenter);
+    appMgr.registerApp(envApp);
+
+    // 消防应用
+    auto fireApp = std::make_shared<AppFireFighting>();
+    fireApp->setServices(&svcSoundLight, &svcFireSupp, &svcEvacuation, &svcCmdCenter);
+    appMgr.registerApp(fireApp);
+
     appMgr.initAll();
     appMgr.startAll();
     LOG_INFO("应用管理器已启动, 注册了 %zu 个应用", appMgr.getAllApps().size());

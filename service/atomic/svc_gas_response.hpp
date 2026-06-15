@@ -13,7 +13,6 @@
 struct GasThresholds {
     int tvocHigh = 200;
     int ch2oHigh = 50;
-    int o3High   = 60;
     int co2High  = 800;
 };
 
@@ -25,7 +24,7 @@ public:
     bool isActive() const override { return active_.load(); }
 
     void setThresholds(const GasThresholds& t);
-    void checkAndControl(int tvoc, int ch2o, int o3, int co2);
+    void checkAndControl(int tvoc, int ch2o, int co2);
 
 private:
     std::atomic<bool> active_{false};

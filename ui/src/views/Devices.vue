@@ -320,7 +320,7 @@ const onlineCount = computed(() => filteredDevices.value.filter(d => d.online).l
 
 const hasChart = computed(() => {
   if (!selectedDevice.value) return false
-  const chartTypes = ['cloud_pm25', 'cloud_pm10', 'cloud_temp', 'cloud_humidity', 'cloud_tvoc', 'cloud_ch2o', 'cloud_o3', 'cloud_co2', 'light']
+  const chartTypes = ['cloud_pm25', 'cloud_pm10', 'cloud_temp', 'cloud_humidity', 'cloud_tvoc', 'cloud_ch2o', 'cloud_co2', 'light']
   return chartTypes.includes(selectedDevice.value.type)
 })
 

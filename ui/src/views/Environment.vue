@@ -283,14 +283,6 @@
           </div>
           <div class="data-card">
             <div class="data-card-title">
-              <i class="fas fa-sun"></i>
-              <span>光照强度</span>
-            </div>
-            <div class="data-card-value">{{ statusData.gas?.o3?.value ?? '--' }}</div>
-            <div class="data-card-unit">{{ statusData.gas?.o3?.unit ?? 'ppb' }}</div>
-          </div>
-          <div class="data-card">
-            <div class="data-card-title">
               <i class="fas fa-cloud"></i>
               <span>空气质量</span>
             </div>
@@ -506,7 +498,7 @@ interface StatusData {
     pm25Online: boolean; pm10Online: boolean; airQualityActive: boolean
   }
   gas?: {
-    tvoc: GasSensor; ch2o: GasSensor; o3: GasSensor; co2: GasSensor
+    tvoc: GasSensor; ch2o: GasSensor; co2: GasSensor
     risk: string; gasResponseActive: boolean; ventilationActive: boolean
   }
   services?: { tempControlActive: boolean; centerAlarmActive: boolean }
@@ -552,7 +544,6 @@ const devices = computed(() => {
     { id: 'dev-0x30', name: 'PM10传感器', type: '空气质量设备', location: '云测仪(0x30)', time: d.airQuality?.pm10Online ? now : '--', status: d.airQuality?.pm10Online !== false ? 'online' : 'offline', addr: '0x30' },
     { id: 'dev-0x30', name: 'TVOC传感器', type: '有害气体设备', location: '云测仪(0x30)', time: d.gas?.tvoc?.online ? now : '--', status: d.gas?.tvoc?.online !== false ? 'online' : 'offline', addr: '0x30' },
     { id: 'dev-0x30', name: '甲醛传感器', type: '有害气体设备', location: '云测仪(0x30)', time: d.gas?.ch2o?.online ? now : '--', status: d.gas?.ch2o?.online !== false ? 'online' : 'offline', addr: '0x30' },
-    { id: 'dev-0x30', name: '臭氧传感器', type: '有害气体设备', location: '云测仪(0x30)', time: d.gas?.o3?.online ? now : '--', status: d.gas?.o3?.online !== false ? 'online' : 'offline', addr: '0x30' },
     { id: 'dev-0x30', name: 'CO₂传感器', type: '有害气体设备', location: '云测仪(0x30)', time: d.gas?.co2?.online ? now : '--', status: d.gas?.co2?.online !== false ? 'online' : 'offline', addr: '0x30' },
     { id: 'dev-0x60', name: '空调', type: '温控调节设备', location: '控制设备(0x60)', time: '--', status: 'online', addr: '0x60' },
     { id: 'dev-0x20', name: '恒湿净化一体机', type: '净化调节设备', location: '控制设备(0x20)', time: '--', status: 'online', addr: '0x20' },

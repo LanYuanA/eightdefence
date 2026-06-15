@@ -62,15 +62,15 @@ extern "C" {
 /* ============================================================
  * 设备实例
  * ============================================================ */
-/* 云测仪 - 拆分为8个独立传感器 */
+/* 云测仪 - 支持连续读和单独读两种模式 */
 DevCloudPm25        dev_pm25;
 DevCloudPm10        dev_pm10;
 DevCloudHumidity    dev_humidity;
 DevCloudTemperature dev_temperature;
 DevCloudTvoc        dev_tvoc;
 DevCloudCh2o        dev_ch2o;
-DevCloudO3          dev_o3;
 DevCloudCo2         dev_co2;
+DevCloudBatch       dev_cloud_batch;
 
 /* 其他设备 */
 DevSmoke            dev_smoke;
@@ -105,13 +105,13 @@ static void signal_handler(int sig) {
  * 初始化所有设备
  * ============================================================ */
 static void init_all_devices() {
+    dev_cloud_batch.init();
     dev_pm25.init();
     dev_pm10.init();
     dev_humidity.init();
     dev_temperature.init();
     dev_tvoc.init();
     dev_ch2o.init();
-    dev_o3.init();
     dev_co2.init();
     dev_smoke.init();
     dev_water.init();
@@ -303,6 +303,12 @@ int main(int argc, char *argv[]) {
     std::vector<DeviceTask> all_tasks;
 
     /* 按设备分组, 同一设备的多个寄存器读取合并为一组 */
+    /* 云测仪: 连续读模式下 dev_cloud_batch 产生1个任务, 各传感器返回空 */
+    /*         单独读模式下 dev_cloud_batch 无任务, 各传感器各自产生任务 */
+    {
+        auto t = dev_cloud_batch.getTasks();
+        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
+    }
     {
         auto t = dev_pm25.getTasks();
         all_tasks.insert(all_tasks.end(), t.begin(), t.end());
@@ -325,10 +331,6 @@ int main(int argc, char *argv[]) {
     }
     {
         auto t = dev_ch2o.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_o3.getTasks();
         all_tasks.insert(all_tasks.end(), t.begin(), t.end());
     }
     {

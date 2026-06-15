@@ -164,10 +164,6 @@
             <span class="data-value" :class="gasItemClass(status.gas?.ch2o, 50)">{{ gasItemText(status.gas?.ch2o) }}</span>
           </div>
           <div class="data-row">
-            <span class="data-label">O3 (臭氧)</span>
-            <span class="data-value" :class="gasItemClass(status.gas?.o3, 60)">{{ gasItemText(status.gas?.o3) }}</span>
-          </div>
-          <div class="data-row">
             <span class="data-label">CO2 (二氧化碳)</span>
             <span class="data-value" :class="gasItemClass(status.gas?.co2, 800)">{{ gasItemText(status.gas?.co2) }}</span>
           </div>
@@ -259,7 +255,7 @@
             <div class="service-body">
               <div class="service-detail">
                 <span class="detail-label">触发条件</span>
-                <span class="detail-value">有害气体(TVOC/CH2O/O3/CO2)超标</span>
+                <span class="detail-value">有害气体(TVOC/CH2O/CO2)超标</span>
               </div>
               <div class="service-detail">
                 <span class="detail-label">执行动作</span>
@@ -394,7 +390,7 @@ interface SecurityStatus {
   system: { overallRisk: string; systemNormal: boolean; running: boolean }
   water: { level: number; sensorState: number; risk: string; controlActive: boolean; online: boolean }
   intrusion: { infraredState: number; radarState: number; risk: string; online: boolean }
-  gas: { online: boolean; tvoc: { value: number; unit: string; online: boolean }; ch2o: { value: number; unit: string; online: boolean }; o3: { value: number; unit: string; online: boolean }; co2: { value: number; unit: string; online: boolean }; risk: string; ventilationActive: boolean }
+  gas: { online: boolean; tvoc: { value: number; unit: string; online: boolean }; ch2o: { value: number; unit: string; online: boolean }; co2: { value: number; unit: string; online: boolean }; risk: string; ventilationActive: boolean }
   alarm: { soundActive: boolean; centerActive: boolean }
   devices?: { water?: { online: boolean }; infrared?: { online: boolean }; smoke?: { online: boolean }; alarm?: { online: boolean }; purifier?: { online: boolean }; humidifier?: { online: boolean } }
 }
@@ -410,7 +406,7 @@ const status = ref<SecurityStatus>({
   system: { overallRisk: "低风险", systemNormal: true, running: true },
   water: { level: 0, sensorState: 0, risk: "低风险", controlActive: false, online: true },
   intrusion: { infraredState: 0, radarState: 0, risk: "低风险", online: true },
-  gas: { online: true, tvoc: { value: 0, unit: "ppb", online: true }, ch2o: { value: 0, unit: "ppb", online: true }, o3: { value: 0, unit: "ppb", online: true }, co2: { value: 0, unit: "ppm", online: true }, risk: "低风险", ventilationActive: false },
+  gas: { online: true, tvoc: { value: 0, unit: "ppb", online: true }, ch2o: { value: 0, unit: "ppb", online: true }, co2: { value: 0, unit: "ppm", online: true }, risk: "低风险", ventilationActive: false },
   alarm: { soundActive: false, centerActive: false },
   devices: { water: { online: true }, infrared: { online: true }, smoke: { online: true }, alarm: { online: true }, purifier: { online: true }, humidifier: { online: true } }
 })

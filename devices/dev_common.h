@@ -59,7 +59,6 @@ typedef struct {
     int tvoc;            /* TVOC 浓度 (ppb) */
     int ch2o;            /* 甲醛浓度 (mg/m3 * 1000) */
     int co2;             /* CO2 浓度 (ppm) */
-    int o3;              /* 臭氧浓度 (ppb) */
     pthread_mutex_t lock;
 } EnvData;
 

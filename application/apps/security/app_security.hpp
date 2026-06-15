@@ -49,7 +49,6 @@ struct SecurityState {
     std::atomic<bool>  gasSimulated{false};
     std::atomic<int>   simTvoc{0};
     std::atomic<int>   simCh2o{0};
-    std::atomic<int>   simO3{0};
     std::atomic<int>   simCo2{0};
     SecurityRiskLevel  gasRisk{SecurityRiskLevel::LOW};
 

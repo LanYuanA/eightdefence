@@ -17,6 +17,14 @@ export default defineConfig({
       '/security': {
         target: 'http://localhost:8080',
         changeOrigin: true
+      },
+      '/environment': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
+      },
+      '/fire': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
       }
     }
   }

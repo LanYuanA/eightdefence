@@ -65,7 +65,7 @@
               </div>
               <div class="sensor-info">
                 <div class="sensor-name">温度</div>
-                <div class="sensor-value">{{ data.temperature }}<span class="sensor-unit">°C</span></div>
+                <div class="sensor-value">{{ (data.temperature / 10).toFixed(1) }}<span class="sensor-unit">°C</span></div>
               </div>
             </div>
             <div class="sensor-item">
@@ -74,7 +74,7 @@
               </div>
               <div class="sensor-info">
                 <div class="sensor-name">湿度</div>
-                <div class="sensor-value">{{ data.humidity }}<span class="sensor-unit">%</span></div>
+                <div class="sensor-value">{{ (data.humidity / 10).toFixed(1) }}<span class="sensor-unit">%</span></div>
               </div>
             </div>
             <div class="sensor-item">
@@ -366,21 +366,25 @@ const fetchData = async () => {
   try {
     const res = await axios.get("/api/data")
     data.value = res.data
-    
-    const d = new Date()
-    const t = `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}:${d.getSeconds().toString().padStart(2,"0")}`
-    historyTime.value.push(t)
-    historyTemp.value.push(data.value.temperature)
-    historyHum.value.push(data.value.humidity)
-    historyPm25.value.push(data.value.pm25)
-    
-    if (historyTime.value.length > 30) {
-      historyTime.value.shift()
-      historyTemp.value.shift()
-      historyHum.value.shift()
-      historyPm25.value.shift()
-    }
   } catch (e) {}
+}
+
+// 每1小时记录一次历史数据到曲线图
+const recordHistory = () => {
+  const d = new Date()
+  const t = `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`
+  historyTime.value.push(t)
+  historyTemp.value.push(data.value.temperature / 10)
+  historyHum.value.push(data.value.humidity / 10)
+  historyPm25.value.push(data.value.pm25)
+
+  // 保留最近24小时的数据 (24个点)
+  if (historyTime.value.length > 24) {
+    historyTime.value.shift()
+    historyTemp.value.shift()
+    historyHum.value.shift()
+    historyPm25.value.shift()
+  }
 }
 
 const control = async (device: string, action: string) => {
@@ -413,17 +417,22 @@ const setConstHum = () => {
   controlVal('humidifier', "const_hum", targetHum.value)
 }
 
+let historyInterval = 0
+
 onMounted(() => {
   updateTime()
   timeInterval = window.setInterval(updateTime, 1000)
   fetchData()
   fetchSecurityStatus()
+  recordHistory()  // 立即记录第一个点
   dataInterval = window.setInterval(() => { fetchData(); fetchSecurityStatus() }, 2000)
+  historyInterval = window.setInterval(recordHistory, 3600000)  // 每1小时记录一次
 })
 
 onUnmounted(() => {
   window.clearInterval(timeInterval)
   window.clearInterval(dataInterval)
+  window.clearInterval(historyInterval)
 })
 </script>
 

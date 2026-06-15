@@ -50,11 +50,11 @@ void SvcGasResponse::deactivate() {
 void SvcGasResponse::setThresholds(const GasThresholds& t) {
     std::lock_guard<std::mutex> lock(mtx_);
     thresholds_ = t;
-    printf("  => [SvcGasResponse] 阈值已更新: TVOC>%d CH2O>%d O3>%d CO2>%d\n",
-           thresholds_.tvocHigh, thresholds_.ch2oHigh, thresholds_.o3High, thresholds_.co2High);
+    printf("  => [SvcGasResponse] 阈值已更新: TVOC>%d CH2O>%d CO2>%d\n",
+           thresholds_.tvocHigh, thresholds_.ch2oHigh, thresholds_.co2High);
 }
 
-void SvcGasResponse::checkAndControl(int tvoc, int ch2o, int o3, int co2) {
+void SvcGasResponse::checkAndControl(int tvoc, int ch2o, int co2) {
     if (!active_.load()) return;
 
     std::lock_guard<std::mutex> lock(mtx_);
@@ -63,7 +63,6 @@ void SvcGasResponse::checkAndControl(int tvoc, int ch2o, int o3, int co2) {
 
     bool exceeded = (tvoc > thresholds_.tvocHigh) ||
                     (ch2o > thresholds_.ch2oHigh) ||
-                    (o3   > thresholds_.o3High)   ||
                     (co2  > thresholds_.co2High);
 
     bool purifierOnline = dev_purifier.isOnline();
@@ -81,11 +80,11 @@ void SvcGasResponse::checkAndControl(int tvoc, int ch2o, int o3, int co2) {
             printf("  => [SvcGasResponse] 恒湿机离线, 跳过净化模式指令\n");
         }
         if (purifierOnline || humOnline) {
-            printf("  => [SvcGasResponse] 气体超标, 开启净化器 (TVOC:%d CH2O:%d O3:%d CO2:%d)\n",
-                   tvoc, ch2o, o3, co2);
+            printf("  => [SvcGasResponse] 气体超标, 开启净化器 (TVOC:%d CH2O:%d CO2:%d)\n",
+                   tvoc, ch2o, co2);
             Logger::instance().log(LogLevel::WARNING, __FILE__, __LINE__,
-                "[有害气体处理] 气体超标, 开启净化器 (TVOC:%d CH2O:%d O3:%d CO2:%d)",
-                tvoc, ch2o, o3, co2);
+                "[有害气体处理] 气体超标, 开启净化器 (TVOC:%d CH2O:%d CO2:%d)",
+                tvoc, ch2o, co2);
         }
     } else if (!exceeded && purifierOn_) {
         if (purifyModeOn_ && humOnline) { dev_humidifier.setPurify(*g_modbus, 0, resp, &resp_len); purifyModeOn_ = false; }

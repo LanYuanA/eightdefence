@@ -81,7 +81,6 @@ struct EnvDataCpp {
     int tvoc        = 0;
     int ch2o        = 0;
     int co2         = 0;
-    int o3          = 0;
     mutable std::mutex mtx;
 
     EnvDataCpp() = default;
@@ -90,7 +89,7 @@ struct EnvDataCpp {
         pm25 = other.pm25; pm10 = other.pm10;
         humidity = other.humidity; temperature = other.temperature;
         tvoc = other.tvoc; ch2o = other.ch2o;
-        co2 = other.co2; o3 = other.o3;
+        co2 = other.co2;
     }
     EnvDataCpp& operator=(const EnvDataCpp &other) {
         if (this != &other) {
@@ -98,7 +97,7 @@ struct EnvDataCpp {
             pm25 = other.pm25; pm10 = other.pm10;
             humidity = other.humidity; temperature = other.temperature;
             tvoc = other.tvoc; ch2o = other.ch2o;
-            co2 = other.co2; o3 = other.o3;
+            co2 = other.co2;
         }
         return *this;
     }

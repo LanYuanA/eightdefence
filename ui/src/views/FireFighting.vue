@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="fire-page">
     <!-- 顶部导航栏 -->
     <nav class="top-nav-bar">
@@ -32,14 +32,11 @@
         >
           本区设备在线：<span style="color: var(--accent)">{{ onlineCountText }}</span> &#x1F50D;
         </div>
-        <div class="status-item">系统状态：<span :style="{ color: systemStatusColor }">{{ systemStatusText }}</span></div>
         <div class="status-item">当前时间：<span>{{ currentTime }}</span></div>
       </div>
     </header>
-
-    <div class="container">
-      <!-- Left Panel: Risk + Realtime + Charts -->
-      <div class="panel" style="grid-row: span 3; overflow-y: auto;">
+    <div class="fire-container">
+      <div class="panel" style="overflow-y: hidden;">
         <div class="panel-title">区域火灾风险等级评估</div>
         <div class="risk-section" style="margin-bottom: 30px;">
           <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
@@ -100,6 +97,7 @@
         </div>
       </div>
 
+      <div class="right-col" style="display: flex; flex-direction: column; gap: 20px;">
       <!-- Right Panel: Thresholds -->
       <div class="panel">
         <div class="panel-title">预警阈值设置与数据峰值</div>
@@ -122,32 +120,6 @@
             <input type="number" v-model.number="thresholds.gas" /> <span style="font-size: 12px; color: var(--text-sub)">ppm</span>
             <button class="btn" style="padding: 4px 10px; font-size: 12px;" @click="updateThreshold('gas')">保存设置</button>
           </div>
-        </div>
-      </div>
-
-      <!-- Right Panel: Alarm Log -->
-      <div class="panel">
-        <div class="panel-title">异常状况与火情报警事件</div>
-        <div style="overflow-y: auto; flex: 1;">
-          <table class="log-table">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>报警类型</th>
-                <th>状态说明</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(log, i) in logs" :key="i">
-                <td>{{ log.timestamp }}</td>
-                <td><span class="tag" :class="logTagClass(log.level)">{{ log.event }}</span></td>
-                <td>{{ log.details }}</td>
-              </tr>
-              <tr v-if="logs.length === 0">
-                <td colspan="3" style="text-align:center; color: var(--text-sub)">暂无报警记录</td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </div>
 
@@ -211,15 +183,16 @@
           <button class="btn" style="padding: 5px 12px; font-size:12px;" @click="doControl('smoke', 'reset')">解除烟雾</button>
         </div>
         <div class="btn-group" style="margin-top: 5px;">
-          <button class="btn" @click="openModal('deviceControlLogModal')">设备控制历史记录</button>
-          <button class="btn" @click="openModal('historyModal')">历史监测日志</button>
-          <button class="btn" @click="openModal('alarmModal')">报警事件库</button>
+          <button class="btn" @click="openModal('deviceControlLog')">设备控制历史记录</button>
+          <button class="btn" @click="openModal('history')">历史监测日志</button>
+          <button class="btn" @click="openModal('alarm')">报警事件库</button>
           <button class="btn" @click="handleBackup">数据备份归档</button>
         </div>
         <div class="btn-group">
-          <button class="btn" style="background-color: var(--text-sub)" @click="openModal('recoveryModal')">数据恢复</button>
+          <button class="btn" style="background-color: var(--text-sub)" @click="openModal('recovery')">数据恢复</button>
         </div>
       </div>
+      </div>  <!-- /right-col -->
     </div>
 
     <!-- 火情确认弹窗 -->
@@ -530,29 +503,11 @@ const co2Display = computed(() => {
   return val != null ? String(val) : "--"
 })
 
-const systemStatusText = computed(() => {
-  if (!status.value.system?.running) return "已停止 (STOPPED)"
-  if (status.value.system?.overallRisk === "火灾") return "火灾报警 (FIRE)"
-  if (status.value.system?.overallRisk === "高风险") return "高风险 (HIGH RISK)"
-  if (status.value.system?.overallRisk === "预警") return "预警中 (WARNING)"
-  return "监控中 (NORMAL)"
-})
-
-const systemStatusColor = computed(() => {
-  const risk = status.value.system?.overallRisk
-  if (risk === "火灾" || risk === "高风险") return "var(--danger)"
-  if (risk === "预警") return "var(--warning)"
-  return "var(--success)"
-})
-
 const onlineCountText = computed(() => {
-  const devices = status.value.devices
-  if (!devices) return "--"
-  let online = 0, total = 0
-  if (devices.smoke) { total++; if (devices.smoke.online) online++ }
-  if (devices.temperature) { total++; if (devices.temperature.online) online++ }
-  if (devices.alarm) { total++; if (devices.alarm.online) online++ }
-  return `${online}/${total}`
+  const list = allDevices.value
+  if (!list || list.length === 0) return "--"
+  const online = list.filter(d => d.online).length
+  return `${online}/${list.length}`
 })
 
 const riskPercent = computed(() => {
@@ -590,10 +545,9 @@ const allDevices = computed<DeviceInfo[]>(() => {
   return [
     { name: `区域${region} - 烟雾探测器`, online: devices?.smoke?.online ?? true },
     { name: `区域${region} - 温度传感器`, online: devices?.temperature?.online ?? true },
-    { name: `区域${region} - 声光报警器`, online: devices?.alarm?.online ?? true },
-    { name: `区域${region} - 排烟风机`, online: true },
-    { name: `区域${region} - 自动水淋系统`, online: true },
-    { name: `区域${region} - 舱门控制开关`, online: true }
+    { name: `区域${region} - 湿度传感器`, online: devices?.humidity?.online ?? true },
+    { name: `区域${region} - CO₂传感器`, online: devices?.co2?.online ?? true },
+    { name: `区域${region} - 声光报警器`, online: devices?.alarm?.online ?? true }
   ]
 })
 
@@ -606,12 +560,6 @@ const offlineDeviceCount = computed(() => offlineDevices.value.length)
 function updateTime() {
   const d = new Date()
   currentTime.value = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}:${d.getSeconds().toString().padStart(2, "0")}`
-}
-
-function logTagClass(level: string) {
-  if (level === "alarm" || level === "danger") return "danger"
-  if (level === "warning") return "warning"
-  return "system"
 }
 
 function openModal(name: string) {
@@ -1056,10 +1004,10 @@ watch(currentRegion, () => {
   background: rgba(59, 130, 246, 0.2);
 }
 
-.container {
+.fire-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: min-content 1fr min-content;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr;
   gap: 20px;
   padding: 20px;
   flex: 1;
@@ -1151,7 +1099,7 @@ watch(currentRegion, () => {
 .panel-title {
   font-size: 16px;
   font-weight: bold;
-  margin-bottom: 15px;
+  margin-bottom: 8px;
   color: var(--text-main);
   border-left: 4px solid var(--accent);
   padding-left: 10px;
@@ -1206,13 +1154,13 @@ watch(currentRegion, () => {
   gap: 15px;
   flex: 1;
   width: 100%;
-  min-height: 380px;
+  min-height: 260px;
 }
 
 .chart-box {
   width: 100%;
   height: 100%;
-  min-height: 170px;
+  min-height: 110px;
 }
 
 .log-table {

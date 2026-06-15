@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file app_environment.hpp
  * @brief 环境监测应用 - 温湿度/PM2.5/PM10/有害气体环境监测
  *

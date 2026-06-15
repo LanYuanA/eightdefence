@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file app_fire_fighting.cpp
  * @brief 消防系统应用实现
  */

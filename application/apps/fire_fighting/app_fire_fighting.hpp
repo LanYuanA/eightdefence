@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file app_fire_fighting.hpp
  * @brief 消防系统应用 - 烟雾/温度火灾检测与应急处置
  *

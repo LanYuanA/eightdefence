@@ -416,8 +416,10 @@ interface FireStatus {
   system: { overallRisk: string; systemNormal: boolean; running: boolean; fireSimulated: boolean }
   smoke: { state: number; stateText: string; risk: string; online: boolean }
   temperature: { value: number; unit: string; risk: string; online: boolean }
+  humidity: { value: number; unit: string; online: boolean }
+  co2: { value: number; unit: string; online: boolean }
   services: { alarmActive: boolean; suppressionActive: boolean; evacuationActive: boolean; centerAlarmActive: boolean }
-  devices: { smoke: { online: boolean }; temperature: { online: boolean }; alarm: { online: boolean } }
+  devices: { smoke: { online: boolean }; temperature: { online: boolean }; humidity: { online: boolean }; co2: { online: boolean }; alarm: { online: boolean } }
 }
 
 interface LogEntry {
@@ -448,8 +450,10 @@ const status = ref<FireStatus>({
   system: { overallRisk: "安全", systemNormal: true, running: true, fireSimulated: false },
   smoke: { state: 0, stateText: "正常", risk: "安全", online: true },
   temperature: { value: 25, unit: "°C", risk: "安全", online: true },
+  humidity: { value: 50, unit: "%", online: true },
+  co2: { value: 400, unit: "ppm", online: true },
   services: { alarmActive: false, suppressionActive: false, evacuationActive: false, centerAlarmActive: false },
-  devices: { smoke: { online: true }, temperature: { online: true }, alarm: { online: true } }
+  devices: { smoke: { online: true }, temperature: { online: true }, humidity: { online: true }, co2: { online: true }, alarm: { online: true } }
 })
 
 const logs = ref<LogEntry[]>([])
@@ -517,13 +521,13 @@ const temperatureDisplay = computed(() => {
 })
 
 const humidityDisplay = computed(() => {
-  // humidity not in API, show static or placeholder
-  return "--"
+  const val = status.value.humidity?.value
+  return val != null ? val.toFixed(1) : "--"
 })
 
 const co2Display = computed(() => {
-  // CO2 not directly in API, show static placeholder
-  return "--"
+  const val = status.value.co2?.value
+  return val != null ? String(val) : "--"
 })
 
 const systemStatusText = computed(() => {
@@ -748,8 +752,8 @@ async function fetchStatus() {
     const label = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`
     chartData.labels.push(label)
     chartData.temp.push(res.data.temperature?.value ?? 0)
-    chartData.hum.push(0) // placeholder
-    chartData.gas.push(0) // placeholder
+    chartData.hum.push(res.data.humidity?.value ?? 0)
+    chartData.gas.push(res.data.co2?.value ?? 0)
     chartData.smoke.push(res.data.smoke?.state ?? 0)
     // Keep last 20 points
     if (chartData.labels.length > 20) {
@@ -1001,6 +1005,7 @@ watch(currentRegion, () => {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   display: flex;
   flex-direction: column;
+  width: 100%;
   height: 100vh;
   --bg-color: #0b0f19;
   --panel-bg: #151a27;
@@ -1053,11 +1058,13 @@ watch(currentRegion, () => {
 
 .container {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr 1fr;
   grid-template-rows: min-content 1fr min-content;
   gap: 20px;
   padding: 20px;
   flex: 1;
+  width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
 }
 

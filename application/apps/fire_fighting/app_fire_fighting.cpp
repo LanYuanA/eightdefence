@@ -82,9 +82,15 @@ HttpResponse AppFireFighting::handleGetStatus(const HttpRequest& /*req*/) {
     m_state.smokeState.store(smokeState);
     m_state.temperature.store(temp);
 
+    // 从云测仪读取湿度和CO2
+    float hum = dev_humidity.isOnline() ? dev_humidity.getValue() / 10.0f : 0.0f;
+    int co2 = dev_co2.isOnline() ? dev_co2.getValue() : 0;
+
     // 设备在线状态
     bool smokeOnline = dev_smoke.isOnline();
     bool tempOnline  = dev_temperature.isOnline();
+    bool humOnline   = dev_humidity.isOnline();
+    bool co2Online   = dev_co2.isOnline();
     bool alarmOnline = dev_alarm.isOnline();
 
     // 实时计算风险等级
@@ -113,6 +119,16 @@ HttpResponse AppFireFighting::handleGetStatus(const HttpRequest& /*req*/) {
         "\"risk\":\"%s\","
         "\"online\":%s"
         "},"
+        "\"humidity\":{"
+        "\"value\":%.1f,"
+        "\"unit\":\"%%\","
+        "\"online\":%s"
+        "},"
+        "\"co2\":{"
+        "\"value\":%d,"
+        "\"unit\":\"ppm\","
+        "\"online\":%s"
+        "},"
         "\"services\":{"
         "\"alarmActive\":%s,"
         "\"suppressionActive\":%s,"
@@ -122,6 +138,8 @@ HttpResponse AppFireFighting::handleGetStatus(const HttpRequest& /*req*/) {
         "\"devices\":{"
         "\"smoke\":{\"online\":%s},"
         "\"temperature\":{\"online\":%s},"
+        "\"humidity\":{\"online\":%s},"
+        "\"co2\":{\"online\":%s},"
         "\"alarm\":{\"online\":%s}"
         "}"
         "}",
@@ -136,12 +154,18 @@ HttpResponse AppFireFighting::handleGetStatus(const HttpRequest& /*req*/) {
         temp,
         riskStr[static_cast<int>(m_state.tempRisk)],
         tempOnline ? "true" : "false",
+        hum,
+        humOnline ? "true" : "false",
+        co2,
+        co2Online ? "true" : "false",
         m_state.alarmActive.load() ? "true" : "false",
         m_state.suppressionActive.load() ? "true" : "false",
         m_state.evacuationActive.load() ? "true" : "false",
         m_state.centerAlarmActive.load() ? "true" : "false",
         smokeOnline ? "true" : "false",
         tempOnline ? "true" : "false",
+        humOnline ? "true" : "false",
+        co2Online ? "true" : "false",
         alarmOnline ? "true" : "false"
     );
 

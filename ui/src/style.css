@@ -1,1 +1,14 @@
+﻿/* ===== 全局CSS变量 (八防系统) ===== */
+:root {
+  --bg-color: #0f172a;
+  --panel-bg: #1e293b;
+  --border: #334155;
+  --text-main: #e2e8f0;
+  --text-sub: #94a3b8;
+  --accent: #3b82f6;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #22c55d;
+  --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
 @import "tailwindcss";

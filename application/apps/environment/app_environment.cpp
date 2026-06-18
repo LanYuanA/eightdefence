@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file app_environment.cpp
  * @brief 环境监测应用实现
  */

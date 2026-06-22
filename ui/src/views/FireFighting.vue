@@ -1,4 +1,4 @@
-﻿<template>
+﻿﻿<template>
   <div class="fire-page">
     <!-- 顶部导航栏 -->
     <nav class="top-nav-bar">
@@ -400,7 +400,7 @@ import * as echarts from "echarts"
 
 // ---- Interfaces ----
 interface FireStatus {
-  system: { overallRisk: string; systemNormal: boolean; running: boolean; fireSimulated: boolean }
+  system: { overallRisk: string; riskPercent: number; systemNormal: boolean; running: boolean; fireSimulated: boolean }
   smoke: { state: number; stateText: string; risk: string; online: boolean }
   temperature: { value: number; unit: string; risk: string; online: boolean }
   humidity: { value: number; unit: string; online: boolean }
@@ -435,7 +435,7 @@ const handleLogout = () => {
 }
 
 const status = ref<FireStatus>({
-  system: { overallRisk: "安全", systemNormal: true, running: true, fireSimulated: false },
+  system: { overallRisk: "安全", riskPercent: 15, systemNormal: true, running: true, fireSimulated: false },
   smoke: { state: 0, stateText: "正常", risk: "安全", online: true },
   temperature: { value: 25, unit: "°C", risk: "安全", online: true },
   humidity: { value: 50, unit: "%", online: true },
@@ -494,11 +494,11 @@ const alarmFilteredLogs = computed(() => {
 })
 
 // 火情误报屏蔽标志: 点击"火情误报"后置true, 数据恢复正常后自动重置
-const alarmDismissed = ref(false)
+const alarmDismissed = ref(false); let alarmDismissTimer: ReturnType<typeof setTimeout> | null = null
 
 const deviceSwitches = reactive({ cabin: false, fan: false, sprinkler: false, horn: false })
 
-const deviceControlLogList = ref<DeviceControlLogItem[]>([])
+const deviceControlLogList = ref<DeviceControlLogItem[]>([]); const fireActions = ref<{timestamp:string;action:string;operator:string}[]>([])
 
 // Modals
 const modals = reactive({
@@ -576,29 +576,19 @@ function logTagClass(level: string) {
 }
 
 const riskPercent = computed(() => {
-  const risk = status.value.system?.overallRisk
-  if (risk === "火灾") return 100
-  if (risk === "高风险") return 88
-  if (risk === "预警") return 65
-  if (risk === "中风险") return 50
-  // compute from temperature risk
-  const tRisk = status.value.temperature?.risk
-  if (tRisk === "高风险") return 80
-  if (tRisk === "中风险") return 50
-  return 15
+  return status.value.system?.riskPercent ?? 15
 })
-
 const riskColor = computed(() => {
   const p = riskPercent.value
-  if (p >= 80) return "var(--danger)"
-  if (p >= 50) return "var(--warning)"
+  if (p >= 55) return "var(--danger)"
+  if (p >= 25) return "var(--warning)"
   return "var(--success)"
 })
 
 const riskText = computed(() => {
   const p = riskPercent.value
-  if (p >= 80) return `高风险 ${p}%`
-  if (p >= 50) return `中风险 ${p}%`
+  if (p >= 55) return `高风险 ${p}%`
+  if (p >= 25) return `中风险 ${p}%`
   return `低风险 ${p}%`
 })
 
@@ -661,8 +651,10 @@ function openCurrentRegionDeviceModal() {
   openModal("deviceList")
 }
 
-function confirmFire() {
+async function confirmFire() {
   closeModal("fireConfirm")
+  const operator = localStorage.getItem("loginUser") || "管理员"
+  try { await axios.get("/fire/api/control", { params: { action: "confirm", operator } }) } catch (e) {}
   deviceSwitches.cabin = true
   deviceSwitches.fan = true
   deviceSwitches.sprinkler = true
@@ -671,13 +663,17 @@ function confirmFire() {
   addDeviceControlLog("排烟风机设备", "开启")
   addDeviceControlLog("自动水淋灭火系统", "开启")
   addDeviceControlLog("声光报警器", "开启")
-  ElMessage.success("已确认火情并执行安全防御！")
+  fireActions.value.push({ timestamp: new Date().toLocaleString('zh-CN'), action: 'confirmed', operator })
+  if (alarmDismissTimer) clearTimeout(alarmDismissTimer); alarmDismissed.value = true; alarmDismissTimer = setTimeout(() => { alarmDismissed.value = false }, 60000); ElMessage.success("已确认火情，60秒后可再次告警")
 }
 
-function cancelFireAlarm() {
+async function cancelFireAlarm() {
   closeModal("fireConfirm")
+  const operator = localStorage.getItem("loginUser") || "管理员"
+  try { await axios.get("/fire/api/control", { params: { action: "dismiss", operator } }) } catch (e) {}
   alarmDismissed.value = true
-  ElMessage.info("已标记为火情误报，数据恢复正常后将自动重置")
+  fireActions.value.push({ timestamp: new Date().toLocaleString('zh-CN'), action: 'dismissed', operator })
+  if (alarmDismissTimer) clearTimeout(alarmDismissTimer); alarmDismissed.value = true; alarmDismissTimer = setTimeout(() => { alarmDismissed.value = false }, 60000); ElMessage.info("已标记为火情误报，60秒后可再次告警，操作已记录")
 }
 
 function updateThreshold(type: string) {
@@ -688,6 +684,7 @@ function updateThreshold(type: string) {
   }
 }
 
+
 function handleBackup() {
   const now = new Date()
   const dateStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,"0")}-${now.getDate().toString().padStart(2,"0")}`
@@ -696,7 +693,8 @@ function handleBackup() {
     backupDate: dateStr,
     dailyHistory: dailyHistory.value,
     alarmLogs: alarmFilteredLogs.value,
-    deviceControlLogs: deviceControlLogList.value
+    deviceControlLogs: deviceControlLogList.value,
+    fireActions: fireActions.value
   }
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
   const url = URL.createObjectURL(blob)

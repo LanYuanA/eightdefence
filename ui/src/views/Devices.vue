@@ -1,624 +1,602 @@
 <template>
-  <div class="dev-root flex flex-col min-h-screen">
-    <!-- 顶部导航栏 -->
-    <header class="nav-header">
-      <div class="nav-inner">
-        <div class="flex items-center gap-4">
-          <div class="brand-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-          </div>
-          <div>
-            <div class="brand-title">智慧环控安防系统</div>
-            <div class="brand-sub">Smart Environment & Security Platform</div>
-          </div>
-        </div>
-        <div class="flex items-center gap-5">
-          <div class="nav-time">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1.5 opacity-60">
-              <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
-            </svg>
-            {{ currentTime }}
-          </div>
-          <button class="nav-btn" @click="$router.push('/')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            返回主页
-          </button>
-          <button class="nav-btn" @click="$router.push('/logs')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            日志查看
-          </button>
-        </div>
-      </div>
-    </header>
+  <div class="devices-root">
+    <ParticleBackground :particle-count="30" color="#8b5cf6" :opacity="0.3" />
+    <AppNavbar title="设备管理中心" subtitle="Device Management Center" :menu-items="menuItems" />
 
-    <main class="flex-1 p-5 flex gap-5 overflow-hidden">
-      <!-- 左侧面板: 设备列表 -->
-      <div class="w-72 flex flex-col gap-4 shrink-0">
-        <!-- 筛选器 -->
-        <div class="card">
-          <div class="card-header">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-            <span>设备筛选</span>
-          </div>
-          <div class="flex flex-wrap gap-2 mt-3">
-            <button
-              v-for="cat in categories" :key="cat.value"
-              class="filter-tag"
-              :class="{ 'active': activeCategory === cat.value }"
-              @click="activeCategory = cat.value"
-            >{{ cat.label }}</button>
-          </div>
-          <div class="mt-3 flex items-center gap-3 text-xs text-slate-400">
-            <span class="flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-emerald"></span>
-              在线 <span class="text-emerald-400 font-semibold">{{ onlineCount }}</span>
-            </span>
-            <span class="text-slate-600">/</span>
-            <span>共 <span class="text-slate-200">{{ filteredDevices.length }}</span> 台</span>
+    <main class="devices-main">
+      <!-- 设备概览 -->
+      <section class="overview-section">
+        <div class="section-header">
+          <h2 class="section-title">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+            设备概览
+          </h2>
+          <div class="header-actions">
+            <CyberButton variant="primary" size="sm" @click="showAddDevice = true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              添加设备
+            </CyberButton>
+            <CyberButton variant="ghost" size="sm" @click="refreshAllDevices">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
+              刷新全部
+            </CyberButton>
+            <CyberButton variant="ghost" size="sm" @click="exportDevices">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              导出配置
+            </CyberButton>
           </div>
         </div>
 
-        <!-- 设备列表 -->
-        <div class="card flex-1 flex flex-col">
-          <div class="card-header">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
-            <span>设备列表</span>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(59,130,246,0.2); color: #3b82f6;">📡</div>
+            <div class="stat-info"><div class="stat-value">{{ totalCount }}</div><div class="stat-label">设备总数</div></div>
           </div>
-          <div class="mt-3 flex flex-col gap-1.5 max-h-[calc(100vh-340px)] overflow-y-auto custom-scrollbar">
-            <div
-              v-for="dev in filteredDevices" :key="dev.type"
-              class="device-item"
-              :class="{ 'active': selectedDevice?.type === dev.type, 'offline': !dev.online }"
-              @click="selectDevice(dev)"
-            >
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="w-2 h-2 rounded-full shrink-0" :class="dev.online ? 'bg-emerald-400 shadow-emerald' : 'bg-red-500 shadow-red'"></span>
-                <span class="text-sm truncate">{{ dev.name }}</span>
-              </div>
-              <span class="text-xs font-mono" :class="dev.online ? 'text-indigo-300' : 'text-red-400'">
-                {{ dev.online ? formatValue(dev) : '离线' }}
-              </span>
-            </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(34,197,94,0.2); color: #22c55d;">✅</div>
+            <div class="stat-info"><div class="stat-value">{{ onlineCount }}</div><div class="stat-label">在线设备</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(239,68,68,0.2); color: #ef4444;">❌</div>
+            <div class="stat-info"><div class="stat-value">{{ offlineCount }}</div><div class="stat-label">离线设备</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(245,158,11,0.2); color: #f59e0b;">⚠️</div>
+            <div class="stat-info"><div class="stat-value">{{ alertCount }}</div><div class="stat-label">告警设备</div></div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- 右侧面板: 设备详情 -->
-      <div class="flex-1 flex flex-col gap-5 min-w-0">
-        <template v-if="selectedDevice">
-          <!-- 设备信息卡片 -->
-          <div class="card">
-            <div class="flex items-center justify-between mb-4">
-              <div class="card-header pb-0 mb-0 border-0">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                <span>设备信息</span>
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="status-badge" :class="selectedDevice.online ? 'status-online' : 'status-offline'">
-                  {{ selectedDevice.online ? '在线' : '离线' }}
-                </span>
-                <span class="category-badge">{{ selectedDevice.category }}</span>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div class="info-box">
-                <div class="info-label">设备名称</div>
-                <div class="info-value text-indigo-300">{{ selectedDevice.name }}</div>
-              </div>
-              <div class="info-box">
-                <div class="info-label">设备类型</div>
-                <div class="info-value text-purple-300">{{ selectedDevice.type }}</div>
-              </div>
-              <div class="info-box">
-                <div class="info-label">当前数值</div>
-                <div class="info-value text-amber-300">
-                  {{ formatValue(selectedDevice) }}
-                  <span class="text-xs text-slate-500 ml-1">{{ selectedDevice.unit }}</span>
-                </div>
-              </div>
-              <div class="info-box">
-                <div class="info-label">运行状态</div>
-                <div class="info-value" :class="selectedDevice.online ? 'text-emerald-400' : 'text-red-400'">
-                  {{ selectedDevice.online ? '正常运行' : '通信中断' }}
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-4 p-3 bg-slate-900/50 border border-slate-700/50 rounded-lg">
-              <div class="text-xs text-slate-500 mb-1">设备描述</div>
-              <div class="text-sm text-slate-300">{{ selectedDevice.description }}</div>
-            </div>
+      <!-- 筛选和搜索 -->
+      <section class="filter-section">
+        <div class="filter-bar">
+          <div class="filter-tabs">
+            <button v-for="cat in categories" :key="cat.value" class="filter-tab" :class="{ active: activeCategory === cat.value }" @click="activeCategory = cat.value">
+              {{ cat.label }} <span class="tab-count">{{ cat.count }}</span>
+            </button>
           </div>
+          <div class="search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input v-model="searchQuery" type="text" placeholder="搜索设备..." class="search-input" />
+          </div>
+        </div>
+      </section>
 
-          <!-- 实时数据图表 -->
-          <div class="card flex-1 flex flex-col">
+      <!-- 设备网格 -->
+      <section class="devices-grid-section">
+        <div class="devices-grid">
+          <div
+            v-for="dev in filteredDevices"
+            :key="dev.id"
+            class="device-card"
+            :class="{ offline: dev.status === 'offline', selected: selectedDevice?.id === dev.id }"
+            @click="selectDevice(dev)"
+          >
             <div class="card-header">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-              <span>实时数据</span>
-              <span class="ml-auto text-xs text-slate-400 font-mono">最近 60 个采样点</span>
+              <div class="device-icon" :style="{ background: dev.color + '20', color: dev.color }">
+                {{ dev.icon }}
+              </div>
+              <div class="device-status" :class="dev.status">
+                <span class="status-dot"></span>
+                {{ dev.status === 'online' ? '在线' : '离线' }}
+              </div>
             </div>
-            <div class="mt-4 flex-1">
-              <div v-if="hasChart">
-                <div class="flex items-center gap-4 mb-4">
-                  <span class="text-xs text-slate-400">当前: <span class="text-indigo-300 font-semibold font-mono">{{ formatValue(selectedDevice) }} {{ selectedDevice.unit }}</span></span>
-                </div>
-                <!-- 柱状图 -->
-                <div class="chart-area flex items-end gap-1 h-48 px-2">
-                  <div
-                    v-for="(val, idx) in valueHistory" :key="idx"
-                    class="flex-1 transition-all duration-300 rounded-t-sm relative group"
-                    :style="{ height: getBarHeight(val) + '%', background: getBarColor(val) }"
-                  >
-                    <div class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-indigo-300 font-mono opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      {{ val }}{{ selectedDevice.unit }}
-                    </div>
-                  </div>
-                </div>
-                <div class="flex justify-between text-[10px] text-slate-500 mt-2 px-2">
-                  <span>{{ valueHistory.length > 0 ? valueHistory.length + ' 个采样点' : '采集中...' }}</span>
-                  <span>最小: {{ historyMin }} | 最大: {{ historyMax }} | 平均: {{ historyAvg }}</span>
+
+            <div class="card-body">
+              <h3 class="device-name">{{ dev.name }}</h3>
+              <p class="device-type">{{ dev.type }}</p>
+              <div class="device-meta">
+                <span class="meta-item">型号: {{ dev.model }}</span>
+                <span class="meta-item">地址: {{ dev.address }}</span>
+              </div>
+              <div class="device-value">
+                <span class="value-number">{{ dev.value }}</span>
+                <span class="value-unit">{{ dev.unit }}</span>
+              </div>
+            </div>
+
+            <div class="card-footer">
+              <button class="action-btn" @click.stop="refreshDevice(dev)">刷新</button>
+              <button class="action-btn" @click.stop="editDevice(dev)">编辑</button>
+              <button class="action-btn danger" @click.stop="deleteDevice(dev)">删除</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 设备详情面板 -->
+      <Transition name="slide-right">
+        <div v-if="selectedDevice" class="detail-panel">
+          <div class="detail-card">
+            <div class="detail-header">
+              <div class="detail-icon" :style="{ background: selectedDevice.color + '20', color: selectedDevice.color }">
+                {{ selectedDevice.icon }}
+              </div>
+              <div class="detail-info">
+                <h3 class="detail-name">{{ selectedDevice.name }}</h3>
+                <p class="detail-type">{{ selectedDevice.type }}</p>
+              </div>
+              <button class="close-btn" @click="selectedDevice = null">×</button>
+            </div>
+
+            <div class="detail-content">
+              <div class="detail-section">
+                <h4 class="section-title">基本信息</h4>
+                <div class="detail-grid">
+                  <div class="detail-item"><span class="detail-label">设备ID</span><span class="detail-value">{{ selectedDevice.id }}</span></div>
+                  <div class="detail-item"><span class="detail-label">设备型号</span><span class="detail-value">{{ selectedDevice.model }}</span></div>
+                  <div class="detail-item"><span class="detail-label">Modbus地址</span><span class="detail-value">{{ selectedDevice.address }}</span></div>
+                  <div class="detail-item"><span class="detail-label">所属应用</span><span class="detail-value">{{ selectedDevice.app }}</span></div>
+                  <div class="detail-item"><span class="detail-label">状态</span><span class="detail-value" :class="selectedDevice.status">{{ selectedDevice.status === 'online' ? '在线' : '离线' }}</span></div>
+                  <div class="detail-item"><span class="detail-label">最后更新</span><span class="detail-value">{{ selectedDevice.lastUpdate }}</span></div>
                 </div>
               </div>
 
-              <!-- 报警/开关设备的大状态显示 -->
-              <div v-else class="flex items-center justify-center py-12">
-                <div class="text-center">
-                  <div class="text-8xl font-black font-mono" :class="selectedDevice.value ? 'text-red-400' : 'text-emerald-400'" style="text-shadow: 0 0 30px currentColor">
-                    {{ selectedDevice.value ? '⚠' : '✓' }}
-                  </div>
-                  <div class="text-2xl mt-4 font-mono" :class="selectedDevice.value ? 'text-red-400' : 'text-emerald-400'">
-                    {{ selectedDevice.value ? '报警触发' : '正常状态' }}
+              <div class="detail-section">
+                <h4 class="section-title">当前数据</h4>
+                <div class="data-display">
+                  <div class="data-value-large">{{ selectedDevice.value }}<span class="data-unit">{{ selectedDevice.unit }}</span></div>
+                  <div class="data-trend" :class="selectedDevice.trend">
+                    {{ selectedDevice.trend === 'up' ? '↑ 上升' : selectedDevice.trend === 'down' ? '↓ 下降' : '→ 稳定' }}
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- 系统统计 -->
-          <div class="card">
-            <div class="card-header">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-              <span>总线统计</span>
-            </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-              <div class="info-box">
-                <div class="info-label">总事务数</div>
-                <div class="info-value text-indigo-300 font-mono">{{ busStats.totalTransactions || 0 }}</div>
-              </div>
-              <div class="info-box">
-                <div class="info-label">总错误数</div>
-                <div class="info-value text-red-400 font-mono">{{ busStats.totalErrors || 0 }}</div>
-              </div>
-              <div class="info-box">
-                <div class="info-label">平均延迟</div>
-                <div class="info-value text-amber-300 font-mono">{{ busStats.avgLatencyMs?.toFixed(1) || '0' }}ms</div>
-              </div>
-              <div class="info-box">
-                <div class="info-label">命令队列</div>
-                <div class="info-value text-purple-300 font-mono">{{ cmdStats.queueSize || 0 }}</div>
+              <div class="detail-section">
+                <h4 class="section-title">操作</h4>
+                <div class="detail-actions">
+                  <CyberButton variant="primary" size="sm" @click="editDevice(selectedDevice)">编辑配置</CyberButton>
+                  <CyberButton variant="ghost" size="sm" @click="refreshDevice(selectedDevice)">刷新数据</CyberButton>
+                  <CyberButton variant="warning" size="sm" @click="toggleDeviceStatus(selectedDevice)">
+                    {{ selectedDevice.status === 'online' ? '设为离线' : '设为在线' }}
+                  </CyberButton>
+                  <CyberButton variant="danger" size="sm" @click="deleteDevice(selectedDevice)">删除设备</CyberButton>
+                </div>
               </div>
             </div>
-          </div>
-
-          <!-- 轮询配置 -->
-          <div class="card">
-            <div class="card-header">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span>轮询配置</span>
-            </div>
-            <div class="mt-3 overflow-x-auto">
-              <table class="poll-table">
-                <thead>
-                  <tr>
-                    <th>设备组</th>
-                    <th>地址</th>
-                    <th>轮询间隔</th>
-                    <th>超时</th>
-                    <th>任务数</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="cfg in pollingConfig" :key="cfg.name">
-                    <td class="font-medium text-slate-200">{{ cfg.name }}</td>
-                    <td class="font-mono text-indigo-300">{{ cfg.devAddr }}</td>
-                    <td>
-                      <template v-if="editingGroup === cfg.name">
-                        <input v-model.number="editInterval" type="number" class="poll-input" min="100" step="100" /> ms
-                      </template>
-                      <template v-else>
-                        <span class="font-mono text-amber-300">{{ cfg.pollIntervalMs }}</span> ms
-                      </template>
-                    </td>
-                    <td>
-                      <template v-if="editingGroup === cfg.name">
-                        <input v-model.number="editTimeout" type="number" class="poll-input" min="100" step="100" /> ms
-                      </template>
-                      <template v-else>
-                        <span class="font-mono text-purple-300">{{ cfg.timeoutMs }}</span> ms
-                      </template>
-                    </td>
-                    <td class="text-slate-400">{{ cfg.taskCount }}</td>
-                    <td>
-                      <template v-if="editingGroup === cfg.name">
-                        <button class="poll-btn save" @click="savePollingConfig(cfg.name)">保存</button>
-                        <button class="poll-btn cancel" @click="cancelEdit()">取消</button>
-                      </template>
-                      <template v-else>
-                        <button class="poll-btn edit" @click="startEdit(cfg)">修改</button>
-                      </template>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </template>
-
-        <!-- 未选择设备 -->
-        <div v-else class="flex items-center justify-center h-full">
-          <div class="text-center">
-            <div class="empty-icon mx-auto mb-4">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-slate-600">
-                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/>
-              </svg>
-            </div>
-            <div class="text-lg text-slate-400 font-medium">请从左侧选择设备</div>
-            <div class="text-sm text-slate-600 mt-2">点击任意设备查看详细信息与实时数据</div>
           </div>
         </div>
-      </div>
+      </Transition>
     </main>
+
+    <!-- 添加设备弹窗 -->
+    <Transition name="modal">
+      <div v-if="showAddDevice" class="modal-overlay" @click.self="showAddDevice = false">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>添加新设备</h3>
+            <button class="modal-close" @click="showAddDevice = false">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-group"><label>设备名称 *</label><input v-model="newDevice.name" placeholder="输入设备名称" /></div>
+              <div class="form-group"><label>设备类型</label><select v-model="newDevice.type"><option value="传感器">传感器</option><option value="控制器">控制器</option><option value="报警器">报警器</option></select></div>
+              <div class="form-group"><label>设备型号 *</label><input v-model="newDevice.model" placeholder="输入设备型号" /></div>
+              <div class="form-group"><label>Modbus地址</label><input v-model="newDevice.address" placeholder="0x30" /></div>
+              <div class="form-group"><label>数据单位</label><input v-model="newDevice.unit" placeholder="℃, %, ppm" /></div>
+              <div class="form-group"><label>所属应用</label><select v-model="newDevice.app"><option value="环境监测">环境监测</option><option value="安防系统">安防系统</option><option value="消防系统">消防系统</option><option value="资源池">资源池</option></select></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <CyberButton variant="ghost" @click="showAddDevice = false">取消</CyberButton>
+            <CyberButton variant="primary" @click="addDevice">添加设备</CyberButton>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- 编辑设备弹窗 -->
+    <Transition name="modal">
+      <div v-if="showEditDevice" class="modal-overlay" @click.self="showEditDevice = false">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>编辑设备配置</h3>
+            <button class="modal-close" @click="showEditDevice = false">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-group"><label>设备名称 *</label><input v-model="editForm.name" placeholder="输入设备名称" /></div>
+              <div class="form-group"><label>设备类型</label><select v-model="editForm.type"><option value="传感器">传感器</option><option value="控制器">控制器</option><option value="报警器">报警器</option></select></div>
+              <div class="form-group"><label>设备型号 *</label><input v-model="editForm.model" placeholder="输入设备型号" /></div>
+              <div class="form-group"><label>Modbus地址</label><input v-model="editForm.address" placeholder="0x30" /></div>
+              <div class="form-group"><label>数据单位</label><input v-model="editForm.unit" placeholder="℃, %, ppm" /></div>
+              <div class="form-group"><label>所属应用</label><select v-model="editForm.app"><option value="环境监测">环境监测</option><option value="安防系统">安防系统</option><option value="消防系统">消防系统</option><option value="资源池">资源池</option></select></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <CyberButton variant="ghost" @click="showEditDevice = false">取消</CyberButton>
+            <CyberButton variant="primary" @click="saveEditDevice">保存修改</CyberButton>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import axios from 'axios'
+import { ref, reactive, computed } from 'vue'
+import { ElMessage } from 'element-plus'
+import ParticleBackground from '../components/ParticleBackground.vue'
+import AppNavbar from '../components/AppNavbar.vue'
+import CyberButton from '../components/CyberButton.vue'
 
-interface DeviceInfo {
-  name: string
-  type: string
-  online: number
-  value: number
-  unit: string
-  description: string
-  category: string
-}
-
-const currentTime = ref('')
-const devices = ref<DeviceInfo[]>([])
-const selectedDevice = ref<DeviceInfo | null>(null)
-const activeCategory = ref('all')
-const valueHistory = ref<number[]>([])
-const busStats = ref<any>({})
-const cmdStats = ref<any>({})
-const pollingConfig = ref<any[]>([])
-const editingGroup = ref<string | null>(null)
-const editInterval = ref(5000)
-const editTimeout = ref(1000)
-
-let timeInterval = 0
-let dataInterval = 0
-
-const categories = [
-  { value: 'all', label: '全部' },
-  { value: 'sensor', label: '传感器' },
-  { value: 'alarm', label: '报警器' },
-  { value: 'control', label: '控制器' }
+const menuItems = [
+  { path: '/', label: '主控台' },
+  { path: '/security', label: '安防系统' },
+  { path: '/environment', label: '环境监测' },
+  { path: '/fire', label: '消防系统' },
+  { path: '/logs', label: '系统日志' }
 ]
 
+const showAddDevice = ref(false)
+const showEditDevice = ref(false)
+const searchQuery = ref('')
+const activeCategory = ref('all')
+const selectedDevice = ref<any>(null)
+const editingDevice = ref<any>(null)
+
+interface Device {
+  id: string
+  name: string
+  type: string
+  model: string
+  address: string
+  icon: string
+  color: string
+  value: number
+  unit: string
+  status: 'online' | 'offline'
+  app: string
+  lastUpdate: string
+  trend: 'up' | 'down' | 'stable'
+}
+
+const newDevice = reactive({
+  name: '',
+  type: '传感器',
+  model: '',
+  address: '',
+  unit: '',
+  app: '环境监测'
+})
+
+const editForm = reactive({
+  name: '',
+  type: '传感器',
+  model: '',
+  address: '',
+  unit: '',
+  app: '环境监测'
+})
+
+// 所有现有设备 + 资源池设备
+const devices = reactive<Device[]>([
+  // ===== 云测仪 SD123-E60V2 (主设备) =====
+  { id: 'dev-001', name: '云测仪-温度传感器', type: '传感器', model: 'SD123-E60V2', address: '0x30', icon: '🌡️', color: '#3b82f6', value: 24.5, unit: '℃', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:30:00', trend: 'stable' },
+  { id: 'dev-002', name: '云测仪-湿度传感器', type: '传感器', model: 'SD123-E60V2', address: '0x30', icon: '💧', color: '#06b6d4', value: 65, unit: '%', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:30:00', trend: 'down' },
+  { id: 'dev-003', name: '云测仪-PM2.5传感器', type: '传感器', model: 'SD123-E60V2', address: '0x30', icon: '💨', color: '#f59e0b', value: 42, unit: 'μg/m³', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:30:00', trend: 'stable' },
+  { id: 'dev-004', name: '云测仪-CO2传感器', type: '传感器', model: 'SD123-E60V2', address: '0x30', icon: '☁️', color: '#8b5cf6', value: 520, unit: 'ppm', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:30:00', trend: 'up' },
+  { id: 'dev-005', name: '云测仪-TVOC传感器', type: '传感器', model: 'SD123-E60V2', address: '0x30', icon: '🧪', color: '#ec4899', value: 120, unit: 'ppb', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:23:00', trend: 'stable' },
+  { id: 'dev-006', name: '云测仪-甲醛传感器', type: '传感器', model: 'SD123-E60V2', address: '0x30', icon: '⚗️', color: '#14b8a6', value: 30, unit: 'ppb', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:22:00', trend: 'down' },
+  { id: 'dev-007', name: '云测仪-PM10传感器', type: '传感器', model: 'SD123-E60V2', address: '0x30', icon: '💨', color: '#f59e0b', value: 68, unit: 'μg/m³', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:17:00', trend: 'stable' },
+  { id: 'dev-008', name: '云测仪-PM1.0传感器', type: '传感器', model: 'SD123-E60V2', address: '0x30', icon: '💨', color: '#f59e0b', value: 25, unit: 'μg/m³', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:16:00', trend: 'stable' },
+
+  // ===== 独立设备 =====
+  { id: 'dev-009', name: '烟雾报警器', type: '报警器', model: 'SMK-200', address: '0x70', icon: '🔥', color: '#ef4444', value: 0, unit: '', status: 'online', app: '消防系统', lastUpdate: '2024-01-15 10:29:00', trend: 'stable' },
+  { id: 'dev-010', name: '水浸传感器', type: '传感器', model: 'WTR-100', address: '0x90', icon: '💧', color: '#06b6d4', value: 0, unit: 'cm', status: 'online', app: '安防系统', lastUpdate: '2024-01-15 10:28:00', trend: 'stable' },
+  { id: 'dev-011', name: '红外探测器', type: '传感器', model: 'IRD-300', address: '0x40', icon: '👤', color: '#8b5cf6', value: 0, unit: '', status: 'online', app: '安防系统', lastUpdate: '2024-01-15 10:27:00', trend: 'stable' },
+  { id: 'dev-012', name: '弱光检测传感器', type: '传感器', model: 'LS-100', address: '0x50', icon: '💡', color: '#f59e0b', value: 350, unit: 'lux', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:24:00', trend: 'up' },
+  { id: 'dev-013', name: '恒湿净化一体机', type: '控制器', model: 'HUM-400', address: '0x20', icon: '🌀', color: '#22c55d', value: 0, unit: '', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:25:00', trend: 'stable' },
+  { id: 'dev-014', name: '霉菌空气净化机', type: '控制器', model: 'AP-500', address: '0x10', icon: '🌬️', color: '#22c55d', value: 0, unit: '', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:24:00', trend: 'stable' },
+  { id: 'dev-015', name: '空调集中控制器', type: '控制器', model: 'ACT-500', address: '0x60', icon: '❄️', color: '#22c55d', value: 24, unit: '℃', status: 'online', app: '环境监测', lastUpdate: '2024-01-15 10:26:00', trend: 'down' },
+  { id: 'dev-016', name: '报警装置(驱鼠器)', type: '报警器', model: 'ALM-100', address: '0x80', icon: '🔔', color: '#ef4444', value: 0, unit: '', status: 'online', app: '安防系统', lastUpdate: '2024-01-15 10:21:00', trend: 'stable' },
+
+  // ===== 资源池设备 (传感器虚拟副本1) =====
+  { id: 'pool-001', name: '[资源池]温度传感器-副本1', type: '传感器', model: 'SD123-E60V2-Copy1', address: '0x31', icon: '🌡️', color: '#3b82f6', value: 24.5, unit: '℃', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:30:00', trend: 'stable' },
+  { id: 'pool-002', name: '[资源池]湿度传感器-副本1', type: '传感器', model: 'SD123-E60V2-Copy1', address: '0x31', icon: '💧', color: '#06b6d4', value: 65, unit: '%', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:30:00', trend: 'down' },
+  { id: 'pool-003', name: '[资源池]PM2.5传感器-副本1', type: '传感器', model: 'SD123-E60V2-Copy1', address: '0x31', icon: '💨', color: '#f59e0b', value: 42, unit: 'μg/m³', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:30:00', trend: 'stable' },
+  { id: 'pool-004', name: '[资源池]CO2传感器-副本1', type: '传感器', model: 'SD123-E60V2-Copy1', address: '0x31', icon: '☁️', color: '#8b5cf6', value: 520, unit: 'ppm', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:30:00', trend: 'up' },
+  { id: 'pool-005', name: '[资源池]TVOC传感器-副本1', type: '传感器', model: 'SD123-E60V2-Copy1', address: '0x31', icon: '🧪', color: '#ec4899', value: 120, unit: 'ppb', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:23:00', trend: 'stable' },
+  { id: 'pool-006', name: '[资源池]甲醛传感器-副本1', type: '传感器', model: 'SD123-E60V2-Copy1', address: '0x31', icon: '⚗️', color: '#14b8a6', value: 30, unit: 'ppb', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:22:00', trend: 'down' },
+  { id: 'pool-007', name: '[资源池]PM10传感器-副本1', type: '传感器', model: 'SD123-E60V2-Copy1', address: '0x31', icon: '💨', color: '#f59e0b', value: 68, unit: 'μg/m³', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:17:00', trend: 'stable' },
+  { id: 'pool-008', name: '[资源池]PM1.0传感器-副本1', type: '传感器', model: 'SD123-E60V2-Copy1', address: '0x31', icon: '💨', color: '#f59e0b', value: 25, unit: 'μg/m³', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:16:00', trend: 'stable' },
+  { id: 'pool-009', name: '[资源池]烟雾报警器-副本1', type: '报警器', model: 'SMK-200-Copy1', address: '0x71', icon: '🔥', color: '#ef4444', value: 0, unit: '', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:29:00', trend: 'stable' },
+  { id: 'pool-010', name: '[资源池]水浸传感器-副本1', type: '传感器', model: 'WTR-100-Copy1', address: '0x91', icon: '💧', color: '#06b6d4', value: 0, unit: 'cm', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:28:00', trend: 'stable' },
+  { id: 'pool-011', name: '[资源池]红外探测器-副本1', type: '传感器', model: 'IRD-300-Copy1', address: '0x41', icon: '👤', color: '#8b5cf6', value: 0, unit: '', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:27:00', trend: 'stable' },
+  { id: 'pool-012', name: '[资源池]弱光检测传感器-副本1', type: '传感器', model: 'LS-100-Copy1', address: '0x51', icon: '💡', color: '#f59e0b', value: 350, unit: 'lux', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:24:00', trend: 'up' },
+
+  // ===== 资源池设备 (传感器虚拟副本2) =====
+  { id: 'pool-013', name: '[资源池]温度传感器-副本2', type: '传感器', model: 'SD123-E60V2-Copy2', address: '0x32', icon: '🌡️', color: '#3b82f6', value: 24.5, unit: '℃', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:30:00', trend: 'stable' },
+  { id: 'pool-014', name: '[资源池]湿度传感器-副本2', type: '传感器', model: 'SD123-E60V2-Copy2', address: '0x32', icon: '💧', color: '#06b6d4', value: 65, unit: '%', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:30:00', trend: 'down' },
+  { id: 'pool-015', name: '[资源池]PM2.5传感器-副本2', type: '传感器', model: 'SD123-E60V2-Copy2', address: '0x32', icon: '💨', color: '#f59e0b', value: 42, unit: 'μg/m³', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:30:00', trend: 'stable' },
+  { id: 'pool-016', name: '[资源池]CO2传感器-副本2', type: '传感器', model: 'SD123-E60V2-Copy2', address: '0x32', icon: '☁️', color: '#8b5cf6', value: 520, unit: 'ppm', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:30:00', trend: 'up' },
+  { id: 'pool-017', name: '[资源池]TVOC传感器-副本2', type: '传感器', model: 'SD123-E60V2-Copy2', address: '0x32', icon: '🧪', color: '#ec4899', value: 120, unit: 'ppb', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:23:00', trend: 'stable' },
+  { id: 'pool-018', name: '[资源池]甲醛传感器-副本2', type: '传感器', model: 'SD123-E60V2-Copy2', address: '0x32', icon: '⚗️', color: '#14b8a6', value: 30, unit: 'ppb', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:22:00', trend: 'down' },
+  { id: 'pool-019', name: '[资源池]PM10传感器-副本2', type: '传感器', model: 'SD123-E60V2-Copy2', address: '0x32', icon: '💨', color: '#f59e0b', value: 68, unit: 'μg/m³', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:17:00', trend: 'stable' },
+  { id: 'pool-020', name: '[资源池]PM1.0传感器-副本2', type: '传感器', model: 'SD123-E60V2-Copy2', address: '0x32', icon: '💨', color: '#f59e0b', value: 25, unit: 'μg/m³', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:16:00', trend: 'stable' },
+  { id: 'pool-021', name: '[资源池]烟雾报警器-副本2', type: '报警器', model: 'SMK-200-Copy2', address: '0x72', icon: '🔥', color: '#ef4444', value: 0, unit: '', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:29:00', trend: 'stable' },
+  { id: 'pool-022', name: '[资源池]水浸传感器-副本2', type: '传感器', model: 'WTR-100-Copy2', address: '0x92', icon: '💧', color: '#06b6d4', value: 0, unit: 'cm', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:28:00', trend: 'stable' },
+  { id: 'pool-023', name: '[资源池]红外探测器-副本2', type: '传感器', model: 'IRD-300-Copy2', address: '0x42', icon: '👤', color: '#8b5cf6', value: 0, unit: '', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:27:00', trend: 'stable' },
+  { id: 'pool-024', name: '[资源池]弱光检测传感器-副本2', type: '传感器', model: 'LS-100-Copy2', address: '0x52', icon: '💡', color: '#f59e0b', value: 350, unit: 'lux', status: 'online', app: '资源池', lastUpdate: '2024-01-15 10:24:00', trend: 'up' }
+])
+
+const categories = computed(() => [
+  { value: 'all', label: '全部', count: devices.length },
+  { value: 'sensor', label: '传感器', count: devices.filter(d => d.type === '传感器').length },
+  { value: 'controller', label: '控制器', count: devices.filter(d => d.type === '控制器').length },
+  { value: 'alarm', label: '报警器', count: devices.filter(d => d.type === '报警器').length },
+  { value: 'pool', label: '资源池', count: devices.filter(d => d.app === '资源池').length }
+])
+
+const totalCount = computed(() => devices.length)
+const onlineCount = computed(() => devices.filter(d => d.status === 'online').length)
+const offlineCount = computed(() => devices.filter(d => d.status === 'offline').length)
+const alertCount = computed(() => devices.filter(d => d.value > 100).length)
+
 const filteredDevices = computed(() => {
-  if (activeCategory.value === 'all') return devices.value
-  return devices.value.filter(d => d.category === activeCategory.value)
-})
-
-const onlineCount = computed(() => filteredDevices.value.filter(d => d.online).length)
-
-const hasChart = computed(() => {
-  if (!selectedDevice.value) return false
-  const chartTypes = ['cloud_pm25', 'cloud_pm10', 'cloud_temp', 'cloud_humidity', 'cloud_tvoc', 'cloud_ch2o', 'cloud_o3', 'cloud_co2', 'light']
-  return chartTypes.includes(selectedDevice.value.type)
-})
-
-const historyMin = computed(() => {
-  if (valueHistory.value.length === 0) return 0
-  return Math.min(...valueHistory.value)
-})
-
-const historyMax = computed(() => {
-  if (valueHistory.value.length === 0) return 0
-  return Math.max(...valueHistory.value)
-})
-
-const historyAvg = computed(() => {
-  if (valueHistory.value.length === 0) return 0
-  return (valueHistory.value.reduce((a, b) => a + b, 0) / valueHistory.value.length).toFixed(1)
-})
-
-function formatValue(dev: DeviceInfo): string {
-  if (dev.category === 'alarm') return dev.value ? '报警' : '正常'
-  if (dev.type === 'humidifier') return dev.value ? '开启' : '关闭'
-  if (dev.type === 'purifier') return dev.value ? '开启' : '关闭'
-  return String(dev.value)
-}
-
-function getBarHeight(val: number): number {
-  if (valueHistory.value.length === 0) return 0
-  const max = historyMax.value || 1
-  return Math.max(2, (val / max) * 100)
-}
-
-function getBarColor(val: number): string {
-  if (!selectedDevice.value) return 'rgba(99, 102, 241, 0.6)'
-  if (selectedDevice.value.type === 'cloud_pm25') {
-    if (val > 75) return 'rgba(239, 68, 68, 0.7)'
-    if (val > 35) return 'rgba(245, 158, 11, 0.7)'
-    return 'rgba(99, 102, 241, 0.7)'
+  let result = devices
+  if (activeCategory.value !== 'all') {
+    if (activeCategory.value === 'sensor') result = result.filter(d => d.type === '传感器')
+    else if (activeCategory.value === 'controller') result = result.filter(d => d.type === '控制器')
+    else if (activeCategory.value === 'alarm') result = result.filter(d => d.type === '报警器')
+    else if (activeCategory.value === 'pool') result = result.filter(d => d.app === '资源池')
   }
-  return 'rgba(99, 102, 241, 0.7)'
-}
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter(d => d.name.toLowerCase().includes(q) || d.type.toLowerCase().includes(q))
+  }
+  return result
+})
 
-const updateTime = () => {
-  const d = new Date()
-  currentTime.value = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`
-}
-
-async function fetchDevices() {
-  try {
-    const res = await axios.get('/api/devices')
-    const newDevices: DeviceInfo[] = res.data || []
-    for (const newDev of newDevices) {
-      const existing = devices.value.find(d => d.type === newDev.type)
-      if (existing) {
-        Object.assign(existing, newDev)
-      } else {
-        devices.value.push(newDev)
-      }
-    }
-    if (devices.value.length === 0) devices.value = newDevices
-
-    if (selectedDevice.value) {
-      const updated = newDevices.find(d => d.type === selectedDevice.value!.type)
-      if (updated) {
-        selectedDevice.value = updated
-        if (hasChart.value) {
-          valueHistory.value.push(updated.value)
-          if (valueHistory.value.length > 60) valueHistory.value.shift()
-        }
-      }
-    }
-  } catch (e) {}
-}
-
-async function fetchBusStats() {
-  try {
-    const [busRes, cmdRes] = await Promise.all([
-      axios.get('/api/bus/stats'),
-      axios.get('/api/cmd/stats')
-    ])
-    busStats.value = busRes.data || {}
-    cmdStats.value = cmdRes.data || {}
-  } catch (e) {}
-}
-
-function selectDevice(dev: DeviceInfo) {
+function selectDevice(dev: Device) {
   selectedDevice.value = dev
-  valueHistory.value = []
-  if (hasChart.value) valueHistory.value.push(dev.value)
 }
 
-async function fetchPollingConfig() {
-  try {
-    const res = await axios.get('/api/polling/config')
-    pollingConfig.value = res.data || []
-  } catch (e) {}
+function refreshAllDevices() {
+  // 模拟刷新所有设备数据
+  devices.forEach(dev => {
+    if (dev.status === 'online') {
+      // 随机波动数据
+      const fluctuation = (Math.random() - 0.5) * 2
+      dev.value = Math.round((dev.value + fluctuation) * 10) / 10
+      dev.lastUpdate = new Date().toLocaleString('zh-CN')
+    }
+  })
+  ElMessage.success('所有设备数据已刷新')
 }
 
-function startEdit(group: any) {
-  editingGroup.value = group.name
-  editInterval.value = group.pollIntervalMs
-  editTimeout.value = group.timeoutMs
+function refreshDevice(dev: Device) {
+  const index = devices.findIndex(d => d.id === dev.id)
+  if (index !== -1) {
+    // 模拟刷新数据
+    const fluctuation = (Math.random() - 0.5) * 5
+    devices[index].value = Math.round((devices[index].value + fluctuation) * 10) / 10
+    devices[index].lastUpdate = new Date().toLocaleString('zh-CN')
+    selectedDevice.value = devices[index]
+    ElMessage.success(`${dev.name} 数据已刷新`)
+  }
 }
 
-function cancelEdit() {
-  editingGroup.value = null
+function editDevice(dev: Device) {
+  editingDevice.value = dev
+  editForm.name = dev.name
+  editForm.type = dev.type
+  editForm.model = dev.model
+  editForm.address = dev.address
+  editForm.unit = dev.unit
+  editForm.app = dev.app
+  showEditDevice.value = true
 }
 
-async function savePollingConfig(groupName: string) {
-  try {
-    await axios.get('/api/polling/set', {
-      params: { group: groupName, interval: editInterval.value, timeout: editTimeout.value }
-    })
-    editingGroup.value = null
-    fetchPollingConfig()
-  } catch (e) {}
+function saveEditDevice() {
+  if (!editForm.name || !editForm.model) {
+    ElMessage.warning('请填写必填项')
+    return
+  }
+
+  const index = devices.findIndex(d => d.id === editingDevice.value.id)
+  if (index !== -1) {
+    devices[index].name = editForm.name
+    devices[index].type = editForm.type
+    devices[index].model = editForm.model
+    devices[index].address = editForm.address
+    devices[index].unit = editForm.unit
+    devices[index].app = editForm.app
+    devices[index].lastUpdate = new Date().toLocaleString('zh-CN')
+
+    // 更新图标和颜色
+    if (editForm.type === '传感器') {
+      devices[index].icon = '🌡️'
+      devices[index].color = '#3b82f6'
+    } else if (editForm.type === '控制器') {
+      devices[index].icon = '🎮'
+      devices[index].color = '#22c55d'
+    } else if (editForm.type === '报警器') {
+      devices[index].icon = '🔔'
+      devices[index].color = '#ef4444'
+    }
+
+    selectedDevice.value = devices[index]
+    showEditDevice.value = false
+    ElMessage.success(`设备 ${editForm.name} 配置已更新`)
+  }
 }
 
-onMounted(() => {
-  updateTime()
-  timeInterval = window.setInterval(updateTime, 1000)
-  fetchDevices()
-  fetchBusStats()
-  fetchPollingConfig()
-  dataInterval = window.setInterval(() => {
-    fetchDevices()
-    fetchBusStats()
-  }, 2000)
-  window.setInterval(fetchPollingConfig, 5000)
-})
+function toggleDeviceStatus(dev: Device) {
+  const index = devices.findIndex(d => d.id === dev.id)
+  if (index !== -1) {
+    devices[index].status = devices[index].status === 'online' ? 'offline' : 'online'
+    devices[index].lastUpdate = new Date().toLocaleString('zh-CN')
+    selectedDevice.value = devices[index]
+    ElMessage.success(`${dev.name} 已${devices[index].status === 'online' ? '上线' : '下线'}`)
+  }
+}
 
-onUnmounted(() => {
-  window.clearInterval(timeInterval)
-  window.clearInterval(dataInterval)
-})
+function deleteDevice(dev: Device) {
+  const index = devices.findIndex(d => d.id === dev.id)
+  if (index !== -1) {
+    devices.splice(index, 1)
+    selectedDevice.value = null
+    ElMessage.success(`设备 ${dev.name} 已删除`)
+  }
+}
+
+function addDevice() {
+  if (!newDevice.name || !newDevice.model) {
+    ElMessage.warning('请填写必填项')
+    return
+  }
+
+  const device: Device = {
+    id: `dev-${Date.now()}`,
+    name: newDevice.name,
+    type: newDevice.type,
+    model: newDevice.model,
+    address: newDevice.address || '0x00',
+    icon: newDevice.type === '传感器' ? '🌡️' : newDevice.type === '控制器' ? '🎮' : '🔔',
+    color: newDevice.type === '传感器' ? '#3b82f6' : newDevice.type === '控制器' ? '#22c55d' : '#ef4444',
+    value: 0,
+    unit: newDevice.unit,
+    status: 'online',
+    app: newDevice.app,
+    lastUpdate: new Date().toLocaleString('zh-CN'),
+    trend: 'stable'
+  }
+
+  devices.push(device)
+  showAddDevice.value = false
+  ElMessage.success(`设备 ${device.name} 已添加`)
+
+  // 重置表单
+  newDevice.name = ''
+  newDevice.model = ''
+  newDevice.address = ''
+  newDevice.unit = ''
+}
+
+function exportDevices() {
+  const config = devices.map(d => ({
+    id: d.id,
+    name: d.name,
+    type: d.type,
+    model: d.model,
+    address: d.address,
+    unit: d.unit,
+    app: d.app,
+    status: d.status
+  }))
+
+  const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'devices-config.json'
+  a.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('设备配置已导出')
+}
 </script>
 
 <style scoped>
-.dev-root {
-  background: #0f172a;
-  background-image:
-    radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.06) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 20%, rgba(59, 130, 246, 0.04) 0%, transparent 50%);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  color: #e2e8f0;
-}
+.devices-root { min-height: 100vh; background: var(--bg-primary); position: relative; }
+.devices-main { position: relative; z-index: 1; padding: var(--spacing-xl); max-width: 1920px; margin: 0 auto; }
 
-/* ===== 导航栏 ===== */
-.nav-header {
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-  padding: 0 24px;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-}
-.nav-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 60px;
-}
-.brand-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #6366f1, #3b82f6);
-  color: white;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
-}
-.brand-title { font-size: 18px; font-weight: 700; color: #f1f5f9; }
-.brand-sub { font-size: 11px; color: #64748b; margin-top: -1px; }
-.nav-time { display: flex; align-items: center; font-size: 13px; color: #94a3b8; font-variant-numeric: tabular-nums; }
-.nav-btn {
-  display: flex; align-items: center; padding: 7px 14px; font-size: 13px; color: #94a3b8;
-  background: rgba(148, 163, 184, 0.06); border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 8px; cursor: pointer; transition: all 0.2s;
-}
-.nav-btn:hover { color: #e2e8f0; background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.3); }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--spacing-lg); }
+.section-title { display: flex; align-items: center; gap: var(--spacing-sm); font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0; }
+.section-title svg { color: var(--accent-primary); }
+.header-actions { display: flex; gap: var(--spacing-sm); }
 
-/* ===== 卡片 ===== */
-.card {
-  background: rgba(30, 41, 59, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.08);
-  border-radius: 12px;
-  padding: 18px;
-  backdrop-filter: blur(8px);
-}
-.card-header {
-  display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;
-  color: #e2e8f0; padding-bottom: 12px; border-bottom: 1px solid rgba(148, 163, 184, 0.08);
-}
-.card-header svg { color: #6366f1; flex-shrink: 0; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--spacing-lg); margin-bottom: var(--spacing-xl); }
+.stat-card { display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-lg); background: var(--bg-card); border: 1px solid var(--border-primary); border-radius: var(--radius-lg); }
+.stat-icon { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); font-size: 24px; }
+.stat-value { font-size: 28px; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); }
+.stat-label { font-size: 13px; color: var(--text-secondary); }
 
-/* ===== 筛选标签 ===== */
-.filter-tag {
-  padding: 4px 12px; font-size: 12px; border-radius: 16px; cursor: pointer; transition: all 0.15s;
-  background: rgba(148, 163, 184, 0.06); border: 1px solid rgba(148, 163, 184, 0.12); color: #94a3b8;
-}
-.filter-tag:hover { background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.3); color: #c7d2fe; }
-.filter-tag.active {
-  background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.5); color: #a5b4fc;
-  box-shadow: 0 0 8px rgba(99, 102, 241, 0.15);
-}
+.filter-section { margin-bottom: var(--spacing-xl); }
+.filter-bar { display: flex; align-items: center; justify-content: space-between; }
+.filter-tabs { display: flex; gap: var(--spacing-xs); }
+.filter-tab { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: transparent; border: 1px solid var(--border-primary); border-radius: var(--radius-full); color: var(--text-secondary); font-size: 13px; cursor: pointer; transition: all var(--duration-fast); }
+.filter-tab:hover { border-color: var(--accent-primary); color: var(--text-primary); }
+.filter-tab.active { background: rgba(59,130,246,0.2); border-color: var(--accent-primary); color: var(--accent-primary); }
+.tab-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 4px; background: rgba(255,255,255,0.1); border-radius: 10px; font-size: 11px; }
+.search-box { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-card); border: 1px solid var(--border-primary); border-radius: var(--radius-md); }
+.search-box svg { color: var(--text-tertiary); }
+.search-input { background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 14px; width: 200px; }
 
-/* ===== 设备列表项 ===== */
-.device-item {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 8px 12px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(148, 163, 184, 0.06);
-  border-radius: 8px; cursor: pointer; transition: all 0.15s; font-size: 13px; color: #94a3b8;
-}
-.device-item:hover { background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.2); }
-.device-item.active {
-  background: rgba(99, 102, 241, 0.12); border-color: rgba(99, 102, 241, 0.35); color: #c7d2fe;
-}
-.device-item.offline { opacity: 0.5; }
+.devices-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--spacing-lg); }
 
-.shadow-emerald { box-shadow: 0 0 6px rgba(52, 211, 153, 0.5); }
-.shadow-red { box-shadow: 0 0 6px rgba(239, 68, 68, 0.5); }
+.device-card { background: var(--bg-card); border: 1px solid var(--border-primary); border-radius: var(--radius-lg); overflow: hidden; transition: all var(--duration-fast); cursor: pointer; }
+.device-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--border-accent); }
+.device-card.offline { opacity: 0.6; }
+.device-card.selected { border-color: var(--accent-primary); box-shadow: 0 0 20px rgba(59,130,246,0.3); }
 
-/* ===== 状态标签 ===== */
-.status-badge {
-  display: inline-flex; align-items: center; padding: 3px 10px; font-size: 11px;
-  font-weight: 600; border-radius: 8px; letter-spacing: 0.05em;
-}
-.status-online { background: rgba(16, 185, 129, 0.1); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.25); }
-.status-offline { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
-.category-badge {
-  display: inline-flex; padding: 3px 10px; font-size: 11px; font-weight: 500;
-  background: rgba(99, 102, 241, 0.1); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.25);
-  border-radius: 8px;
-}
+.card-header { display: flex; align-items: center; justify-content: space-between; padding: var(--spacing-md); }
+.device-icon { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); font-size: 24px; }
+.device-status { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 8px; border-radius: var(--radius-full); }
+.device-status.online { background: rgba(34,197,94,0.2); color: #22c55d; }
+.device-status.offline { background: rgba(100,116,139,0.2); color: #64748b; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.device-status.online .status-dot { background: #22c55d; box-shadow: 0 0 8px #22c55d; }
+.device-status.offline .status-dot { background: #64748b; }
 
-/* ===== 信息框 ===== */
-.info-box {
-  background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(148, 163, 184, 0.08);
-  padding: 12px 14px; border-radius: 8px;
-}
-.info-label { font-size: 11px; color: #64748b; margin-bottom: 4px; letter-spacing: 0.03em; }
-.info-value { font-size: 18px; font-weight: 600; }
+.card-body { padding: 0 var(--spacing-md) var(--spacing-md); }
+.device-name { font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0 0 4px; }
+.device-type { font-size: 13px; color: var(--text-secondary); margin: 0 0 8px; }
+.device-meta { display: flex; gap: var(--spacing-md); margin-bottom: var(--spacing-sm); }
+.meta-item { font-size: 11px; color: var(--text-tertiary); }
+.device-value { display: flex; align-items: baseline; gap: 4px; }
+.value-number { font-size: 24px; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); }
+.value-unit { font-size: 14px; color: var(--text-secondary); }
 
-/* ===== 图表 ===== */
-.chart-area {
-  background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(148, 163, 184, 0.06);
-  border-radius: 8px; padding: 14px;
-}
+.card-footer { display: flex; gap: var(--spacing-xs); padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md); }
+.action-btn { flex: 1; padding: 6px 12px; background: transparent; border: 1px solid var(--border-primary); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all var(--duration-fast); }
+.action-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+.action-btn.danger:hover { border-color: var(--status-danger); color: var(--status-danger); }
 
-/* ===== 空状态 ===== */
-.empty-icon {
-  display: flex; align-items: center; justify-content: center;
-  width: 80px; height: 80px; border-radius: 20px;
-  background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(148, 163, 184, 0.08);
-}
+.detail-panel { position: fixed; top: 0; right: 0; width: 400px; height: 100vh; z-index: var(--z-overlay); padding: var(--spacing-md); overflow-y: auto; }
+.detail-card { background: var(--bg-card); border: 1px solid var(--border-primary); border-radius: var(--radius-lg); height: 100%; display: flex; flex-direction: column; }
+.detail-header { display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-lg); border-bottom: 1px solid var(--border-primary); }
+.detail-icon { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); font-size: 28px; }
+.detail-info { flex: 1; }
+.detail-name { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
+.detail-type { font-size: 13px; color: var(--text-secondary); margin: 4px 0 0; }
+.close-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; border-radius: var(--radius-sm); }
+.close-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
 
-/* ===== 轮询配置表格 ===== */
-.poll-table {
-  width: 100%; border-collapse: collapse; font-size: 13px;
-}
-.poll-table th {
-  text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 600;
-  color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-}
-.poll-table td {
-  padding: 8px 10px; border-bottom: 1px solid rgba(148, 163, 184, 0.05);
-  color: #cbd5e1;
-}
-.poll-table tr:hover td { background: rgba(99, 102, 241, 0.04); }
-.poll-input {
-  width: 80px; padding: 4px 8px; font-size: 13px; font-family: monospace;
-  background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(99, 102, 241, 0.4);
-  border-radius: 6px; color: #e2e8f0; outline: none;
-}
-.poll-input:focus { border-color: rgba(99, 102, 241, 0.8); box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15); }
-.poll-btn {
-  padding: 3px 10px; font-size: 11px; font-weight: 600; border-radius: 6px;
-  cursor: pointer; transition: all 0.15s; border: 1px solid transparent;
-}
-.poll-btn.edit {
-  background: rgba(99, 102, 241, 0.1); color: #a5b4fc; border-color: rgba(99, 102, 241, 0.25);
-}
-.poll-btn.edit:hover { background: rgba(99, 102, 241, 0.2); }
-.poll-btn.save {
-  background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3);
-  margin-right: 4px;
-}
-.poll-btn.save:hover { background: rgba(16, 185, 129, 0.25); }
-.poll-btn.cancel {
-  background: rgba(148, 163, 184, 0.08); color: #94a3b8; border-color: rgba(148, 163, 184, 0.15);
-}
-.poll-btn.cancel:hover { background: rgba(148, 163, 184, 0.15); }
+.detail-content { flex: 1; overflow-y: auto; padding: var(--spacing-lg); }
+.detail-section { margin-bottom: var(--spacing-lg); }
+.detail-section .section-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--spacing-sm); padding-bottom: var(--spacing-xs); border-bottom: 1px solid var(--border-primary); }
+.detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--spacing-sm); }
+.detail-item { display: flex; flex-direction: column; gap: 4px; }
+.detail-label { font-size: 12px; color: var(--text-tertiary); }
+.detail-value { font-size: 14px; color: var(--text-primary); font-weight: 500; }
+.detail-value.online { color: #22c55d; }
+.detail-value.offline { color: #ef4444; }
 
-/* ===== 滚动条 ===== */
-.custom-scrollbar::-webkit-scrollbar { width: 6px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.15); border-radius: 3px; }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.3); }
+.data-display { text-align: center; padding: var(--spacing-lg); }
+.data-value-large { font-size: 48px; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); }
+.data-unit { font-size: 18px; color: var(--text-secondary); margin-left: 8px; }
+.data-trend { font-size: 14px; margin-top: var(--spacing-sm); }
+.data-trend.up { color: #ef4444; }
+.data-trend.down { color: #3b82f6; }
+.data-trend.stable { color: #22c55d; }
+
+.detail-actions { display: flex; flex-wrap: wrap; gap: var(--spacing-sm); }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: var(--z-modal); }
+.modal-content { background: var(--bg-card); border: 1px solid var(--border-primary); border-radius: var(--radius-xl); width: 90%; max-width: 600px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: var(--spacing-lg); border-bottom: 1px solid var(--border-primary); }
+.modal-header h3 { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
+.modal-close { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; }
+.modal-body { padding: var(--spacing-lg); }
+.modal-footer { display: flex; justify-content: flex-end; gap: var(--spacing-sm); padding: var(--spacing-lg); border-top: 1px solid var(--border-primary); }
+
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--spacing-md); }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label { font-size: 13px; color: var(--text-secondary); }
+.form-group input, .form-group select { padding: 10px 12px; background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: var(--radius-md); color: var(--text-primary); font-size: 14px; outline: none; }
+.form-group input:focus, .form-group select:focus { border-color: var(--accent-primary); }
+
+@media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .form-grid { grid-template-columns: 1fr; } }
+@media (max-width: 768px) { .devices-main { padding: var(--spacing-md); } .stats-grid { grid-template-columns: 1fr; } .filter-bar { flex-direction: column; gap: var(--spacing-md); } .detail-panel { width: 100%; } }
 </style>

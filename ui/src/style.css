@@ -1,1 +1,103 @@
+/* ===== 软件定义消防系统 - 全局样式 ===== */
+
+/* 导入样式系统 */
+@import "./styles/variables.css";
+@import "./styles/animations.css";
+@import "./styles/mixins.css";
+@import "./styles/transitions.css";
+
+/* 导入Tailwind CSS */
 @import "tailwindcss";
+
+/* ===== 全局重置 ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* ===== 链接 ===== */
+a {
+  color: var(--accent-primary);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-default);
+}
+
+a:hover {
+  color: var(--text-accent);
+}
+
+/* ===== 选中文本 ===== */
+::selection {
+  background: rgba(59, 130, 246, 0.3);
+  color: var(--text-primary);
+}
+
+/* ===== 聚焦样式 ===== */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* ===== 滚动条全局样式 ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* ===== 无障碍：减少动画 ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ===== 打印样式 ===== */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

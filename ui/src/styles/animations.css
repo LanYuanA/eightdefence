@@ -1,0 +1,425 @@
+/* ===== 软件定义消防系统 - 动画定义 ===== */
+
+/* ===== 呼吸灯动画 ===== */
+@keyframes breathe {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes breathe-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 20px currentColor;
+  }
+}
+
+/* ===== 脉冲动画 ===== */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-expand {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* ===== 闪烁动画 ===== */
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes blink-fast {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ===== 报警闪烁 ===== */
+@keyframes alarm-flash {
+  0%, 100% {
+    background-color: var(--status-danger);
+    box-shadow: 0 0 20px var(--status-danger);
+  }
+  50% {
+    background-color: transparent;
+    box-shadow: 0 0 40px var(--status-danger);
+  }
+}
+
+@keyframes alarm-border {
+  0%, 100% {
+    border-color: var(--status-danger);
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    border-color: transparent;
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.5);
+  }
+}
+
+/* ===== 渐变流动 ===== */
+@keyframes gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 100% 100%;
+  }
+}
+
+/* ===== 边框流动 ===== */
+@keyframes border-flow {
+  0% {
+    border-image-source: linear-gradient(0deg, var(--accent-primary), transparent);
+  }
+  25% {
+    border-image-source: linear-gradient(90deg, var(--accent-primary), transparent);
+  }
+  50% {
+    border-image-source: linear-gradient(180deg, var(--accent-primary), transparent);
+  }
+  75% {
+    border-image-source: linear-gradient(270deg, var(--accent-primary), transparent);
+  }
+  100% {
+    border-image-source: linear-gradient(360deg, var(--accent-primary), transparent);
+  }
+}
+
+/* ===== 光线扫过 ===== */
+@keyframes shine-sweep {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+  }
+  100% {
+    transform: translateX(200%) skewX(-15deg);
+  }
+}
+
+/* ===== 旋转动画 ===== */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== 淡入动画 ===== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ===== 缩放动画 ===== */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleInBounce {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ===== 滑入动画 ===== */
+@keyframes slideInUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ===== 数字滚动 ===== */
+@keyframes number-roll {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ===== 粒子浮动 ===== */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  25% {
+    transform: translateY(-10px) translateX(5px);
+  }
+  50% {
+    transform: translateY(-5px) translateX(-5px);
+  }
+  75% {
+    transform: translateY(-15px) translateX(3px);
+  }
+}
+
+@keyframes float-random {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(10px, -15px) rotate(5deg);
+  }
+  50% {
+    transform: translate(-5px, -25px) rotate(-3deg);
+  }
+  75% {
+    transform: translate(15px, -10px) rotate(2deg);
+  }
+}
+
+/* ===== 波纹效果 ===== */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* ===== 打字机效果 ===== */
+@keyframes typing {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes blink-cursor {
+  0%, 100% {
+    border-right-color: transparent;
+  }
+  50% {
+    border-right-color: var(--text-primary);
+  }
+}
+
+/* ===== 进度条动画 ===== */
+@keyframes progress-stripes {
+  0% {
+    background-position: 1rem 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+@keyframes progress-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px var(--accent-primary);
+  }
+  50% {
+    box-shadow: 0 0 25px var(--accent-primary);
+  }
+}
+
+/* ===== 加载动画 ===== */
+@keyframes loading-dots {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes loading-spinner {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== 骨架屏 ===== */
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+/* ===== 数据更新闪烁 ===== */
+@keyframes data-update {
+  0% {
+    background-color: transparent;
+  }
+  20% {
+    background-color: rgba(59, 130, 246, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* ===== 涟漪效果 ===== */
+@keyframes ripple-effect {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(4);
+    opacity: 0;
+  }
+}

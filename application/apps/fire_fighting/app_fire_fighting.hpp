@@ -86,6 +86,7 @@ private:
     HttpResponse handleGetSensors(const HttpRequest& req);
     HttpResponse handlePostControl(const HttpRequest& req);
     HttpResponse handleGetLogs(const HttpRequest& req);
+    HttpResponse handleGetFireActions(const HttpRequest& req);
 
     // 风险评估
     void evaluateRisk();
@@ -127,6 +128,8 @@ private:
     std::vector<FireActionRecord> m_fireActions;
     mutable std::mutex m_actionMutex;
 
+    void loadFireActions();
+    void saveFireActions();
     void handleRiskResponse();
 };
 

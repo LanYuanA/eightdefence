@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <ctime>
 #include <chrono>
+#include <fstream>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -25,6 +26,7 @@ AppFireFighting::AppFireFighting()
     registerApi("/api/sensors", [this](const HttpRequest& r){ return handleGetSensors(r); });
     registerApi("/api/control", [this](const HttpRequest& r){ return handlePostControl(r); });
     registerApi("/api/logs",    [this](const HttpRequest& r){ return handleGetLogs(r); });
+    registerApi("/api/fire_actions", [this](const HttpRequest& r){ return handleGetFireActions(r); });
 }
 
 AppFireFighting::~AppFireFighting() {
@@ -35,6 +37,7 @@ AppFireFighting::~AppFireFighting() {
  * 生命周期
  * ============================================================ */
 int AppFireFighting::init() {
+    loadFireActions();
     APP_LOG_INFO("初始化...");
     addLog("normal", "系统初始化", "消防应用正在初始化, 加载传感器配置");
     return 0;
@@ -332,6 +335,67 @@ HttpResponse AppFireFighting::handleGetLogs(const HttpRequest& req) {
 /* ============================================================
  * 业务逻辑
  * ============================================================ */
+
+/* ============================================================
+ * 火情操作记录 JSON 持久化
+ * ============================================================ */
+void AppFireFighting::saveFireActions() {
+    std::lock_guard<std::mutex> lock(m_actionMutex);
+    system("mkdir -p ./data");
+    std::ofstream ofs("./data/fire_actions.json");
+    if (!ofs) return;
+    ofs << "[\n";
+    for (size_t i = 0; i < m_fireActions.size(); i++) {
+        if (i > 0) ofs << ",\n";
+        ofs << "  {\"timestamp\":\"" << m_fireActions[i].timestamp
+            << "\",\"action\":\"" << m_fireActions[i].action
+            << "\",\"operator\":\"" << m_fireActions[i].operatorName << "\"}";
+    }
+    ofs << "\n]\n";
+}
+
+void AppFireFighting::loadFireActions() {
+    std::lock_guard<std::mutex> lock(m_actionMutex);
+    std::ifstream ifs("./data/fire_actions.json");
+    if (!ifs) return;
+    std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+    // Simple JSON parse: find each { } object
+    size_t pos = 0;
+    while ((pos = content.find("{\"timestamp\"", pos)) != std::string::npos) {
+        size_t end = content.find("}", pos);
+        if (end == std::string::npos) break;
+        std::string obj = content.substr(pos, end - pos + 1);
+        FireActionRecord rec;
+        // Extract timestamp
+        auto extract = [&](const std::string& key) -> std::string {
+            size_t k = obj.find(key);
+            if (k == std::string::npos) return "";
+            k += key.length() + 3; // skip key":"
+            size_t ve = obj.find("\"", k);
+            if (ve == std::string::npos) return "";
+            return obj.substr(k, ve - k);
+        };
+        rec.timestamp = extract("timestamp");
+        rec.action = extract("action");
+        rec.operatorName = extract("operator");
+        if (!rec.timestamp.empty())
+            m_fireActions.push_back(rec);
+        pos = end + 1;
+    }
+}
+
+HttpResponse AppFireFighting::handleGetFireActions(const HttpRequest& /*req*/) {
+    std::lock_guard<std::mutex> lock(m_actionMutex);
+    std::string json = "[";
+    for (size_t i = 0; i < m_fireActions.size(); i++) {
+        if (i > 0) json += ",";
+        json += "{\"timestamp\":\"" + m_fireActions[i].timestamp + "\","
+                "\"action\":\"" + m_fireActions[i].action + "\","
+                "\"operator\":\"" + m_fireActions[i].operatorName + "\"}";
+    }
+    json += "]";
+    return HttpResponse::json(json);
+}
 void AppFireFighting::evaluateRisk() {
     m_state.smokeRisk = calcSmokeRisk(m_state.smokeState.load());
     m_state.tempRisk  = calcTempRisk(m_state.temperature.load());

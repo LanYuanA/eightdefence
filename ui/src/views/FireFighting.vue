@@ -22,9 +22,6 @@
     </nav>
     <header>
       <h1>智能火灾预警应用分析平台</h1>
-      <div style="display: flex; gap: 15px;">
-        <button class="btn danger" style="padding: 5px 12px; font-size:12px;" @click="emergencyLinkage">&#x1F6A8; 应急联动处置</button>
-      </div>
       <div class="status-bar">
         <div
           class="status-item status-item-clickable"
@@ -212,26 +209,6 @@
           <div class="btn-group" style="justify-content: center; gap: 20px;">
             <button class="btn danger" @click="confirmFire">确认火情</button>
             <button class="btn" @click="cancelFireAlarm">火情误报</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 应急联动弹窗 -->
-    <div v-if="modals.realtimeAlarm" class="modal-overlay" style="display: flex;">
-      <div class="modal" style="width: 500px;">
-        <div class="modal-header">
-          <span>&#x1F6A8; 应急联动处置</span>
-          <span class="modal-close" @click="closeModal('realtimeAlarm')">&times;</span>
-        </div>
-        <div class="modal-body">
-          <div style="font-size: 16px; margin-bottom: 20px; text-align: center;">
-            <p>是否执行应急联动处置？</p>
-            <p style="color: var(--warning);">该操作将开启所有联动设备！</p>
-          </div>
-          <div class="btn-group" style="justify-content: center;">
-            <button class="btn danger" @click="confirmEmergencyLinkage">确认执行</button>
-            <button class="btn" @click="closeModal('realtimeAlarm')">取消</button>
           </div>
         </div>
       </div>
@@ -437,15 +414,16 @@ const gasPeak = ref("--")
 
 // 火情误报屏蔽标志: 点击"火情误报"后置true, 数据恢复正常后自动重置
 const alarmDismissed = ref(false)
+let alarmDismissTimer: ReturnType<typeof setTimeout> | null = null
 
 const deviceSwitches = reactive({ cabin: false, fan: false, sprinkler: false, horn: false })
 
 const deviceControlLogList = ref<DeviceControlLogItem[]>([])
+const fireActions = ref<{timestamp:string;action:string;operator:string}[]>([])
 
 // Modals
 const modals = reactive({
   fireConfirm: false,
-  realtimeAlarm: false,
   deviceList: false,
   deviceControlLog: false,
   history: false,
@@ -603,25 +581,10 @@ function openCurrentRegionDeviceModal() {
   openModal("deviceList")
 }
 
-function emergencyLinkage() {
-  openModal("realtimeAlarm")
-}
-
-function confirmEmergencyLinkage() {
-  closeModal("realtimeAlarm")
-  deviceSwitches.cabin = true
-  deviceSwitches.fan = true
-  deviceSwitches.sprinkler = true
-  deviceSwitches.horn = true
-  addDeviceControlLog("舱门控制开关", "开启")
-  addDeviceControlLog("排烟风机设备", "开启")
-  addDeviceControlLog("自动水淋灭火系统", "开启")
-  addDeviceControlLog("声光报警器", "开启")
-  ElMessage.success("应急联动处置已执行！所有设备已开启")
-}
-
 function confirmFire() {
   closeModal("fireConfirm")
+  const operator = localStorage.getItem("loginUser") || "管理员"
+  axios.get("/fire/api/control", { params: { action: "confirm", operator } }).catch(() => {})
   deviceSwitches.cabin = true
   deviceSwitches.fan = true
   deviceSwitches.sprinkler = true
@@ -630,13 +593,22 @@ function confirmFire() {
   addDeviceControlLog("排烟风机设备", "开启")
   addDeviceControlLog("自动水淋灭火系统", "开启")
   addDeviceControlLog("声光报警器", "开启")
-  ElMessage.success("已确认火情并执行安全防御！")
+  fireActions.value.push({ timestamp: new Date().toLocaleString("zh-CN"), action: "confirmed", operator })
+  alarmDismissed.value = true
+  if (alarmDismissTimer) clearTimeout(alarmDismissTimer)
+  alarmDismissTimer = setTimeout(() => { alarmDismissed.value = false }, 60000)
+  ElMessage.success("已确认火情，60秒后可再次告警")
 }
 
 function cancelFireAlarm() {
   closeModal("fireConfirm")
+  const operator = localStorage.getItem("loginUser") || "管理员"
+  axios.get("/fire/api/control", { params: { action: "dismiss", operator } }).catch(() => {})
   alarmDismissed.value = true
-  ElMessage.info("已标记为火情误报，数据恢复正常后将自动重置")
+  fireActions.value.push({ timestamp: new Date().toLocaleString("zh-CN"), action: "dismissed", operator })
+  if (alarmDismissTimer) clearTimeout(alarmDismissTimer)
+  alarmDismissTimer = setTimeout(() => { alarmDismissed.value = false }, 60000)
+  ElMessage.info("已标记为火情误报，60秒后可再次告警，操作已记录")
 }
 
 function updateThreshold(type: string) {

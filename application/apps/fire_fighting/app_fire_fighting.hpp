@@ -121,6 +121,12 @@ private:
     int   m_prevRiskPercent{15};
 
     // 风险响应
+    struct FireActionRecord {
+        std::string timestamp, action, operatorName;
+    };
+    std::vector<FireActionRecord> m_fireActions;
+    mutable std::mutex m_actionMutex;
+
     void handleRiskResponse();
 };
 

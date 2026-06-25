@@ -207,6 +207,34 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
     std::string action = req.getParam("action");
     std::string target = req.getParam("target");
 
+    // 火情确认 / 误报
+    if (action == "confirm" || action == "dismiss") {
+        std::string operatorName = req.getParam("operator");
+        if (operatorName.empty()) operatorName = "管理员";
+
+        m_state.alarmAcknowledged.store(true);
+
+        auto now = std::chrono::system_clock::now();
+        auto tt = std::chrono::system_clock::to_time_t(now);
+        struct tm tm_buf;
+        localtime_r(&tt, &tm_buf);
+        char ts[64];
+        strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm_buf);
+
+        {
+            std::lock_guard<std::mutex> lock(m_actionMutex);
+            m_fireActions.push_back({ts, action, operatorName});
+        }
+
+        if (action == "confirm")
+            addLog("alarm", "火情已确认", "操作人: " + operatorName + ", 已执行安全防御");
+        else
+            addLog("normal", "火情误报", "操作人: " + operatorName + ", 标记为误报, 风险恢复前不再弹窗");
+
+        APP_LOG_INFO("火情%s: 操作人=%s", action == "confirm" ? "确认" : "误报", operatorName.c_str());
+        return HttpResponse::json("{\"status\":\"success\"}");
+    }
+
     if (target == "fire") {
         if (action == "simulate") {
             m_state.fireSimulated.store(true);

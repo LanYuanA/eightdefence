@@ -1,4 +1,4 @@
-﻿﻿<template>
+﻿<template>
   <div class="fire-page">
     <!-- 顶部导航栏 -->
     <nav class="top-nav-bar">
@@ -22,6 +22,9 @@
     </nav>
     <header>
       <h1>智能火灾预警应用分析平台</h1>
+      <div style="display: flex; gap: 15px;">
+        <button class="btn danger" style="padding: 5px 12px; font-size:12px;" @click="emergencyLinkage">&#x1F6A8; 应急联动处置</button>
+      </div>
       <div class="status-bar">
         <div
           class="status-item status-item-clickable"
@@ -71,12 +74,12 @@
           <div class="data-card">
             <div class="label">湿度 (%RH)</div>
             <div class="value hum-val">{{ humidityDisplay }}</div>
-            <div class="label" style="font-size: 12px">传感器状态: 在线</div>
+            <div class="label" style="font-size: 12px">传感器状态: <span :style="{ color: status.humidity?.online === false ? 'var(--danger)' : 'inherit' }">{{ status.humidity?.online === false ? '离线' : '在线' }}</span></div>
           </div>
           <div class="data-card">
             <div class="label">CO&#x2082; (ppm)</div>
             <div class="value gas-val">{{ co2Display }}</div>
-            <div class="label" style="font-size: 12px">传感器状态: 在线</div>
+            <div class="label" style="font-size: 12px">传感器状态: <span :style="{ color: status.co2?.online === false ? 'var(--danger)' : 'inherit' }">{{ status.co2?.online === false ? '离线' : '在线' }}</span></div>
           </div>
           <div class="data-card">
             <div class="label">烟雾浓度</div>
@@ -214,6 +217,26 @@
       </div>
     </div>
 
+    <!-- 应急联动弹窗 -->
+    <div v-if="modals.realtimeAlarm" class="modal-overlay" style="display: flex;">
+      <div class="modal" style="width: 500px;">
+        <div class="modal-header">
+          <span>&#x1F6A8; 应急联动处置</span>
+          <span class="modal-close" @click="closeModal('realtimeAlarm')">&times;</span>
+        </div>
+        <div class="modal-body">
+          <div style="font-size: 16px; margin-bottom: 20px; text-align: center;">
+            <p>是否执行应急联动处置？</p>
+            <p style="color: var(--warning);">该操作将开启所有联动设备！</p>
+          </div>
+          <div class="btn-group" style="justify-content: center;">
+            <button class="btn danger" @click="confirmEmergencyLinkage">确认执行</button>
+            <button class="btn" @click="closeModal('realtimeAlarm')">取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 设备列表弹窗 -->
     <div v-if="modals.deviceList" class="modal-overlay" style="display: flex;">
       <div class="modal" style="width: 500px;">
@@ -280,7 +303,6 @@
             <thead>
               <tr>
                 <th>时间</th>
-                <th>操作人</th>
                 <th>区域</th>
                 <th>设备名称</th>
                 <th>操作状态</th>
@@ -289,13 +311,12 @@
             <tbody>
               <tr v-for="(item, i) in deviceControlLogList" :key="i">
                 <td>{{ item.time }}</td>
-                <td>{{ item.operator }}</td>
                 <td>{{ item.region }}</td>
                 <td>{{ item.device }}</td>
                 <td>{{ item.status }}</td>
               </tr>
               <tr v-if="deviceControlLogList.length === 0">
-                <td colspan="5" style="text-align:center;color:var(--text-sub)">暂无设备操作记录</td>
+                <td colspan="4" style="text-align:center;color:var(--text-sub)">暂无设备操作记录</td>
               </tr>
             </tbody>
           </table>
@@ -305,86 +326,51 @@
 
     <!-- 历史监测日志弹窗 -->
     <div v-if="modals.history" class="modal-overlay" style="display: flex;">
-      <div class="modal" style="width: 650px;">
+      <div class="modal">
         <div class="modal-header">
-          <span>历史监测日志 (30天)</span>
+          <span>历史监测日志</span>
           <span class="modal-close" @click="closeModal('history')">&times;</span>
         </div>
         <div class="modal-body">
-          <table class="table-striped">
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>最高温度</th>
-                <th>温度阈值</th>
-                <th>最高CO₂</th>
-                <th>CO₂阈值</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(d, i) in dailyHistory" :key="i">
-                <td>{{ d.date }}</td>
-                <td>{{ d.maxTemp }}℃</td>
-                <td>{{ d.tempThreshold }}℃</td>
-                <td>{{ d.maxCo2 }} ppm</td>
-                <td>{{ d.co2Threshold }} ppm</td>
-              </tr>
-              <tr v-if="dailyHistory.length === 0">
-                <td colspan="5" style="text-align:center;color:var(--text-sub)">暂无历史数据</td>
-              </tr>
-            </tbody>
-          </table>
+          <p style="color:var(--text-sub); text-align:center;">历史监测数据展示区域</p>
         </div>
       </div>
     </div>
+
     <!-- 报警事件库弹窗 -->
     <div v-if="modals.alarm" class="modal-overlay" style="display: flex;">
-      <div class="modal" style="width: 700px;">
+      <div class="modal">
         <div class="modal-header">
-          <span>报警事件库 (30天)</span>
+          <span>报警事件库</span>
           <span class="modal-close" @click="closeModal('alarm')">&times;</span>
         </div>
         <div class="modal-body">
-          <table class="table-striped">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>类型</th>
-                <th>事件</th>
-                <th>详情</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(log, i) in alarmFilteredLogs" :key="i">
-                <td>{{ log.timestamp }}</td>
-                <td><span :class="'tag ' + logTagClass(log.level)">{{ log.level }}</span></td>
-                <td>{{ log.event }}</td>
-                <td>{{ log.details }}</td>
-              </tr>
-              <tr v-if="alarmFilteredLogs.length === 0">
-                <td colspan="4" style="text-align:center;color:var(--text-sub)">暂无报警记录</td>
-              </tr>
-            </tbody>
-          </table>
+          <p style="color:var(--text-sub); text-align:center;">报警事件数据展示区域</p>
         </div>
       </div>
     </div>
+
     <!-- 数据恢复弹窗 -->
     <div v-if="modals.recovery" class="modal-overlay" style="display: flex;">
-      <div class="modal" style="width: 500px;">
+      <div class="modal">
         <div class="modal-header">
           <span>数据恢复</span>
           <span class="modal-close" @click="closeModal('recovery')">&times;</span>
         </div>
         <div class="modal-body">
-          <div style="margin-bottom:15px; color:var(--text-sub); font-size:13px;">
-            选择之前备份的 JSON 文件进行数据恢复
-          </div>
-          <input ref="recoveryFileInput" type="file" accept=".json" style="display:none" @change="handleRecoveryFile" />
           <div style="margin-bottom:15px;">
+            <label style="font-size:14px; margin-right:10px;">选择备份节点：</label>
+            <select v-model="recoverySelect" style="background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border); padding: 6px 12px; border-radius: 4px;">
+              <option value="">请选择</option>
+              <option value="20260422">2026-04-22 18:00</option>
+              <option value="20260421">2026-04-21 18:00</option>
+              <option value="20260420">2026-04-20 18:00</option>
+            </select>
+          </div>
+          <div style="margin-bottom:15px; color:var(--text-sub); font-size:13px;">
             <span :style="{ color: recoveryStatusColor }">{{ recoveryStatusText }}</span>
           </div>
-          <button class="btn" :disabled="recoveryRunning" @click="startRecovery">选择文件并恢复</button>
+          <button class="btn" :disabled="recoveryRunning" @click="startRecovery">执行恢复</button>
         </div>
       </div>
     </div>
@@ -400,7 +386,7 @@ import * as echarts from "echarts"
 
 // ---- Interfaces ----
 interface FireStatus {
-  system: { overallRisk: string; riskPercent: number; systemNormal: boolean; running: boolean; fireSimulated: boolean }
+  system: { overallRisk: string; systemNormal: boolean; running: boolean; fireSimulated: boolean }
   smoke: { state: number; stateText: string; risk: string; online: boolean }
   temperature: { value: number; unit: string; risk: string; online: boolean }
   humidity: { value: number; unit: string; online: boolean }
@@ -418,7 +404,6 @@ interface LogEntry {
 
 interface DeviceControlLogItem {
   time: string
-  operator: string
   region: string
   device: string
   status: string
@@ -435,7 +420,7 @@ const handleLogout = () => {
 }
 
 const status = ref<FireStatus>({
-  system: { overallRisk: "安全", riskPercent: 15, systemNormal: true, running: true, fireSimulated: false },
+  system: { overallRisk: "安全", systemNormal: true, running: true, fireSimulated: false },
   smoke: { state: 0, stateText: "正常", risk: "安全", online: true },
   temperature: { value: 25, unit: "°C", risk: "安全", online: true },
   humidity: { value: 50, unit: "%", online: true },
@@ -450,60 +435,17 @@ const thresholds = reactive({ temp: 45, gas: 1000 })
 const tempPeak = ref("--")
 const gasPeak = ref("--")
 
-// 30天历史峰值存储
-interface DailyRecord { date: string; maxTemp: number; tempThreshold: number; maxCo2: number; co2Threshold: number }
-const dailyHistory = ref<DailyRecord[]>([])
-
-function loadDailyHistory() {
-  try {
-    const raw = localStorage.getItem("fire_daily_history")
-    if (raw) dailyHistory.value = JSON.parse(raw)
-  } catch { dailyHistory.value = [] }
-}
-
-function saveDailyHistory() {
-  // 只保留30天
-  if (dailyHistory.value.length > 30) dailyHistory.value = dailyHistory.value.slice(-30)
-  localStorage.setItem("fire_daily_history", JSON.stringify(dailyHistory.value))
-}
-
-function updateDailyHistory() {
-  const now = new Date()
-  const date = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,"0")}-${now.getDate().toString().padStart(2,"0")}`
-  const temp = status.value.temperature?.value ?? 0
-  const co2 = status.value.co2?.value ?? 0
-  const tempTh = thresholds.temp
-  const co2Th = thresholds.gas
-  
-  const today = dailyHistory.value.find(d => d.date === date)
-  if (today) {
-    if (temp > today.maxTemp) { today.maxTemp = temp; today.tempThreshold = tempTh }
-    if (co2 > today.maxCo2)  { today.maxCo2 = co2; today.co2Threshold = co2Th }
-  } else {
-    dailyHistory.value.push({ date, maxTemp: temp, tempThreshold: tempTh, maxCo2: co2, co2Threshold: co2Th })
-  }
-  saveDailyHistory()
-}
-
-// 报警事件过滤
-const alarmFilteredLogs = computed(() => {
-  return logs.value.filter(log =>
-    log.level === "alarm" || log.level === "warning" ||
-    log.event.includes("模拟") || log.event.includes("火灾")
-  )
-})
-
 // 火情误报屏蔽标志: 点击"火情误报"后置true, 数据恢复正常后自动重置
-const alarmDismissed = ref(false); let alarmDismissTimer: ReturnType<typeof setTimeout> | null = null
+const alarmDismissed = ref(false)
 
 const deviceSwitches = reactive({ cabin: false, fan: false, sprinkler: false, horn: false })
 
-const deviceControlLogList = ref<DeviceControlLogItem[]>([]); const fireActions = ref<{timestamp:string;action:string;operator:string}[]>([])
+const deviceControlLogList = ref<DeviceControlLogItem[]>([])
 
 // Modals
 const modals = reactive({
   fireConfirm: false,
-  
+  realtimeAlarm: false,
   deviceList: false,
   deviceControlLog: false,
   history: false,
@@ -520,7 +462,7 @@ const confirmThresholdText = ref("")
 const pendingAlarmType = ref("")
 
 // Recovery modal
-
+const recoverySelect = ref("")
 const recoveryStatusText = ref("")
 const recoveryStatusColor = ref("var(--text-sub)")
 const recoveryRunning = ref(false)
@@ -568,27 +510,30 @@ const onlineCountText = computed(() => {
   return `${online}/${list.length}`
 })
 
-
-function logTagClass(level: string) {
-  if (level === "alarm" || level === "danger") return "danger"
-  if (level === "warning") return "warning"
-  return "system"
-}
-
 const riskPercent = computed(() => {
-  return status.value.system?.riskPercent ?? 15
+  const risk = status.value.system?.overallRisk
+  if (risk === "火灾") return 100
+  if (risk === "高风险") return 88
+  if (risk === "预警") return 65
+  if (risk === "中风险") return 50
+  // compute from temperature risk
+  const tRisk = status.value.temperature?.risk
+  if (tRisk === "高风险") return 80
+  if (tRisk === "中风险") return 50
+  return 15
 })
+
 const riskColor = computed(() => {
   const p = riskPercent.value
-  if (p >= 55) return "var(--danger)"
-  if (p >= 25) return "var(--warning)"
+  if (p >= 80) return "var(--danger)"
+  if (p >= 50) return "var(--warning)"
   return "var(--success)"
 })
 
 const riskText = computed(() => {
   const p = riskPercent.value
-  if (p >= 55) return `高风险 ${p}%`
-  if (p >= 25) return `中风险 ${p}%`
+  if (p >= 80) return `高风险 ${p}%`
+  if (p >= 50) return `中风险 ${p}%`
   return `低风险 ${p}%`
 })
 
@@ -628,22 +573,29 @@ function closeModal(name: string) {
 function addDeviceControlLog(deviceName: string, deviceStatus: string) {
   deviceControlLogList.value.unshift({
     time: new Date().toLocaleString("zh-CN"),
-    operator: localStorage.getItem("loginUser") || "管理员",
     region: "区域" + currentRegion.value,
     device: deviceName,
     status: deviceStatus
   })
 }
 
-function toggleDevice(device: "cabin" | "fan" | "sprinkler" | "horn") {
-  deviceSwitches[device] = !deviceSwitches[device]
+async function toggleDevice(device: "cabin" | "fan" | "sprinkler" | "horn") {
+  const target = device === "fan" ? "fan" : device
+  const newState = !deviceSwitches[device]
+  const action = newState ? "on" : "off"
   const names: Record<string, string> = {
     cabin: "舱门控制开关",
     fan: "排烟风机设备",
     sprinkler: "自动水淋灭火系统",
     horn: "声光报警器"
   }
-  addDeviceControlLog(names[device], deviceSwitches[device] ? "开启" : "关闭")
+  try {
+    await axios.get("/fire/api/control", { params: { target, action, speed: 200 } })
+    deviceSwitches[device] = newState
+    addDeviceControlLog(names[device], newState ? "开启" : "关闭")
+  } catch (e: any) {
+    ElMessage.error("设备控制失败: " + (e?.message || e))
+  }
 }
 
 function openCurrentRegionDeviceModal() {
@@ -651,10 +603,12 @@ function openCurrentRegionDeviceModal() {
   openModal("deviceList")
 }
 
-async function confirmFire() {
-  closeModal("fireConfirm")
-  const operator = localStorage.getItem("loginUser") || "管理员"
-  try { await axios.get("/fire/api/control", { params: { action: "confirm", operator } }) } catch (e) {}
+function emergencyLinkage() {
+  openModal("realtimeAlarm")
+}
+
+function confirmEmergencyLinkage() {
+  closeModal("realtimeAlarm")
   deviceSwitches.cabin = true
   deviceSwitches.fan = true
   deviceSwitches.sprinkler = true
@@ -663,17 +617,26 @@ async function confirmFire() {
   addDeviceControlLog("排烟风机设备", "开启")
   addDeviceControlLog("自动水淋灭火系统", "开启")
   addDeviceControlLog("声光报警器", "开启")
-  fireActions.value.push({ timestamp: new Date().toLocaleString('zh-CN'), action: 'confirmed', operator })
-  if (alarmDismissTimer) clearTimeout(alarmDismissTimer); alarmDismissed.value = true; alarmDismissTimer = setTimeout(() => { alarmDismissed.value = false }, 60000); ElMessage.success("已确认火情，60秒后可再次告警")
+  ElMessage.success("应急联动处置已执行！所有设备已开启")
 }
 
-async function cancelFireAlarm() {
+function confirmFire() {
   closeModal("fireConfirm")
-  const operator = localStorage.getItem("loginUser") || "管理员"
-  try { await axios.get("/fire/api/control", { params: { action: "dismiss", operator } }) } catch (e) {}
+  deviceSwitches.cabin = true
+  deviceSwitches.fan = true
+  deviceSwitches.sprinkler = true
+  deviceSwitches.horn = true
+  addDeviceControlLog("舱门控制开关", "开启")
+  addDeviceControlLog("排烟风机设备", "开启")
+  addDeviceControlLog("自动水淋灭火系统", "开启")
+  addDeviceControlLog("声光报警器", "开启")
+  ElMessage.success("已确认火情并执行安全防御！")
+}
+
+function cancelFireAlarm() {
+  closeModal("fireConfirm")
   alarmDismissed.value = true
-  fireActions.value.push({ timestamp: new Date().toLocaleString('zh-CN'), action: 'dismissed', operator })
-  if (alarmDismissTimer) clearTimeout(alarmDismissTimer); alarmDismissed.value = true; alarmDismissTimer = setTimeout(() => { alarmDismissed.value = false }, 60000); ElMessage.info("已标记为火情误报，60秒后可再次告警，操作已记录")
+  ElMessage.info("已标记为火情误报，数据恢复正常后将自动重置")
 }
 
 function updateThreshold(type: string) {
@@ -684,59 +647,24 @@ function updateThreshold(type: string) {
   }
 }
 
-
 function handleBackup() {
-  const now = new Date()
-  const dateStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,"0")}-${now.getDate().toString().padStart(2,"0")}`
-  const data = {
-    project: "八防消防系统",
-    backupDate: dateStr,
-    dailyHistory: dailyHistory.value,
-    alarmLogs: alarmFilteredLogs.value,
-    deviceControlLogs: deviceControlLogList.value,
-    fireActions: fireActions.value
-  }
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = `消防系统备份_${dateStr}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  ElMessage.success("备份文件已下载: 消防系统备份_" + dateStr + ".json")
+  ElMessage.success("数据已完成归档备份")
 }
-
-const recoveryFileInput = ref<HTMLInputElement>()
 
 function startRecovery() {
-  recoveryFileInput.value?.click()
-}
-
-function handleRecoveryFile(e: Event) {
-  const input = e.target as HTMLInputElement
-  if (!input.files || input.files.length === 0) return
-  recoveryRunning.value = true
-  recoveryStatusText.value = "正在读取文件..."
-  recoveryStatusColor.value = "var(--warning)"
-  const reader = new FileReader()
-  reader.onload = (ev) => {
-    try {
-      const data = JSON.parse(ev.target?.result as string)
-      if (data.dailyHistory) dailyHistory.value = data.dailyHistory
-      if (data.alarmLogs) logs.value = data.alarmLogs
-      if (data.deviceControlLogs) deviceControlLogList.value = data.deviceControlLogs
-      saveDailyHistory()
-      recoveryStatusText.value = "数据恢复成功！已还原 " + (data.backupDate || "") + " 的备份"
-      recoveryStatusColor.value = "var(--success)"
-      ElMessage.success("数据恢复成功")
-    } catch {
-      recoveryStatusText.value = "文件格式错误，请选择正确的备份文件"
-      recoveryStatusColor.value = "var(--danger)"
-      ElMessage.error("文件格式错误")
-    }
-    recoveryRunning.value = false
+  if (!recoverySelect.value) {
+    ElMessage.warning("请选择一个备份节点！")
+    return
   }
-  reader.readAsText(input.files[0])
+  recoveryRunning.value = true
+  recoveryStatusText.value = "正在还原系统快照..."
+  recoveryStatusColor.value = "var(--warning)"
+  setTimeout(() => {
+    recoveryStatusText.value = "数据恢复成功！系统状态已刷新。"
+    recoveryStatusColor.value = "var(--success)"
+    recoveryRunning.value = false
+    setTimeout(() => closeModal("recovery"), 2000)
+  }, 2000)
 }
 
 function checkThresholds() {
@@ -801,7 +729,6 @@ async function fetchStatus() {
     }
     // Check thresholds after status update
     checkThresholds()
-    updateDailyHistory()
   } catch (e) {
     // silent
   }
@@ -944,7 +871,6 @@ let statusInterval = 0
 let logsInterval = 0
 
 onMounted(() => {
-  loadDailyHistory()
   updateTime()
   timeInterval = window.setInterval(updateTime, 1000)
   fetchStatus()

@@ -1,4 +1,4 @@
-#ifndef GLOBAL_DEVICES_HPP
+﻿#ifndef GLOBAL_DEVICES_HPP
 #define GLOBAL_DEVICES_HPP
 
 #include "devices/dev_cloud_sensors.hpp"
@@ -10,6 +10,7 @@
 #include "devices/dev_air_conditioner.hpp"
 #include "devices/dev_air_purifier.hpp"
 #include "devices/dev_alarm_device.hpp"
+#include "devices/dev_stepper_motor.hpp"
 #include "service/modbus_service.hpp"
 #include "serial_bus.hpp"
 #include "polling_manager.hpp"
@@ -32,6 +33,9 @@ extern DevHumidifier       dev_humidifier;
 extern DevAirConditioner   dev_ac;
 extern DevAirPurifier      dev_purifier;
 extern DevAlarmDevice      dev_alarm;
+extern DevStepperMotor     dev_stepper_cabin;     // 舱门电机 0x01
+extern DevStepperMotor     dev_stepper_sprinkler;  // 水淋电机 0x02
+extern DevStepperMotor     dev_stepper_exhaust;   // 排烟风机 0x03
 
 extern ModbusService*      g_modbus;
 extern SerialBus*          g_serial_bus;

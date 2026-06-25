@@ -1,12 +1,13 @@
-﻿/**
+/**
  * @file app_fire_fighting.hpp
- * @brief 消防系统应用 - 烟雾/温度/CO2/湿度多参数火灾风险检测与应急处置
+ * @brief 消防系统应用 - 烟雾/温度火灾检测与应急处置
  *
- * 基于八防综合监控网关平台和 GB/T 31593.9 火灾风险评估框架
- *
- * 风险评估模型：
- *   综合风险% = 0.35×烟雾得分 + 0.30×温度得分 + 0.20×CO2得分 + 0.15×湿度变化得分
- *   等级划分：0-25低风险 / 25-55中风险 / 55-100高风险
+ * 基于八防综合监控网关平台, 提供:
+ *   - 烟雾浓度监测
+ *   - 温度火灾风险评估
+ *   - 火灾等级综合判定
+ *   - 灭火联动与疏散引导
+ *   - 前端页面服务
  */
 
 #ifndef APP_FIRE_FIGHTING_HPP
@@ -14,36 +15,52 @@
 
 #include "../../app_base.hpp"
 #include "service/atomic/svc_sound_light_alarm.hpp"
-#include "service/atomic/svc_fire_suppression.hpp"
-#include "service/atomic/svc_evacuation.hpp"
+#include "service/atomic/svc_fire_sprinkler.hpp"
+#include "service/atomic/svc_fire_fan.hpp"
 #include "service/atomic/svc_command_center.hpp"
+#include "service/atomic/svc_fire_cabin.hpp"
 #include <string>
 #include <atomic>
 #include <thread>
 #include <mutex>
 #include <vector>
 
+/**
+ * @brief 火灾风险等级
+ */
 enum class FireRiskLevel {
-    LOW = 0,
-    MEDIUM = 1,
-    HIGH = 2
+    LOW = 0,       // 低风险 (安全)
+    MEDIUM = 1,    // 中风险 (预警)
+    HIGH = 2       // 高风险 (火灾)
 };
 
+/**
+ * @brief 消防系统状态
+ */
 struct FireFightingState {
-    std::atomic<int>   smokeState{0};
+    // 烟雾
+    std::atomic<int>   smokeState{0};       // 0=正常, 非0=检测到烟雾
     FireRiskLevel      smokeRisk{FireRiskLevel::LOW};
+
+    // 温度
     std::atomic<float> temperature{25.0f};
     FireRiskLevel      tempRisk{FireRiskLevel::LOW};
+
+    // 火灾模拟
     std::atomic<bool>  fireSimulated{false};
     std::atomic<int>   simSmoke{0};
     std::atomic<float> simTemp{25.0f};
+
+    // 服务状态
     std::atomic<bool>  alarmActive{false};
-    std::atomic<bool>  suppressionActive{false};
-    std::atomic<bool>  evacuationActive{false};
+    std::atomic<bool>  sprinklerActive{false};
+    std::atomic<bool>  exhaustActive{false};
     std::atomic<bool>  centerAlarmActive{false};
+
+    // 整体状态
     FireRiskLevel      overallRisk{FireRiskLevel::LOW};
-    std::atomic<int>   riskPercent{15};
     std::atomic<bool>  systemNormal{true};
+    std::atomic<int>   riskPercent{15};
     std::atomic<bool>  alarmAcknowledged{false};
 };
 
@@ -52,25 +69,30 @@ public:
     AppFireFighting();
     ~AppFireFighting() override;
 
+    // 生命周期
     int init() override;
     int start() override;
     void stop() override;
+
+    // API 处理
     HttpResponse handleApi(const HttpRequest& request) override;
-    void setServices(SvcSoundLightAlarm* a1, SvcFireSuppression* a2,
-                     SvcEvacuation* a3, SvcCommandCenter* a4);
+
+    // 服务注入
+    void setServices(SvcSoundLightAlarm* a1, SvcFireSprinkler* a2, SvcFireFan* a3, SvcCommandCenter* a4, SvcFireCabin* a5 = nullptr);
 
 private:
+    // API 处理函数
     HttpResponse handleGetStatus(const HttpRequest& req);
     HttpResponse handleGetSensors(const HttpRequest& req);
     HttpResponse handlePostControl(const HttpRequest& req);
     HttpResponse handleGetLogs(const HttpRequest& req);
 
+    // 风险评估
     void evaluateRisk();
-    int calcSmokeScore(int smokeState, bool online);
-    int calcTempScore(float temp, bool online);
-    int calcCo2Score(int co2, bool online);
-    int calcHumidityScore(float humidity, bool online);
+    FireRiskLevel calcSmokeRisk(int smokeState);
+    FireRiskLevel calcTempRisk(float temp);
 
+    // 日志
     struct LogEntry {
         std::string timestamp;
         std::string level;
@@ -83,25 +105,23 @@ private:
     std::vector<LogEntry> m_logs;
     mutable std::mutex m_logMutex;
 
-    // 火情确认/误报操作记录
-    struct FireActionRecord {
-        std::string timestamp;
-        std::string action;
-        std::string operatorName;
-    };
-    std::vector<FireActionRecord> m_fireActions;
-    mutable std::mutex m_actionMutex;
+    // 上次风险等级
+    FireRiskLevel m_prevSmokeRisk{FireRiskLevel::LOW};
+    FireRiskLevel m_prevTempRisk{FireRiskLevel::LOW};
+
+    // 原子服务指针
+    SvcSoundLightAlarm*    m_svcSoundLight = nullptr;
+    SvcFireSprinkler*   m_svcSprinkler = nullptr;
+    SvcFireFan*         m_svcExhaust = nullptr;
+    SvcCommandCenter*      m_svcCmdCenter  = nullptr;
+    SvcFireCabin*          m_svcCabin      = nullptr;
 
     float m_prevHumidity{60.0f};
     int   m_prevCo2{400};
     int   m_prevRiskPercent{15};
 
-    SvcSoundLightAlarm*    m_svcSoundLight = nullptr;
-    SvcFireSuppression*    m_svcSuppression = nullptr;
-    SvcEvacuation*         m_svcEvacuation = nullptr;
-    SvcCommandCenter*      m_svcCmdCenter = nullptr;
-
+    // 风险响应
     void handleRiskResponse();
 };
 
-#endif
+#endif // APP_FIRE_FIGHTING_HPP

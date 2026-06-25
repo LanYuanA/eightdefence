@@ -1,24 +1,33 @@
-/**
+﻿/**
  * @file svc_evacuation.cpp
- * @brief 疏散引导服务实现（模拟）
+ * @brief 疏散引导服务 - 控制排烟风机步进电机
  */
 
 #include "svc_evacuation.hpp"
 #include "core/logger.hpp"
+#include "core/global_devices.hpp"
 #include <cstdio>
 
 void SvcEvacuation::activate() {
     if (active_.exchange(true)) return;
 
-    printf("  => [SvcEvacuation] 疏散广播和指示灯启动指令已发送 (模拟)\n");
-    Logger::instance().log(LogLevel::WARNING, __FILE__, __LINE__,
-        "[疏散引导服务] 疏散广播和应急指示灯启动指令已发送 (模拟模式)");
+    if (motor_ && g_modbus) {
+        motor_->start(*g_modbus, 300);  // 排烟风机 300rpm
+    } else {
+        printf("  => [SvcEvacuation] 排烟风机启动 (模拟)\n");
+        Logger::instance().log(LogLevel::WARNING, __FILE__, __LINE__,
+            "[疏散引导服务] 排烟风机启动 (模拟模式)");
+    }
 }
 
 void SvcEvacuation::deactivate() {
     if (!active_.exchange(false)) return;
 
-    printf("  => [SvcEvacuation] 疏散广播和指示灯停止指令已发送 (模拟)\n");
-    Logger::instance().log(LogLevel::INFO, __FILE__, __LINE__,
-        "[疏散引导服务] 疏散广播和应急指示灯停止指令已发送 (模拟模式)");
+    if (motor_ && g_modbus) {
+        motor_->stop(*g_modbus);
+    } else {
+        printf("  => [SvcEvacuation] 排烟风机停止 (模拟)\n");
+        Logger::instance().log(LogLevel::INFO, __FILE__, __LINE__,
+            "[疏散引导服务] 排烟风机停止 (模拟模式)");
+    }
 }

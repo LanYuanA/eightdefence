@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file app_fire_fighting.cpp
  * @brief 消防系统应用实现
  */
@@ -103,7 +103,6 @@ HttpResponse AppFireFighting::handleGetStatus(const HttpRequest& /*req*/) {
         "{"
         "\"system\":{"
         "\"overallRisk\":\"%s\","
-        "\"riskPercent\":%d,"
         "\"systemNormal\":%s,"
         "\"running\":%s,"
         "\"fireSimulated\":%s"
@@ -132,8 +131,8 @@ HttpResponse AppFireFighting::handleGetStatus(const HttpRequest& /*req*/) {
         "},"
         "\"services\":{"
         "\"alarmActive\":%s,"
-        "\"suppressionActive\":%s,"
-        "\"evacuationActive\":%s,"
+        "\"sprinklerActive\":%s,"
+        "\"exhaustActive\":%s,"
         "\"centerAlarmActive\":%s"
         "},"
         "\"devices\":{"
@@ -141,11 +140,13 @@ HttpResponse AppFireFighting::handleGetStatus(const HttpRequest& /*req*/) {
         "\"temperature\":{\"online\":%s},"
         "\"humidity\":{\"online\":%s},"
         "\"co2\":{\"online\":%s},"
-        "\"alarm\":{\"online\":%s}"
+        "\"alarm\":{\"online\":%s},"
+        "\"cabin\":{\"online\":%s,\"running\":%s},"
+        "\"sprinkler\":{\"online\":%s,\"running\":%s},"
+        "\"exhaustFan\":{\"online\":%s,\"running\":%s}"
         "}"
         "}",
         riskStr[static_cast<int>(m_state.overallRisk)],
-        m_state.riskPercent.load(),
         m_state.systemNormal.load() ? "true" : "false",
         m_running.load() ? "true" : "false",
         m_state.fireSimulated.load() ? "true" : "false",
@@ -161,14 +162,17 @@ HttpResponse AppFireFighting::handleGetStatus(const HttpRequest& /*req*/) {
         co2,
         co2Online ? "true" : "false",
         m_state.alarmActive.load() ? "true" : "false",
-        m_state.suppressionActive.load() ? "true" : "false",
-        m_state.evacuationActive.load() ? "true" : "false",
+        m_state.sprinklerActive.load() ? "true" : "false",
+        m_state.exhaustActive.load() ? "true" : "false",
         m_state.centerAlarmActive.load() ? "true" : "false",
         smokeOnline ? "true" : "false",
         tempOnline ? "true" : "false",
         humOnline ? "true" : "false",
         co2Online ? "true" : "false",
-        alarmOnline ? "true" : "false"
+        alarmOnline ? "true" : "false",
+        dev_stepper_cabin.isOnline() ? "true" : "false", dev_stepper_cabin.isRunning() ? "true" : "false",
+        dev_stepper_sprinkler.isOnline() ? "true" : "false", dev_stepper_sprinkler.isRunning() ? "true" : "false",
+        dev_stepper_exhaust.isOnline() ? "true" : "false", dev_stepper_exhaust.isRunning() ? "true" : "false"
     );
 
     return HttpResponse::json(json);
@@ -203,40 +207,11 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
     std::string action = req.getParam("action");
     std::string target = req.getParam("target");
 
-    // 火情确认 / 误报
-    if (action == "confirm" || action == "dismiss") {
-        std::string operatorName = req.getParam("operator");
-        if (operatorName.empty()) operatorName = "管理员";
-
-        m_state.alarmAcknowledged.store(true);
-
-        auto now = std::chrono::system_clock::now();
-        auto tt = std::chrono::system_clock::to_time_t(now);
-        struct tm tm_buf;
-        localtime_r(&tt, &tm_buf);
-        char ts[64];
-        strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm_buf);
-
-        {
-            std::lock_guard<std::mutex> lock(m_actionMutex);
-            m_fireActions.push_back({ts, action, operatorName});
-        }
-
-        if (action == "confirm")
-            addLog("alarm", "火情已确认", "操作人: " + operatorName + ", 已执行安全防御");
-        else
-            addLog("normal", "火情误报", "操作人: " + operatorName + ", 标记为误报, 风险恢复前不再弹窗");
-
-        APP_LOG_INFO("火情%s: 操作人=%s", action == "confirm" ? "确认" : "误报", operatorName.c_str());
-        return HttpResponse::json("{\"status\":\"success\"}");
-    }
-
     if (target == "fire") {
         if (action == "simulate") {
             m_state.fireSimulated.store(true);
             m_state.simSmoke.store(1);      // 检测到烟雾
             m_state.simTemp.store(75.0f);   // 高温
-            m_state.alarmAcknowledged.store(false);  // 新火情, 重置确认状态
             evaluateRisk();
             APP_LOG_WARNING("火灾模拟: 烟雾检测触发 + 温度75°C");
             addLog("alarm", "火灾模拟", "模拟火灾已触发: 烟雾检测+高温");
@@ -245,7 +220,6 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
             m_state.fireSimulated.store(false);
             m_state.simSmoke.store(0);
             m_state.simTemp.store(25.0f);
-            m_state.alarmAcknowledged.store(false);
             evaluateRisk();
             APP_LOG_INFO("火灾模拟取消: 恢复正常");
             addLog("normal", "火灾警报解除", "火灾模拟已取消, 恢复正常状态");
@@ -269,6 +243,38 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
             addLog("normal", "烟雾警报解除", "烟雾模拟已取消");
             return HttpResponse::json("{\"status\":\"success\",\"message\":\"烟雾警报已解除\"}");
         }
+    }
+
+    // 设备控制
+    if (target == "cabin" || target == "fan" || target == "sprinkler" || target == "horn") {
+        bool turnOn = (action == "on");
+        if (target == "cabin" && m_svcCabin) {
+            int rc = m_svcCabin->control(turnOn);
+            if (rc == 0) {
+                addLog("normal", turnOn ? "舱门开启" : "舱门关闭", "手动控制");
+                return HttpResponse::json("{\"status\":\"success\"}");
+            }
+        } else if (target == "fan" && m_svcExhaust) {
+            int rc = m_svcExhaust->control(turnOn);
+            if (rc == 0) {
+                m_state.exhaustActive.store(turnOn);
+                addLog("normal", turnOn ? "排烟风机开启" : "排烟风机关闭", "手动控制");
+                return HttpResponse::json("{\"status\":\"success\"}");
+            }
+        } else if (target == "sprinkler" && m_svcSprinkler) {
+            int rc = m_svcSprinkler->control(turnOn);
+            if (rc == 0) {
+                m_state.sprinklerActive.store(turnOn);
+                addLog("normal", turnOn ? "水淋系统开启" : "水淋系统关闭", "手动控制");
+                return HttpResponse::json("{\"status\":\"success\"}");
+            }
+        } else if (target == "horn") {
+            if (turnOn && m_svcSoundLight) m_svcSoundLight->activate();
+            else if (!turnOn && m_svcSoundLight) m_svcSoundLight->deactivate();
+            addLog("normal", turnOn ? "声光报警器开启" : "声光报警器关闭", "手动控制");
+            return HttpResponse::json("{\"status\":\"success\"}");
+        }
+        return HttpResponse::error(500, "设备控制失败");
     }
 
     return HttpResponse::error(400, "无效的控制指令");
@@ -296,90 +302,41 @@ HttpResponse AppFireFighting::handleGetLogs(const HttpRequest& req) {
 }
 
 /* ============================================================
- * 风险评估 (GB/T 31593.9 加权多参数融合模型)
- *
- * 公式: 综合风险% = 0.35*烟雾 + 0.30*温度 + 0.20*CO2 + 0.15*湿度变化
- * 等级: 0-25 低风险(LOW) / 25-55 中风险(MEDIUM) / 55-100 高风险(HIGH)
+ * 业务逻辑
  * ============================================================ */
 void AppFireFighting::evaluateRisk() {
-    int smokeState   = m_state.smokeState.load();
-    float temp       = m_state.temperature.load();
-    int co2          = dev_co2.isOnline() ? dev_co2.getValue() : m_prevCo2;
-    float humidity   = dev_humidity.isOnline() ? dev_humidity.getValue() / 10.0f : m_prevHumidity;
+    m_state.smokeRisk = calcSmokeRisk(m_state.smokeState.load());
+    m_state.tempRisk  = calcTempRisk(m_state.temperature.load());
 
-    bool smokeOn = dev_smoke.isOnline();
-    bool tempOn  = dev_temperature.isOnline();
-    bool co2On   = dev_co2.isOnline();
-    bool humOn   = dev_humidity.isOnline();
+    bool smokeOnline = dev_smoke.isOnline();
+    bool tempOnline  = dev_temperature.isOnline();
 
-    bool fireSim = m_state.fireSimulated.load();
+    // 设备离线时标记中风险
+    if (!smokeOnline && !m_state.fireSimulated.load()) m_state.smokeRisk = FireRiskLevel::MEDIUM;
+    if (!tempOnline && !m_state.fireSimulated.load())  m_state.tempRisk  = FireRiskLevel::MEDIUM;
 
-    // 各传感器评分 (0-100), 离线时给予不确定性惩罚(50分)
-    int smokeScore    = calcSmokeScore(fireSim ? m_state.simSmoke.load() : smokeState, fireSim ? true : smokeOn);
-    int tempScore     = calcTempScore(fireSim ? m_state.simTemp.load() : temp, fireSim ? true : tempOn);
-    int co2Score      = calcCo2Score(co2, co2On);
-    int humidityScore = calcHumidityScore(humidity, humOn);
+    // 整体风险取最高
+    int maxRisk = std::max({
+        static_cast<int>(m_state.smokeRisk),
+        static_cast<int>(m_state.tempRisk)
+    });
+    m_state.overallRisk = static_cast<FireRiskLevel>(maxRisk);
 
-    // 加权融合
-    float weighted = 0.35f * smokeScore + 0.30f * tempScore + 0.20f * co2Score + 0.15f * humidityScore;
-    int riskPct = static_cast<int>(weighted + 0.5f);
-    if (riskPct < 0) riskPct = 0;
-    if (riskPct > 100) riskPct = 100;
-    m_state.riskPercent.store(riskPct);
-
-    // 风险等级判定
-    if (riskPct >= 55)
-        m_state.overallRisk = FireRiskLevel::HIGH;
-    else if (riskPct >= 25)
-        m_state.overallRisk = FireRiskLevel::MEDIUM;
-    else
-        m_state.overallRisk = FireRiskLevel::LOW;
-
-    // 子项风险(用于前端各指标着色)
-    m_state.smokeRisk = (smokeScore >= 60) ? FireRiskLevel::HIGH :
-                        (smokeScore >= 30) ? FireRiskLevel::MEDIUM : FireRiskLevel::LOW;
-    m_state.tempRisk  = (tempScore >= 60) ? FireRiskLevel::HIGH :
-                        (tempScore >= 30) ? FireRiskLevel::MEDIUM : FireRiskLevel::LOW;
-
-    bool allOnline = smokeOn && tempOn && co2On && humOn;
-    m_state.systemNormal.store(riskPct < 25 && allOnline);
-
-    // 更新历史值(用于湿度变化率)
-    m_prevHumidity = humidity;
-    m_prevCo2      = co2;
+    bool allOnline = smokeOnline && tempOnline;
+    m_state.systemNormal.store(maxRisk == 0 && allOnline);
 
     handleRiskResponse();
 }
 
-// 烟雾评分: 检测到烟雾=100, 正常=0, 离线=50
-int AppFireFighting::calcSmokeScore(int smokeState, bool online) {
-    if (!online) return 50;
-    return (smokeState != 0) ? 100 : 0;
+FireRiskLevel AppFireFighting::calcSmokeRisk(int smokeState) {
+    if (smokeState != 0) return FireRiskLevel::HIGH;
+    return FireRiskLevel::LOW;
 }
 
-// 温度评分: 25°C→0分, 70°C→100分, 线性插值, 离线=50
-int AppFireFighting::calcTempScore(float temp, bool online) {
-    if (!online) return 50;
-    if (temp <= 25.0f) return 0;
-    if (temp >= 70.0f) return 100;
-    return static_cast<int>((temp - 25.0f) / (70.0f - 25.0f) * 100.0f);
-}
-
-// CO2评分: 400ppm→0分, 2000ppm→100分, 线性插值, 离线=50
-int AppFireFighting::calcCo2Score(int co2, bool online) {
-    if (!online) return 50;
-    if (co2 <= 400) return 0;
-    if (co2 >= 2000) return 100;
-    return static_cast<int>((co2 - 400) / 1600.0f * 100.0f);
-}
-
-// 湿度变化评分: 湿度快速下降(>5%)→100分, 缓慢下降→线性, 不变/上升→0, 离线=50
-int AppFireFighting::calcHumidityScore(float humidity, bool online) {
-    if (!online) return 50;
-    float drop = m_prevHumidity - humidity;
-    if (drop <= 0.0f) return 0;
-    if (drop >= 5.0f) return 100;
-    return static_cast<int>(drop / 5.0f * 100.0f);
+FireRiskLevel AppFireFighting::calcTempRisk(float temp) {
+    if (temp > 70.0f) return FireRiskLevel::HIGH;
+    if (temp > 50.0f) return FireRiskLevel::MEDIUM;
+    return FireRiskLevel::LOW;
 }
 
 void AppFireFighting::addLog(const std::string& level, const std::string& event, const std::string& details) {
@@ -405,90 +362,106 @@ void AppFireFighting::addLog(const std::string& level, const std::string& event,
     }
 }
 
-void AppFireFighting::setServices(SvcSoundLightAlarm* a1, SvcFireSuppression* a2,
-                                   SvcEvacuation* a3, SvcCommandCenter* a4) {
+void AppFireFighting::setServices(SvcSoundLightAlarm* a1, SvcFireSprinkler* a2, SvcFireFan* a3, SvcCommandCenter* a4, SvcFireCabin* a5) {
     m_svcSoundLight  = a1;
-    m_svcSuppression = a2;
-    m_svcEvacuation  = a3;
+    m_svcSprinkler = a2;
+    m_svcExhaust  = a3;
     m_svcCmdCenter   = a4;
+    m_svcCabin      = a5;
 }
 
 void AppFireFighting::handleRiskResponse() {
     int rp = m_state.riskPercent.load();
-
-    // 高风险 (≥55%): 烟雾确认 → 全部联动；否则高温告警
-    if (rp >= 55) {
-        bool hasSmoke = (m_state.smokeState.load() != 0) || m_state.fireSimulated.load();
-
+    if (rp == m_prevRiskPercent) return;
+    m_prevRiskPercent = rp;
+    // 烟雾高风险 = 火灾确认
+    if (m_state.smokeRisk >= FireRiskLevel::HIGH) {
+        // 声光报警
         if (m_svcSoundLight) m_svcSoundLight->activate();
         m_state.alarmActive.store(true);
 
+        // 灭火联动
+        if (m_svcSprinkler) m_svcSprinkler->activate();
+        m_state.sprinklerActive.store(true);
+
+        // 疏散引导
+        if (m_svcExhaust) m_svcExhaust->activate();
+        m_state.exhaustActive.store(true);
+
+        // 指挥中心告警
         if (m_svcCmdCenter) {
             m_svcCmdCenter->activate();
-            if (hasSmoke)
-                m_svcCmdCenter->alert("high", "火灾警报",
-                    "多参数融合判定火灾高风险, 综合风险" + std::to_string(rp) + "%, 启动全部应急响应");
-            else
-                m_svcCmdCenter->alert("medium", "火灾预警",
-                    "多参数综合风险" + std::to_string(rp) + "%, 温度/CO2偏高, 请立即排查");
+            m_svcCmdCenter->alert("high", "火灾警报",
+                "烟雾探测器检测到烟雾, 火灾风险等级: 高风险, 灭火和疏散系统已启动");
         }
         m_state.centerAlarmActive.store(true);
 
-        if (hasSmoke) {
-            if (m_svcSuppression) m_svcSuppression->activate();
-            if (m_svcEvacuation) m_svcEvacuation->activate();
-            m_state.suppressionActive.store(true);
-            m_state.evacuationActive.store(true);
-
-            if (m_prevRiskPercent < 55)
-                addLog("alarm", "火灾警报",
-                    "多参数融合判定火灾高风险(" + std::to_string(rp) + "%), 启动: 声光报警+灭火联动+疏散引导+指挥中心告警");
-        } else {
-            if (m_svcSuppression) m_svcSuppression->deactivate();
-            if (m_svcEvacuation) m_svcEvacuation->deactivate();
-            m_state.suppressionActive.store(false);
-            m_state.evacuationActive.store(false);
-
-            if (m_prevRiskPercent < 55)
-                addLog("warning", "火灾预警",
-                    "综合风险" + std::to_string(rp) + "%(无烟雾确认), 启动: 声光报警+指挥中心预警");
+        if (m_prevSmokeRisk < FireRiskLevel::HIGH) {
+            addLog("alarm", "火灾警报",
+                "烟雾探测器检测到烟雾, 触发火灾应急响应: 声光报警+灭火联动+疏散引导+指挥中心告警");
         }
     }
-    // 中风险
-    else if (rp >= 25) {
+    // 温度高风险但无烟雾 = 预警
+    else if (m_state.tempRisk >= FireRiskLevel::HIGH) {
+        // 声光报警
+        if (m_svcSoundLight) m_svcSoundLight->activate();
+        m_state.alarmActive.store(true);
+
+        // 指挥中心预警
         if (m_svcCmdCenter) {
             m_svcCmdCenter->activate();
-            m_svcCmdCenter->alert("low", "风险监控",
-                "综合风险" + std::to_string(rp) + "%, 建议加强监测");
+            m_svcCmdCenter->alert("medium", "高温预警",
+                "环境温度超过70°C, 存在火灾风险, 请立即排查");
+        }
+        m_state.centerAlarmActive.store(true);
+
+        // 灭火和疏散暂不启动（仅温度高，无烟雾确认）
+        if (m_svcSprinkler) m_svcSprinkler->deactivate();
+        if (m_svcExhaust) m_svcExhaust->deactivate();
+        m_state.sprinklerActive.store(false);
+        m_state.exhaustActive.store(false);
+
+        if (m_prevTempRisk < FireRiskLevel::HIGH) {
+            addLog("warning", "高温预警",
+                "环境温度超过70°C, 触发高温预警: 声光报警+指挥中心预警");
+        }
+    }
+    // 温度中风险 = 预警
+    else if (m_state.tempRisk >= FireRiskLevel::MEDIUM) {
+        if (m_svcCmdCenter) {
+            m_svcCmdCenter->activate();
+            m_svcCmdCenter->alert("low", "温度偏高",
+                "环境温度超过50°C, 请注意监控");
         }
         m_state.centerAlarmActive.store(true);
 
         if (m_svcSoundLight) m_svcSoundLight->deactivate();
-        if (m_svcSuppression) m_svcSuppression->deactivate();
-        if (m_svcEvacuation) m_svcEvacuation->deactivate();
+        if (m_svcSprinkler) m_svcSprinkler->deactivate();
+        if (m_svcExhaust) m_svcExhaust->deactivate();
         m_state.alarmActive.store(false);
-        m_state.suppressionActive.store(false);
-        m_state.evacuationActive.store(false);
+        m_state.sprinklerActive.store(false);
+        m_state.exhaustActive.store(false);
 
-        if (m_prevRiskPercent < 25)
-            addLog("warning", "风险上升",
-                "综合风险升至" + std::to_string(rp) + "%, 已通知指挥中心关注");
+        if (m_prevTempRisk < FireRiskLevel::MEDIUM) {
+            addLog("warning", "温度偏高", "环境温度超过50°C, 已通知指挥中心");
+        }
     }
-    // 低风险
+    // 安全状态
     else {
         if (m_svcSoundLight) m_svcSoundLight->deactivate();
-        if (m_svcSuppression) m_svcSuppression->deactivate();
-        if (m_svcEvacuation) m_svcEvacuation->deactivate();
+        if (m_svcSprinkler) m_svcSprinkler->deactivate();
+        if (m_svcExhaust) m_svcExhaust->deactivate();
         if (m_svcCmdCenter) m_svcCmdCenter->deactivate();
         m_state.alarmActive.store(false);
-        m_state.suppressionActive.store(false);
-        m_state.evacuationActive.store(false);
+        m_state.sprinklerActive.store(false);
+        m_state.exhaustActive.store(false);
         m_state.centerAlarmActive.store(false);
 
-        if (m_prevRiskPercent >= 25)
-            addLog("normal", "消防系统恢复",
-                "综合风险降至" + std::to_string(rp) + "%, 所有消防服务已停止");
+        if (m_prevSmokeRisk >= FireRiskLevel::HIGH || m_prevTempRisk >= FireRiskLevel::MEDIUM) {
+            addLog("normal", "消防系统恢复", "所有风险已解除, 消防服务已停止");
+        }
     }
 
-    m_prevRiskPercent = rp;
+    m_prevSmokeRisk = m_state.smokeRisk;
+    m_prevTempRisk  = m_state.tempRisk;
 }

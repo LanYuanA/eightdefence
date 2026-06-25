@@ -25,6 +25,7 @@
 
 extern "C" {
 #include "modbus_core.h"
+#include "device_config.h"
 #include "web_server.h"
 }
 
@@ -56,6 +57,10 @@ extern "C" {
 #include "service/atomic/svc_command_center.hpp"
 #include "service/atomic/svc_air_quality_alert.hpp"
 #include "service/atomic/svc_ventilation.hpp"
+#include "service/atomic/svc_fire_cabin.hpp"
+#include "service/atomic/svc_fire_sprinkler.hpp"
+#include "service/atomic/svc_fire_fan.hpp"
+#include "devices/dev_stepper_motor.hpp"
 #include "service/atomic/svc_fire_suppression.hpp"
 #include "service/atomic/svc_evacuation.hpp"
 
@@ -81,6 +86,9 @@ DevHumidifier       dev_humidifier;
 DevAirConditioner   dev_ac;
 DevAirPurifier      dev_purifier;
 DevAlarmDevice      dev_alarm;
+DevStepperMotor     dev_stepper_cabin("舱门电机", DEV_STEPPER_CABIN_ADDR);
+DevStepperMotor     dev_stepper_sprinkler("水淋电机", DEV_STEPPER_SPRINKLER_ADDR);
+DevStepperMotor     dev_stepper_exhaust("排烟风机", DEV_STEPPER_EXHAUST_ADDR);
 
 ModbusService*      g_modbus = nullptr;
 SerialBus*          g_serial_bus = nullptr;
@@ -121,6 +129,9 @@ static void init_all_devices() {
     dev_ac.init();
     dev_purifier.init();
     dev_alarm.init();
+    dev_stepper_cabin.init();
+    dev_stepper_sprinkler.init();
+    dev_stepper_exhaust.init();
 }
 
 /* ============================================================
@@ -211,8 +222,14 @@ int main(int argc, char *argv[]) {
     SvcCommandCenter       svcCmdCenter;
     SvcAirQualityAlert     svcAirQuality;
     SvcVentilation         svcVentilation;
-    SvcFireSuppression     svcFireSupp;
-    SvcEvacuation          svcEvacuation;
+    SvcFireCabin           svcFireCabin;
+    SvcFireSprinkler       svcFireSprinkler;
+    SvcFireFan             svcFireFan;
+
+    /* 注入步进电机到原子服务 */
+    svcFireCabin.setMotor(&dev_stepper_cabin, 200);
+    svcFireSprinkler.setMotor(&dev_stepper_sprinkler, 200);
+    svcFireFan.setMotor(&dev_stepper_exhaust, 300);
 
     /* 注册应用到 AppManager, 注入服务 */
     auto& appMgr = AppManager::instance();
@@ -229,7 +246,7 @@ int main(int argc, char *argv[]) {
 
     // 消防应用
     auto fireApp = std::make_shared<AppFireFighting>();
-    fireApp->setServices(&svcSoundLight, &svcFireSupp, &svcEvacuation, &svcCmdCenter);
+    fireApp->setServices(&svcSoundLight, &svcFireSprinkler, &svcFireFan, &svcCmdCenter, &svcFireCabin);
     appMgr.registerApp(fireApp);
 
     appMgr.initAll();

@@ -17,8 +17,8 @@ int ModbusService::buildAndSend(uint8_t dev_addr, uint8_t func_code,
                                  uint8_t *resp, size_t resp_max, size_t *resp_len,
                                  bool isWrite) {
     if (bus_) {
-        // SerialBus æ¨¡å¼: æž„å»ºå¸§, é€šè¿‡ SerialBus çº¿ç¨‹å®‰å…¨å‘é€
-        // æž„å»º hex å‘½ä»¤å­—ç¬¦ä¸², ç„¶åŽä½¿ç”¨ transactHex
+        // SerialBus Ä£Ê½: ¹¹½¨Ö¡, Í¨¹ý SerialBus Ïß³Ì°²È«·¢ËÍ
+        // ¹¹½¨ hex ÃüÁî×Ö·û´®, È»ºóÊ¹ÓÃ transactHex
         char hex_cmd[1024] = {0};
         char temp[4];
         snprintf(hex_cmd, sizeof(hex_cmd), "%02X%02X", dev_addr, func_code);
@@ -28,7 +28,7 @@ int ModbusService::buildAndSend(uint8_t dev_addr, uint8_t func_code,
         }
         return bus_->transactHex(hex_cmd, resp, resp_max, resp_len, 1000, isWrite);
     } else {
-        // ä¼ ç»Ÿæ¨¡å¼: ç›´æŽ¥è°ƒç”¨åº•å±‚Cå‡½æ•°
+        // ´«Í³Ä£Ê½: Ö±½Óµ÷ÓÃµ×²ãCº¯Êý
         char hex_cmd[1024] = {0};
         char temp[4];
         snprintf(hex_cmd, sizeof(hex_cmd), "%02X%02X", dev_addr, func_code);
@@ -43,7 +43,7 @@ int ModbusService::buildAndSend(uint8_t dev_addr, uint8_t func_code,
 int ModbusService::readReg(uint8_t dev_addr, uint16_t reg_addr, uint16_t reg_count,
                             uint8_t *resp, size_t resp_max, size_t *resp_len) {
     if (bus_) {
-        // SerialBus æ¨¡å¼: æž„å»ºå®Œæ•´çš„ Modbus RTU å¸§
+        // SerialBus Ä£Ê½: ¹¹½¨ÍêÕûµÄ Modbus RTU Ö¡
         uint8_t frame[256];
         frame[0] = dev_addr;
         frame[1] = 0x03;
@@ -54,9 +54,30 @@ int ModbusService::readReg(uint8_t dev_addr, uint16_t reg_addr, uint16_t reg_cou
         uint16_t crc = crc16_modbus(frame, 6);
         frame[6] = crc & 0xFF;
         frame[7] = (crc >> 8) & 0xFF;
-        return bus_->transact(frame, 8, resp, resp_max, resp_len, 1000, false);  // è¯»æ“ä½œ
+        return bus_->transact(frame, 8, resp, resp_max, resp_len, 1000, false);  // ¶Á²Ù×÷
     } else {
         return modbus_build_and_send(device_.c_str(), baud_, dev_addr, 0x03, reg_addr, reg_count, resp, resp_max, resp_len, 1000);
+    }
+}
+
+// ---------- Ð´¶à¸ö±£³Ö¼Ä´æÆ÷ (0x10) ----------
+int ModbusService::writeMultiReg(uint8_t dev_addr, uint16_t reg_addr, uint16_t reg_count,
+                                  const uint16_t *values,
+                                  uint8_t *resp, size_t resp_max, size_t *resp_len) {
+    uint8_t frame[256];
+    size_t flen = 0;
+    buildWriteMultiRegFrame(dev_addr, reg_addr, reg_count, values, frame, sizeof(frame), &flen);
+    if (bus_) {
+        return bus_->transact(frame, flen, resp, resp_max, resp_len, 2000, true);
+    } else {
+        // fallback: convert frame to hex and send via serial
+        char hex_cmd[512] = {0};
+        char tmp[4];
+        for (size_t i = 0; i < flen; i++) {
+            snprintf(tmp, sizeof(tmp), "%02X", frame[i]);
+            strcat(hex_cmd, tmp);
+        }
+        return modbus_send_and_recv_hex(device_.c_str(), baud_, hex_cmd, resp, resp_max, resp_len, 2000);
     }
 }
 
@@ -73,7 +94,7 @@ int ModbusService::writeReg(uint8_t dev_addr, uint16_t reg_addr, uint16_t value,
         uint16_t crc = crc16_modbus(frame, 6);
         frame[6] = crc & 0xFF;
         frame[7] = (crc >> 8) & 0xFF;
-        return bus_->transact(frame, 8, resp, resp_max, resp_len, 1000, true);  // å†™æ“ä½œ, ä¼˜å…ˆæŠ¢å 
+        return bus_->transact(frame, 8, resp, resp_max, resp_len, 1000, true);  // Ð´²Ù×÷, ÓÅÏÈÇÀÕ¼
     } else {
         return modbus_build_and_send(device_.c_str(), baud_, dev_addr, 0x06, reg_addr, value, resp, resp_max, resp_len, 1000);
     }
@@ -92,7 +113,7 @@ int ModbusService::readCoil(uint8_t dev_addr, uint16_t coil_addr, uint16_t coil_
         uint16_t crc = crc16_modbus(frame, 6);
         frame[6] = crc & 0xFF;
         frame[7] = (crc >> 8) & 0xFF;
-        return bus_->transact(frame, 8, resp, resp_max, resp_len, 1000, false);  // è¯»æ“ä½œ
+        return bus_->transact(frame, 8, resp, resp_max, resp_len, 1000, false);  // ¶Á²Ù×÷
     } else {
         return modbus_build_and_send(device_.c_str(), baud_, dev_addr, 0x01, coil_addr, coil_count, resp, resp_max, resp_len, 1000);
     }
@@ -112,14 +133,14 @@ int ModbusService::writeCoil(uint8_t dev_addr, uint16_t coil_addr, bool value,
         uint16_t crc = crc16_modbus(frame, 6);
         frame[6] = crc & 0xFF;
         frame[7] = (crc >> 8) & 0xFF;
-        return bus_->transact(frame, 8, resp, resp_max, resp_len, 1000, true);  // å†™æ“ä½œ, ä¼˜å…ˆæŠ¢å 
+        return bus_->transact(frame, 8, resp, resp_max, resp_len, 1000, true);  // Ð´²Ù×÷, ÓÅÏÈÇÀÕ¼
     } else {
         return modbus_build_and_send(device_.c_str(), baud_, dev_addr, 0x05, coil_addr, coil_val, resp, resp_max, resp_len, 1000);
     }
 }
 
 /* ============================================================
- * å¸§æž„å»ºé™æ€æ–¹æ³• (åªæž„å»º Modbus RTU å¸§, ä¸å‘é€)
+ * Ö¡¹¹½¨¾²Ì¬·½·¨ (Ö»¹¹½¨ Modbus RTU Ö¡, ²»·¢ËÍ)
  * ============================================================ */
 
 int ModbusService::buildReadRegFrame(uint8_t devAddr, uint16_t regAddr, uint16_t count,
@@ -135,6 +156,32 @@ int ModbusService::buildReadRegFrame(uint8_t devAddr, uint16_t regAddr, uint16_t
     frame[6] = crc & 0xFF;
     frame[7] = (crc >> 8) & 0xFF;
     *frameLen = 8;
+    return 0;
+}
+
+// ---------- ¹¹½¨Ð´¶à¸ö¼Ä´æÆ÷Ö¡ (0x10) ----------
+int ModbusService::buildWriteMultiRegFrame(uint8_t devAddr, uint16_t regAddr, uint16_t count,
+                                            const uint16_t *values,
+                                            uint8_t *frame, size_t frameCap, size_t *frameLen) {
+    size_t dataBytes = count * 2;
+    size_t total = 9 + dataBytes;  // addr(1)+func(1)+reg(2)+count(2)+byteCount(1)+data+CRC(2)
+    if (total > frameCap) return -1;
+
+    frame[0] = devAddr;
+    frame[1] = 0x10;  // Ð´¶à¸ö¼Ä´æÆ÷
+    frame[2] = (regAddr >> 8) & 0xFF;
+    frame[3] = regAddr & 0xFF;
+    frame[4] = (count >> 8) & 0xFF;
+    frame[5] = count & 0xFF;
+    frame[6] = (uint8_t)dataBytes;
+    for (size_t i = 0; i < count; i++) {
+        frame[7 + i * 2]     = (values[i] >> 8) & 0xFF;
+        frame[7 + i * 2 + 1] = values[i] & 0xFF;
+    }
+    uint16_t crc = crc16_modbus(frame, (int)(7 + dataBytes));
+    frame[7 + dataBytes]     = crc & 0xFF;
+    frame[7 + dataBytes + 1] = (crc >> 8) & 0xFF;
+    *frameLen = total;
     return 0;
 }
 

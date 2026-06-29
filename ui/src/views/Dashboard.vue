@@ -338,11 +338,15 @@ const atomicLowerLayer = reactive([
 ])
 
 // 设备抽象层：一对一解耦，多数据设备拆分为多个虚拟设备
+// 云测仪 SD123-E60V2 → 8个虚拟传感器
 const abstractionLayer = reactive([
   { id: 'abs-temp', name: '虚拟温度', icon: '🌡️', active: true },
   { id: 'abs-humi', name: '虚拟湿度', icon: '💧', active: true },
   { id: 'abs-pm25', name: '虚拟PM2.5', icon: '💨', active: true },
   { id: 'abs-co2', name: '虚拟CO2', icon: '☁️', active: true },
+  { id: 'abs-tvoc', name: '虚拟TVOC', icon: '🧪', active: true },
+  { id: 'abs-ch2o', name: '虚拟甲醛', icon: '⚗️', active: true },
+  { id: 'abs-pm10', name: '虚拟PM10', icon: '💨', active: true },
   { id: 'abs-smoke', name: '虚拟烟雾', icon: '🔥', active: true },
   { id: 'abs-water', name: '虚拟水浸', icon: '💧', active: true },
   { id: 'abs-infrared', name: '虚拟红外', icon: '👤', active: true },
@@ -542,15 +546,18 @@ function drawFlowChart() {
       name: '设备抽象层（一对一解耦）',
       y: 270,
       nodes: [
-        { id: 'abs-temp', x: 50 + ox, icon: '🌡️', label: '虚拟温度', color: '#3b82f6' },
-        { id: 'abs-humi', x: 130 + ox, icon: '💧', label: '虚拟湿度', color: '#06b6d4' },
-        { id: 'abs-pm25', x: 210 + ox, icon: '💨', label: '虚拟PM2.5', color: '#f59e0b' },
-        { id: 'abs-co2', x: 290 + ox, icon: '☁️', label: '虚拟CO2', color: '#8b5cf6' },
-        { id: 'abs-smoke', x: 380 + ox, icon: '🔥', label: '虚拟烟雾', color: '#ef4444' },
-        { id: 'abs-water', x: 460 + ox, icon: '💧', label: '虚拟水浸', color: '#06b6d4' },
-        { id: 'abs-infrared', x: 540 + ox, icon: '👤', label: '虚拟红外', color: '#8b5cf6' },
-        { id: 'abs-light', x: 620 + ox, icon: '💡', label: '虚拟光照', color: '#f59e0b' },
-        { id: 'abs-humidifier', x: 700 + ox, icon: '🌀', label: '虚拟净化', color: '#22c55d' }
+        { id: 'abs-temp', x: 10 + ox, icon: '🌡️', label: '虚拟温度', color: '#3b82f6' },
+        { id: 'abs-humi', x: 80 + ox, icon: '💧', label: '虚拟湿度', color: '#06b6d4' },
+        { id: 'abs-pm25', x: 150 + ox, icon: '💨', label: '虚拟PM2.5', color: '#f59e0b' },
+        { id: 'abs-co2', x: 220 + ox, icon: '☁️', label: '虚拟CO2', color: '#8b5cf6' },
+        { id: 'abs-tvoc', x: 290 + ox, icon: '🧪', label: '虚拟TVOC', color: '#ec4899' },
+        { id: 'abs-ch2o', x: 360 + ox, icon: '⚗️', label: '虚拟甲醛', color: '#14b8a6' },
+        { id: 'abs-pm10', x: 430 + ox, icon: '💨', label: '虚拟PM10', color: '#f59e0b' },
+        { id: 'abs-smoke', x: 510 + ox, icon: '🔥', label: '虚拟烟雾', color: '#ef4444' },
+        { id: 'abs-water', x: 580 + ox, icon: '💧', label: '虚拟水浸', color: '#06b6d4' },
+        { id: 'abs-infrared', x: 650 + ox, icon: '👤', label: '虚拟红外', color: '#8b5cf6' },
+        { id: 'abs-light', x: 720 + ox, icon: '💡', label: '虚拟光照', color: '#f59e0b' },
+        { id: 'abs-humidifier', x: 790 + ox, icon: '🌀', label: '虚拟净化', color: '#22c55d' }
       ]
     },
     {
@@ -586,11 +593,14 @@ function drawFlowChart() {
 
   // 连接定义 - 修正设备抽象层连接
   const connections = [
-    // 设备层 → 设备抽象层（云测仪解耦成4个虚拟传感器）
+    // 设备层 → 设备抽象层（云测仪解耦成8个虚拟传感器）
     { from: 'sensor-cloud', to: 'abs-temp', active: true },
     { from: 'sensor-cloud', to: 'abs-humi', active: true },
     { from: 'sensor-cloud', to: 'abs-pm25', active: true },
     { from: 'sensor-cloud', to: 'abs-co2', active: true },
+    { from: 'sensor-cloud', to: 'abs-tvoc', active: true },
+    { from: 'sensor-cloud', to: 'abs-ch2o', active: true },
+    { from: 'sensor-cloud', to: 'abs-pm10', active: true },
     // 独立设备一对一抽象
     { from: 'sensor-smoke', to: 'abs-smoke', active: true },
     { from: 'sensor-water', to: 'abs-water', active: true },

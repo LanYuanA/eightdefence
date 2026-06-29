@@ -250,7 +250,6 @@ void* start_web_server(void *arg) {
                 "\"temperature\": %d, \"temperature_online\": %d, "
                 "\"tvoc\": %u, \"tvoc_online\": %d, "
                 "\"ch2o\": %u, \"ch2o_online\": %d, "
-                "\"o3\": %u, \"o3_online\": %d, "
                 "\"co2\": %u, \"co2_online\": %d, "
                 "\"smoke\": %d, \"smoke_online\": %d, "
                 "\"water\": %d, \"water_online\": %d, "
@@ -266,7 +265,6 @@ void* start_web_server(void *arg) {
                 dev_temperature.getValue(), dev_temperature.isOnline(),
                 dev_tvoc.getValue(), dev_tvoc.isOnline(),
                 dev_ch2o.getValue(), dev_ch2o.isOnline(),
-                dev_o3.getValue(), dev_o3.isOnline(),
                 dev_co2.getValue(), dev_co2.isOnline(),
                 dev_smoke.getAlarmState(), dev_smoke.isOnline(),
                 dev_water.getWaterState(), dev_water.isOnline(),
@@ -313,6 +311,13 @@ void* start_web_server(void *arg) {
                         submitted = g_cmd_queue->writeRegister(DEV_PURIFIER_ADDR, REG_PUR_CTRL_RUN_MODE, val) > 0;
                     else if (action == "manual")
                         submitted = g_cmd_queue->writeRegister(DEV_PURIFIER_ADDR, REG_PUR_CTRL_MANUAL, val) > 0;
+                } else if (device == "cloud") {
+                    if (action == "batch") {
+                        /* 连续读模式: val=1 开启, val=0 关闭 */
+                        g_cloud_batch_mode.store(val != 0);
+                        submitted = true;
+                        printf("  => [Cloud] 云测仪读取模式: %s\n", val != 0 ? "连续读(1次读8寄存器)" : "单独读(每个传感器独立)");
+                    }
                 }
             }
 
@@ -473,8 +478,6 @@ void* start_web_server(void *arg) {
                  "\"description\":\"云测仪总挥发性有机化合物传感器\",\"category\":\"sensor\"},"
                 "{\"name\":\"甲醛传感器\",\"type\":\"cloud_ch2o\",\"online\":%d,\"value\":%u,\"unit\":\"ppb\","
                  "\"description\":\"云测仪甲醛浓度传感器\",\"category\":\"sensor\"},"
-                "{\"name\":\"臭氧传感器\",\"type\":\"cloud_o3\",\"online\":%d,\"value\":%u,\"unit\":\"ppb\","
-                 "\"description\":\"云测仪臭氧浓度传感器\",\"category\":\"sensor\"},"
                 "{\"name\":\"CO2传感器\",\"type\":\"cloud_co2\",\"online\":%d,\"value\":%u,\"unit\":\"ppm\","
                  "\"description\":\"云测仪二氧化碳浓度传感器\",\"category\":\"sensor\"},"
                 "{\"name\":\"烟雾探测器\",\"type\":\"smoke\",\"online\":%d,\"value\":%d,\"unit\":\"\","
@@ -500,7 +503,6 @@ void* start_web_server(void *arg) {
                 dev_humidity.isOnline(), dev_humidity.getValue(),
                 dev_tvoc.isOnline(), dev_tvoc.getValue(),
                 dev_ch2o.isOnline(), dev_ch2o.getValue(),
-                dev_o3.isOnline(), dev_o3.getValue(),
                 dev_co2.isOnline(), dev_co2.getValue(),
                 dev_smoke.isOnline(), dev_smoke.getAlarmState(),
                 dev_water.isOnline(), dev_water.getWaterState(),

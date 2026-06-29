@@ -21,8 +21,8 @@ extern DevCloudHumidity    dev_humidity;
 extern DevCloudTemperature dev_temperature;
 extern DevCloudTvoc        dev_tvoc;
 extern DevCloudCh2o        dev_ch2o;
-extern DevCloudO3          dev_o3;
 extern DevCloudCo2         dev_co2;
+extern DevCloudBatch       dev_cloud_batch;
 
 extern DevSmoke            dev_smoke;
 extern DevWater            dev_water;

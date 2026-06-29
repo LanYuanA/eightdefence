@@ -11,18 +11,18 @@
 #define REG_COIL_WRITE     0x05  /* 写单个线圈 */
 
 /* ============================================================
- * 01. 室内空气质量变送器 (云测仪)  地址: 0x30
+ * 01. 室内空气质量变送器 (云测仪) SD123-E60V2  地址: 0x30
+ *     寄存器 0x0000~0x0007 连续排列, 一次读取8个寄存器
  * ============================================================ */
 #define DEV_CLOUD_ADDR     0x30
-#define REG_CLOUD_PM25     0x0000
-#define REG_CLOUD_PM10     0x0001
-#define REG_CLOUD_HUMIDITY 0x0002
-#define REG_CLOUD_TEMP     0x0003
-#define REG_CLOUD_TVOC     0x0007
-#define REG_CLOUD_CH2O     0x0009
-#define REG_CLOUD_O3       0x000A
-#define REG_CLOUD_CO2      0x000F
-#define REG_CLOUD_DATA     0x0001  /* 读取寄存器数量 */
+#define REG_CLOUD_CH2O     0x0000  /* 甲醛 (ppb, 16-bit unsigned) */
+#define REG_CLOUD_PM25     0x0001  /* PM2.5 (ug/m3, 16-bit unsigned) */
+#define REG_CLOUD_TVOC     0x0002  /* TVOC (ug/m3, 16-bit unsigned) */
+#define REG_CLOUD_CO2      0x0003  /* CO2 (ppm, 16-bit unsigned) */
+#define REG_CLOUD_TEMP     0x0004  /* 温度 (0.1C, 16-bit signed) */
+#define REG_CLOUD_HUMIDITY 0x0005  /* 湿度 (0.1%, 16-bit unsigned) */
+#define REG_CLOUD_PM10     0x0007  /* PM10 (ug/m3, 16-bit unsigned) */
+#define REG_CLOUD_DATA     0x0001  /* 读取寄存器数量 (单次读1个) */
 
 /* ============================================================
  * 02. 烟雾报警器  地址: 0x70

@@ -224,20 +224,20 @@ const thresholds = reactive([
 // 软件定义架构数据流向
 const fireFlowNodes = [
   // 设备层
-  { id: 'sensor-smoke', x: 80, y: 280, size: 18, color: '#ef4444', icon: '🔥', label: '烟雾报警', active: true, dataCount: 64 },
-  { id: 'sensor-temp', x: 200, y: 280, size: 18, color: '#f59e0b', icon: '🌡️', label: '温度传感', active: true, dataCount: 48 },
-  { id: 'sensor-spray', x: 320, y: 280, size: 16, color: '#06b6d4', icon: '💦', label: '喷淋控制', active: true, dataCount: 8 },
-  { id: 'sensor-fan', x: 440, y: 280, size: 16, color: '#22c55d', icon: '🌀', label: '排烟风机', active: true, dataCount: 16 },
+  { id: 'sensor-smoke', x: 140, y: 280, size: 18, color: '#ef4444', icon: '🔥', label: '烟雾报警', active: true, dataCount: 64 },
+  { id: 'sensor-temp', x: 280, y: 280, size: 18, color: '#f59e0b', icon: '🌡️', label: '温度传感', active: true, dataCount: 48 },
+  { id: 'sensor-spray', x: 420, y: 280, size: 16, color: '#06b6d4', icon: '💦', label: '喷淋控制', active: true, dataCount: 8 },
+  { id: 'sensor-fan', x: 560, y: 280, size: 16, color: '#22c55d', icon: '🌀', label: '排烟风机', active: true, dataCount: 16 },
   // 设备抽象层
-  { id: 'abs-fire', x: 260, y: 200, size: 20, color: '#ef4444', icon: '🔥', label: '消防抽象', active: true, dataCount: 96 },
+  { id: 'abs-fire', x: 350, y: 210, size: 20, color: '#ef4444', icon: '🔥', label: '消防抽象', active: true, dataCount: 96 },
   // 原子服务下层
-  { id: 'lower-collect', x: 100, y: 130, size: 22, color: '#3b82f6', icon: '📥', label: '数据采集', active: true, dataCount: 96 },
-  { id: 'lower-alarm', x: 250, y: 130, size: 20, color: '#ef4444', icon: '🔔', label: '报警判断', active: true, dataCount: 48 },
-  { id: 'lower-control', x: 400, y: 130, size: 18, color: '#22c55d', icon: '🎮', label: '设备控制', active: true, dataCount: 16 },
+  { id: 'lower-collect', x: 180, y: 140, size: 22, color: '#3b82f6', icon: '📥', label: '数据采集', active: true, dataCount: 96 },
+  { id: 'lower-alarm', x: 350, y: 140, size: 20, color: '#ef4444', icon: '🔔', label: '报警判断', active: true, dataCount: 48 },
+  { id: 'lower-control', x: 520, y: 140, size: 18, color: '#22c55d', icon: '🎮', label: '设备控制', active: true, dataCount: 16 },
   // 原子服务上层
-  { id: 'upper-fire', x: 260, y: 60, size: 24, color: '#ef4444', icon: '🔥', label: '消防预警服务', active: true, dataCount: 48 },
+  { id: 'upper-fire', x: 350, y: 70, size: 24, color: '#ef4444', icon: '🔥', label: '消防预警服务', active: true, dataCount: 48 },
   // 应用层
-  { id: 'app-fire', x: 260, y: 10, size: 20, color: '#ef4444', icon: '🔥', label: '消防系统', active: true, dataCount: 24 }
+  { id: 'app-fire', x: 350, y: 15, size: 20, color: '#ef4444', icon: '🔥', label: '消防系统', active: true, dataCount: 24 }
 ]
 
 const fireFlowFlows = [

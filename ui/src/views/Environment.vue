@@ -252,20 +252,20 @@ const envCards = reactive([
 // 软件定义架构数据流向
 const flowNodes = [
   // 设备层
-  { id: 'sensor-cloud', x: 80, y: 280, size: 18, color: '#22c55d', icon: '🌡️', label: '云测仪', active: true, dataCount: 128 },
-  { id: 'sensor-humidifier', x: 200, y: 280, size: 16, color: '#06b6d4', icon: '🌀', label: '恒湿净化', active: true, dataCount: 32 },
-  { id: 'sensor-conditioner', x: 320, y: 280, size: 16, color: '#3b82f6', icon: '❄️', label: '空调控制', active: true, dataCount: 16 },
+  { id: 'sensor-cloud', x: 140, y: 280, size: 18, color: '#3b82f6', icon: '🌡️', label: '云测仪', active: true, dataCount: 128 },
+  { id: 'sensor-humidifier', x: 280, y: 280, size: 16, color: '#06b6d4', icon: '🌀', label: '恒湿净化', active: true, dataCount: 32 },
+  { id: 'sensor-conditioner', x: 420, y: 280, size: 16, color: '#22c55d', icon: '❄️', label: '空调控制', active: true, dataCount: 16 },
   // 设备抽象层
-  { id: 'abs-cloud', x: 140, y: 200, size: 20, color: '#22c55d', icon: '☁️', label: '云测仪抽象', active: true, dataCount: 128 },
-  { id: 'abs-env', x: 320, y: 200, size: 18, color: '#06b6d4', icon: '🌿', label: '环境抽象', active: true, dataCount: 48 },
+  { id: 'abs-cloud', x: 200, y: 210, size: 20, color: '#3b82f6', icon: '☁️', label: '云测仪抽象', active: true, dataCount: 128 },
+  { id: 'abs-env', x: 400, y: 210, size: 18, color: '#06b6d4', icon: '🌿', label: '环境抽象', active: true, dataCount: 48 },
   // 原子服务下层
-  { id: 'lower-collect', x: 100, y: 130, size: 22, color: '#3b82f6', icon: '📥', label: '数据采集', active: true, dataCount: 96 },
-  { id: 'lower-process', x: 250, y: 130, size: 20, color: '#8b5cf6', icon: '⚙️', label: '数据处理', active: true, dataCount: 64 },
-  { id: 'lower-alarm', x: 400, y: 130, size: 18, color: '#ef4444', icon: '🔔', label: '报警判断', active: true, dataCount: 32 },
+  { id: 'lower-collect', x: 180, y: 140, size: 22, color: '#3b82f6', icon: '📥', label: '数据采集', active: true, dataCount: 96 },
+  { id: 'lower-process', x: 330, y: 140, size: 20, color: '#8b5cf6', icon: '⚙️', label: '数据处理', active: true, dataCount: 64 },
+  { id: 'lower-alarm', x: 480, y: 140, size: 18, color: '#ef4444', icon: '🔔', label: '报警判断', active: true, dataCount: 32 },
   // 原子服务上层
-  { id: 'upper-monitor', x: 200, y: 60, size: 24, color: '#22c55d', icon: '📊', label: '环境监测服务', active: true, dataCount: 48 },
+  { id: 'upper-monitor', x: 280, y: 70, size: 24, color: '#3b82f6', icon: '📊', label: '环境监测服务', active: true, dataCount: 48 },
   // 应用层
-  { id: 'app-env', x: 200, y: 10, size: 20, color: '#22c55d', icon: '🌡️', label: '环境监测', active: true, dataCount: 24 }
+  { id: 'app-env', x: 280, y: 15, size: 20, color: '#3b82f6', icon: '🌡️', label: '环境监测', active: true, dataCount: 24 }
 ]
 
 const flowFlows = [

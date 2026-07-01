@@ -49,16 +49,6 @@
                   <span class="dropdown-label">主控台</span>
                   <span class="dropdown-desc">系统概览和数据流向</span>
                 </button>
-                <button class="dropdown-item" @click="navigateTo('/resource-pool-manager')">
-                  <span class="dropdown-icon">📦</span>
-                  <span class="dropdown-label">资源池管理</span>
-                  <span class="dropdown-desc">自由组合设备和服务</span>
-                </button>
-                <button class="dropdown-item" @click="navigateTo('/workflow')">
-                  <span class="dropdown-icon">🔀</span>
-                  <span class="dropdown-label">流程编排</span>
-                  <span class="dropdown-desc">拖拽式流程设计</span>
-                </button>
               </div>
 
               <!-- 业务应用 -->
@@ -101,21 +91,6 @@
                 </button>
               </div>
 
-              <!-- 智能分析 -->
-              <div class="dropdown-section">
-                <div class="dropdown-section-title">智能分析</div>
-                <button class="dropdown-item" @click="navigateTo('/ai-analysis')">
-                  <span class="dropdown-icon">🧠</span>
-                  <span class="dropdown-label">AI分析</span>
-                  <span class="dropdown-desc">智能分析和预测</span>
-                </button>
-                <button class="dropdown-item" @click="navigateTo('/scene-mode')">
-                  <span class="dropdown-icon">🎬</span>
-                  <span class="dropdown-label">场景模式</span>
-                  <span class="dropdown-desc">一键切换场景</span>
-                </button>
-              </div>
-
               <!-- 系统管理 -->
               <div class="dropdown-section">
                 <div class="dropdown-section-title">系统管理</div>
@@ -148,10 +123,6 @@
         <button class="nav-btn" :class="{ 'nav-btn-active': isActive('/') }" @click="$router.push('/')">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           主控台
-        </button>
-        <button class="nav-btn" :class="{ 'nav-btn-active': isActive('/resource-pool-manager') }" @click="$router.push('/resource-pool-manager')">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-          资源池
         </button>
         <button class="nav-btn" :class="{ 'nav-btn-active': isActive('/devices') }" @click="$router.push('/devices')">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>

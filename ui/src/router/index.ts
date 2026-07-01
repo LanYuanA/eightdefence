@@ -9,13 +9,9 @@ import FireFighting from '../views/FireFighting.vue'
 import AlarmCenter from '../views/AlarmCenter.vue'
 import DataScreen from '../views/DataScreen.vue'
 import Settings from '../views/Settings.vue'
-import WorkflowDesigner from '../views/WorkflowDesigner.vue'
 import AtomicServices from '../views/AtomicServices.vue'
 import ResourcePool from '../views/ResourcePool.vue'
-import AIAnalysis from '../views/AIAnalysis.vue'
-import SceneMode from '../views/SceneMode.vue'
 import DeviceGraph from '../views/DeviceGraph.vue'
-import ResourcePoolManager from '../views/ResourcePoolManager.vue'
 
 const router = createRouter({
   history: createWebHistory('/'),
@@ -71,11 +67,6 @@ const router = createRouter({
       component: Settings
     },
     {
-      path: '/workflow',
-      name: 'workflow',
-      component: WorkflowDesigner
-    },
-    {
       path: '/atomic-services',
       name: 'atomic-services',
       component: AtomicServices
@@ -86,24 +77,9 @@ const router = createRouter({
       component: ResourcePool
     },
     {
-      path: '/ai-analysis',
-      name: 'ai-analysis',
-      component: AIAnalysis
-    },
-    {
-      path: '/scene-mode',
-      name: 'scene-mode',
-      component: SceneMode
-    },
-    {
       path: '/device-graph',
       name: 'device-graph',
       component: DeviceGraph
-    },
-    {
-      path: '/resource-pool-manager',
-      name: 'resource-pool-manager',
-      component: ResourcePoolManager
     }
   ]
 })

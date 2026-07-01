@@ -205,19 +205,19 @@ const gasRiskClass = computed(() => gasRisk.value === '高' ? 'text-danger' : ga
 // 软件定义架构数据流向
 const securityFlowNodes = [
   // 设备层
-  { id: 'sensor-water', x: 80, y: 280, size: 18, color: '#3b82f6', icon: '💧', label: '水浸传感器', active: true, dataCount: 32 },
-  { id: 'sensor-infrared', x: 200, y: 280, size: 18, color: '#8b5cf6', icon: '👤', label: '红外探测', active: true, dataCount: 48 },
-  { id: 'sensor-gas', x: 320, y: 280, size: 18, color: '#f59e0b', icon: '☁️', label: '气体传感', active: true, dataCount: 64 },
+  { id: 'sensor-water', x: 140, y: 280, size: 18, color: '#06b6d4', icon: '💧', label: '水浸传感器', active: true, dataCount: 32 },
+  { id: 'sensor-infrared', x: 280, y: 280, size: 18, color: '#8b5cf6', icon: '👤', label: '红外探测', active: true, dataCount: 48 },
+  { id: 'sensor-gas', x: 420, y: 280, size: 18, color: '#f59e0b', icon: '☁️', label: '气体传感', active: true, dataCount: 64 },
   // 设备抽象层
-  { id: 'abs-alarm', x: 200, y: 200, size: 20, color: '#ef4444', icon: '🔔', label: '报警抽象', active: true, dataCount: 96 },
+  { id: 'abs-alarm', x: 280, y: 210, size: 20, color: '#ef4444', icon: '🔔', label: '报警抽象', active: true, dataCount: 96 },
   // 原子服务下层
-  { id: 'lower-collect', x: 100, y: 130, size: 22, color: '#3b82f6', icon: '📥', label: '数据采集', active: true, dataCount: 96 },
-  { id: 'lower-alarm', x: 250, y: 130, size: 20, color: '#ef4444', icon: '🔔', label: '报警判断', active: true, dataCount: 48 },
-  { id: 'lower-control', x: 400, y: 130, size: 18, color: '#22c55d', icon: '🎮', label: '设备控制', active: true, dataCount: 16 },
+  { id: 'lower-collect', x: 180, y: 140, size: 22, color: '#3b82f6', icon: '📥', label: '数据采集', active: true, dataCount: 96 },
+  { id: 'lower-alarm', x: 330, y: 140, size: 20, color: '#ef4444', icon: '🔔', label: '报警判断', active: true, dataCount: 48 },
+  { id: 'lower-control', x: 480, y: 140, size: 18, color: '#22c55d', icon: '🎮', label: '设备控制', active: true, dataCount: 16 },
   // 原子服务上层
-  { id: 'upper-security', x: 200, y: 60, size: 24, color: '#8b5cf6', icon: '🛡️', label: '安防监控服务', active: true, dataCount: 48 },
+  { id: 'upper-security', x: 280, y: 70, size: 24, color: '#8b5cf6', icon: '🛡️', label: '安防监控服务', active: true, dataCount: 48 },
   // 应用层
-  { id: 'app-security', x: 200, y: 10, size: 20, color: '#8b5cf6', icon: '🛡️', label: '安防系统', active: true, dataCount: 24 }
+  { id: 'app-security', x: 280, y: 15, size: 20, color: '#8b5cf6', icon: '🛡️', label: '安防系统', active: true, dataCount: 24 }
 ]
 
 const securityFlowFlows = [

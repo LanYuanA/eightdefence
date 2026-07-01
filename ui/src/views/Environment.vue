@@ -57,7 +57,7 @@
                 <div><h3 class="card-title">数据流向</h3><p class="card-subtitle">实时传输可视化</p></div>
               </div>
             </template>
-            <DataFlowVisualizer :nodes="flowNodes" :flows="flowFlows" flow-color="#22c55d" :show-controls="true" />
+            <canvas ref="flowCanvasRef" class="flow-canvas"></canvas>
           </BaseCard>
         </div>
       </section>
@@ -217,7 +217,6 @@ import DataCard from '../components/DataCard.vue'
 import BaseCard from '../components/BaseCard.vue'
 import CyberButton from '../components/CyberButton.vue'
 import StatusDot from '../components/StatusDot.vue'
-import DataFlowVisualizer from '../components/DataFlowVisualizer.vue'
 import LiveDataStream from '../components/LiveDataStream.vue'
 
 Chart.register(...registerables)
@@ -249,42 +248,100 @@ const envCards = reactive([
   { label: 'CO₂浓度', value: 520, unit: 'ppm', icon: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>', iconColor: 'purple' as const, status: 'normal' as const, trend: '正常', trendDirection: 'stable' as const, miniChartData: [510,515,520,518,522,520,520] }
 ])
 
-// 软件定义架构数据流向
-const flowNodes = [
-  // 设备层
-  { id: 'sensor-cloud', x: 140, y: 280, size: 18, color: '#3b82f6', icon: '🌡️', label: '云测仪', active: true, dataCount: 128 },
-  { id: 'sensor-humidifier', x: 280, y: 280, size: 16, color: '#06b6d4', icon: '🌀', label: '恒湿净化', active: true, dataCount: 32 },
-  { id: 'sensor-conditioner', x: 420, y: 280, size: 16, color: '#22c55d', icon: '❄️', label: '空调控制', active: true, dataCount: 16 },
-  // 设备抽象层
-  { id: 'abs-cloud', x: 200, y: 210, size: 20, color: '#3b82f6', icon: '☁️', label: '云测仪抽象', active: true, dataCount: 128 },
-  { id: 'abs-env', x: 400, y: 210, size: 18, color: '#06b6d4', icon: '🌿', label: '环境抽象', active: true, dataCount: 48 },
-  // 原子服务下层
-  { id: 'lower-collect', x: 180, y: 140, size: 22, color: '#3b82f6', icon: '📥', label: '数据采集', active: true, dataCount: 96 },
-  { id: 'lower-process', x: 330, y: 140, size: 20, color: '#8b5cf6', icon: '⚙️', label: '数据处理', active: true, dataCount: 64 },
-  { id: 'lower-alarm', x: 480, y: 140, size: 18, color: '#ef4444', icon: '🔔', label: '报警判断', active: true, dataCount: 32 },
-  // 原子服务上层
-  { id: 'upper-monitor', x: 280, y: 70, size: 24, color: '#3b82f6', icon: '📊', label: '环境监测服务', active: true, dataCount: 48 },
-  // 应用层
-  { id: 'app-env', x: 280, y: 15, size: 20, color: '#3b82f6', icon: '🌡️', label: '环境监测', active: true, dataCount: 24 }
-]
+// Canvas 数据流向图
+const flowCanvasRef = ref<HTMLCanvasElement | null>(null)
+let flowAnimId = 0
 
-const flowFlows = [
-  // 设备层 → 设备抽象层
-  { from: 'sensor-cloud', to: 'abs-cloud', active: true, speed: 2 },
-  { from: 'sensor-humidifier', to: 'abs-env', active: true, speed: 2 },
-  { from: 'sensor-conditioner', to: 'abs-env', active: true, speed: 2 },
-  // 设备抽象层 → 原子服务下层
-  { from: 'abs-cloud', to: 'lower-collect', active: true, speed: 2 },
-  { from: 'abs-env', to: 'lower-collect', active: true, speed: 2 },
-  // 原子服务下层 → 原子服务下层
-  { from: 'lower-collect', to: 'lower-process', active: true, speed: 3 },
-  { from: 'lower-collect', to: 'lower-alarm', active: true, speed: 2 },
-  // 原子服务下层 → 原子服务上层
-  { from: 'lower-process', to: 'upper-monitor', active: true, speed: 2 },
-  { from: 'lower-alarm', to: 'upper-monitor', active: true, speed: 2 },
-  // 原子服务上层 → 应用层
-  { from: 'upper-monitor', to: 'app-env', active: true, speed: 2 }
-]
+function drawFlowChart() {
+  if (!flowCanvasRef.value) return
+  const canvas = flowCanvasRef.value
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const container = canvas.parentElement
+  if (!container) return
+  canvas.width = container.clientWidth
+  canvas.height = 380
+
+  const ox = 220
+  const layers = [
+    { name: '设备层', y: 320, nodes: [
+      { id: 'sensor-cloud', x: 140 + ox, icon: '🌡️', label: '云测仪', color: '#3b82f6' },
+      { id: 'sensor-humidifier', x: 300 + ox, icon: '🌀', label: '恒湿净化', color: '#06b6d4' },
+      { id: 'sensor-conditioner', x: 460 + ox, icon: '❄️', label: '空调控制', color: '#22c55d' }
+    ]},
+    { name: '设备抽象层', y: 240, nodes: [
+      { id: 'abs-cloud', x: 200 + ox, icon: '☁️', label: '云测仪抽象', color: '#3b82f6' },
+      { id: 'abs-env', x: 400 + ox, icon: '🌿', label: '环境抽象', color: '#06b6d4' }
+    ]},
+    { name: '原子服务下层', y: 160, nodes: [
+      { id: 'lower-collect', x: 200 + ox, icon: '📥', label: '数据采集', color: '#3b82f6' },
+      { id: 'lower-process', x: 400 + ox, icon: '⚙️', label: '数据处理', color: '#8b5cf6' },
+      { id: 'lower-alarm', x: 550 + ox, icon: '🔔', label: '报警判断', color: '#ef4444' }
+    ]},
+    { name: '原子服务上层', y: 80, nodes: [
+      { id: 'upper-monitor', x: 350 + ox, icon: '📊', label: '环境监测服务', color: '#3b82f6' }
+    ]},
+    { name: '应用层', y: 20, nodes: [
+      { id: 'app-env', x: 350 + ox, icon: '🌡️', label: '环境监测', color: '#3b82f6' }
+    ]}
+  ]
+  const connections = [
+    { from: 'sensor-cloud', to: 'abs-cloud' }, { from: 'sensor-humidifier', to: 'abs-env' }, { from: 'sensor-conditioner', to: 'abs-env' },
+    { from: 'abs-cloud', to: 'lower-collect' }, { from: 'abs-env', to: 'lower-collect' },
+    { from: 'lower-collect', to: 'lower-process' }, { from: 'lower-collect', to: 'lower-alarm' },
+    { from: 'lower-process', to: 'upper-monitor' }, { from: 'lower-alarm', to: 'upper-monitor' },
+    { from: 'upper-monitor', to: 'app-env' }
+  ]
+
+  let time = 0
+  function animate() {
+    if (!ctx) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    time += 0.02
+
+    layers.forEach((layer, i) => {
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(34,197,94,0.03)' : 'rgba(59,130,246,0.03)'
+      ctx.fillRect(0, layer.y - 12, canvas.width, 58)
+      ctx.font = '11px sans-serif'; ctx.fillStyle = '#64748b'; ctx.textAlign = 'left'
+      ctx.fillText(layer.name, 10, layer.y + 22)
+    })
+
+    connections.forEach(conn => {
+      const fromLayer = layers.find(l => l.nodes.some(n => n.id === conn.from))
+      const toLayer = layers.find(l => l.nodes.some(n => n.id === conn.to))
+      if (!fromLayer || !toLayer) return
+      const fromNode = fromLayer.nodes.find(n => n.id === conn.from)
+      const toNode = toLayer.nodes.find(n => n.id === conn.to)
+      if (!fromNode || !toNode) return
+
+      ctx.beginPath(); ctx.moveTo(fromNode.x, fromLayer.y + 30); ctx.lineTo(toNode.x, toLayer.y + 30)
+      ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2; ctx.globalAlpha = 0.5; ctx.stroke()
+
+      const t = (time % 2) / 2
+      const px = fromNode.x + (toNode.x - fromNode.x) * t
+      const py = fromLayer.y + 30 + (toLayer.y + 30 - fromLayer.y - 30) * t
+      ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2)
+      ctx.fillStyle = '#3b82f6'; ctx.globalAlpha = 0.9; ctx.fill()
+      ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2)
+      ctx.fillStyle = '#3b82f6'; ctx.globalAlpha = 0.25; ctx.fill()
+    })
+    ctx.globalAlpha = 1
+
+    layers.forEach(layer => {
+      layer.nodes.forEach(node => {
+        ctx.beginPath(); ctx.arc(node.x, layer.y + 30, 20, 0, Math.PI * 2)
+        ctx.fillStyle = node.color + '30'; ctx.strokeStyle = node.color; ctx.lineWidth = 2
+        ctx.fill(); ctx.stroke()
+        ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillStyle = '#ffffff'; ctx.fillText(node.icon, node.x, layer.y + 30)
+        ctx.font = '10px sans-serif'; ctx.fillStyle = node.color
+        ctx.fillText(node.label, node.x, layer.y + 55)
+      })
+    })
+    flowAnimId = requestAnimationFrame(animate)
+  }
+  animate()
+}
 
 const devices = reactive([
   { id: 1, name: '温度传感器', type: '云测仪 SD123', icon: '🌡️', value: '24.5℃', online: true },
@@ -363,8 +420,8 @@ function addDevice() {
   newDevice.unit = ''
 }
 
-onMounted(() => { initCharts() })
-onUnmounted(() => { tempChart?.destroy(); humiChart?.destroy() })
+onMounted(() => { initCharts(); drawFlowChart() })
+onUnmounted(() => { tempChart?.destroy(); humiChart?.destroy(); if (flowAnimId) cancelAnimationFrame(flowAnimId) })
 </script>
 
 <style scoped>
@@ -426,6 +483,8 @@ onUnmounted(() => { tempChart?.destroy(); humiChart?.destroy() })
 .th-inputs { display: flex; align-items: center; gap: var(--spacing-sm); }
 .th-input { width: 70px; padding: 6px; background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: var(--radius-sm); color: var(--text-primary); text-align: center; font-size: 13px; }
 .th-unit { font-size: 12px; color: var(--text-secondary); }
+
+.flow-canvas { width: 100%; height: 380px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); }
 
 @media (max-width: 1200px) {
   .cards-grid { grid-template-columns: repeat(2, 1fr); }

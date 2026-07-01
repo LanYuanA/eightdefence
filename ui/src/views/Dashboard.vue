@@ -528,7 +528,7 @@ function drawFlowChart() {
   canvas.height = 400
 
   // 软件定义架构节点 - 居中布局
-  const ox = 160 // 向右偏移
+  const ox = 220 // 向右偏移居中
   const layers = [
     {
       name: '设备层',

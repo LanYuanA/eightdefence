@@ -138,7 +138,7 @@
                 <div><h3 class="card-title">消防数据流向</h3><p class="card-subtitle">实时数据传输</p></div>
               </div>
             </template>
-            <DataFlowVisualizer :nodes="fireFlowNodes" :flows="fireFlowFlows" flow-color="#ef4444" :show-controls="true" />
+            <canvas ref="flowCanvasRef" class="flow-canvas"></canvas>
           </BaseCard>
         </div>
         <div class="stream-panel">
@@ -168,7 +168,6 @@ import AppNavbar from '../components/AppNavbar.vue'
 import DataCard from '../components/DataCard.vue'
 import BaseCard from '../components/BaseCard.vue'
 import CyberButton from '../components/CyberButton.vue'
-import DataFlowVisualizer from '../components/DataFlowVisualizer.vue'
 import LiveDataStream from '../components/LiveDataStream.vue'
 
 Chart.register(...registerables)
@@ -221,43 +220,101 @@ const thresholds = reactive([
   { key: 'co2', label: 'CO₂报警阈值', value: 1000, unit: 'ppm', peak: 680 }
 ])
 
-// 软件定义架构数据流向
-const fireFlowNodes = [
-  // 设备层
-  { id: 'sensor-smoke', x: 140, y: 280, size: 18, color: '#ef4444', icon: '🔥', label: '烟雾报警', active: true, dataCount: 64 },
-  { id: 'sensor-temp', x: 280, y: 280, size: 18, color: '#f59e0b', icon: '🌡️', label: '温度传感', active: true, dataCount: 48 },
-  { id: 'sensor-spray', x: 420, y: 280, size: 16, color: '#06b6d4', icon: '💦', label: '喷淋控制', active: true, dataCount: 8 },
-  { id: 'sensor-fan', x: 560, y: 280, size: 16, color: '#22c55d', icon: '🌀', label: '排烟风机', active: true, dataCount: 16 },
-  // 设备抽象层
-  { id: 'abs-fire', x: 350, y: 210, size: 20, color: '#ef4444', icon: '🔥', label: '消防抽象', active: true, dataCount: 96 },
-  // 原子服务下层
-  { id: 'lower-collect', x: 180, y: 140, size: 22, color: '#3b82f6', icon: '📥', label: '数据采集', active: true, dataCount: 96 },
-  { id: 'lower-alarm', x: 350, y: 140, size: 20, color: '#ef4444', icon: '🔔', label: '报警判断', active: true, dataCount: 48 },
-  { id: 'lower-control', x: 520, y: 140, size: 18, color: '#22c55d', icon: '🎮', label: '设备控制', active: true, dataCount: 16 },
-  // 原子服务上层
-  { id: 'upper-fire', x: 350, y: 70, size: 24, color: '#ef4444', icon: '🔥', label: '消防预警服务', active: true, dataCount: 48 },
-  // 应用层
-  { id: 'app-fire', x: 350, y: 15, size: 20, color: '#ef4444', icon: '🔥', label: '消防系统', active: true, dataCount: 24 }
-]
+// Canvas 数据流向图
+const flowCanvasRef = ref<HTMLCanvasElement | null>(null)
+let flowAnimId = 0
 
-const fireFlowFlows = [
-  // 设备层 → 设备抽象层
-  { from: 'sensor-smoke', to: 'abs-fire', active: true, speed: 1.5 },
-  { from: 'sensor-temp', to: 'abs-fire', active: true, speed: 2 },
-  { from: 'sensor-spray', to: 'abs-fire', active: true, speed: 2 },
-  { from: 'sensor-fan', to: 'abs-fire', active: true, speed: 2 },
-  // 设备抽象层 → 原子服务下层
-  { from: 'abs-fire', to: 'lower-collect', active: true, speed: 2 },
-  // 原子服务下层 → 原子服务下层
-  { from: 'lower-collect', to: 'lower-alarm', active: true, speed: 2 },
-  { from: 'lower-alarm', to: 'lower-control', active: true, speed: 2 },
-  // 原子服务下层 → 原子服务上层
-  { from: 'lower-collect', to: 'upper-fire', active: true, speed: 2 },
-  { from: 'lower-alarm', to: 'upper-fire', active: true, speed: 2 },
-  { from: 'lower-control', to: 'upper-fire', active: true, speed: 2 },
-  // 原子服务上层 → 应用层
-  { from: 'upper-fire', to: 'app-fire', active: true, speed: 2 }
-]
+function drawFlowChart() {
+  if (!flowCanvasRef.value) return
+  const canvas = flowCanvasRef.value
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const container = canvas.parentElement
+  if (!container) return
+  canvas.width = container.clientWidth
+  canvas.height = 380
+
+  const ox = 220
+  const layers = [
+    { name: '设备层', y: 320, nodes: [
+      { id: 'sensor-smoke', x: 100 + ox, icon: '🔥', label: '烟雾报警', color: '#ef4444' },
+      { id: 'sensor-temp', x: 260 + ox, icon: '🌡️', label: '温度传感', color: '#f59e0b' },
+      { id: 'sensor-spray', x: 420 + ox, icon: '💦', label: '喷淋控制', color: '#06b6d4' },
+      { id: 'sensor-fan', x: 560 + ox, icon: '🌀', label: '排烟风机', color: '#22c55d' }
+    ]},
+    { name: '设备抽象层', y: 240, nodes: [
+      { id: 'abs-fire', x: 330 + ox, icon: '🔥', label: '消防抽象', color: '#ef4444' }
+    ]},
+    { name: '原子服务下层', y: 160, nodes: [
+      { id: 'lower-collect', x: 200 + ox, icon: '📥', label: '数据采集', color: '#3b82f6' },
+      { id: 'lower-alarm', x: 400 + ox, icon: '🔔', label: '报警判断', color: '#ef4444' },
+      { id: 'lower-control', x: 550 + ox, icon: '🎮', label: '设备控制', color: '#22c55d' }
+    ]},
+    { name: '原子服务上层', y: 80, nodes: [
+      { id: 'upper-fire', x: 350 + ox, icon: '🔥', label: '消防预警服务', color: '#ef4444' }
+    ]},
+    { name: '应用层', y: 20, nodes: [
+      { id: 'app-fire', x: 350 + ox, icon: '🔥', label: '消防系统', color: '#ef4444' }
+    ]}
+  ]
+  const connections = [
+    { from: 'sensor-smoke', to: 'abs-fire' }, { from: 'sensor-temp', to: 'abs-fire' },
+    { from: 'sensor-spray', to: 'abs-fire' }, { from: 'sensor-fan', to: 'abs-fire' },
+    { from: 'abs-fire', to: 'lower-collect' },
+    { from: 'lower-collect', to: 'lower-alarm' }, { from: 'lower-alarm', to: 'lower-control' },
+    { from: 'lower-collect', to: 'upper-fire' }, { from: 'lower-alarm', to: 'upper-fire' }, { from: 'lower-control', to: 'upper-fire' },
+    { from: 'upper-fire', to: 'app-fire' }
+  ]
+
+  let time = 0
+  function animate() {
+    if (!ctx) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    time += 0.02
+
+    layers.forEach((layer, i) => {
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(239,68,68,0.03)' : 'rgba(245,158,11,0.03)'
+      ctx.fillRect(0, layer.y - 12, canvas.width, 58)
+      ctx.font = '11px sans-serif'; ctx.fillStyle = '#64748b'; ctx.textAlign = 'left'
+      ctx.fillText(layer.name, 10, layer.y + 22)
+    })
+
+    connections.forEach(conn => {
+      const fromLayer = layers.find(l => l.nodes.some(n => n.id === conn.from))
+      const toLayer = layers.find(l => l.nodes.some(n => n.id === conn.to))
+      if (!fromLayer || !toLayer) return
+      const fromNode = fromLayer.nodes.find(n => n.id === conn.from)
+      const toNode = toLayer.nodes.find(n => n.id === conn.to)
+      if (!fromNode || !toNode) return
+
+      ctx.beginPath(); ctx.moveTo(fromNode.x, fromLayer.y + 30); ctx.lineTo(toNode.x, toLayer.y + 30)
+      ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; ctx.globalAlpha = 0.5; ctx.stroke()
+
+      const t = (time % 2) / 2
+      const px = fromNode.x + (toNode.x - fromNode.x) * t
+      const py = fromLayer.y + 30 + (toLayer.y + 30 - fromLayer.y - 30) * t
+      ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2)
+      ctx.fillStyle = '#ef4444'; ctx.globalAlpha = 0.9; ctx.fill()
+      ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2)
+      ctx.fillStyle = '#ef4444'; ctx.globalAlpha = 0.25; ctx.fill()
+    })
+    ctx.globalAlpha = 1
+
+    layers.forEach(layer => {
+      layer.nodes.forEach(node => {
+        ctx.beginPath(); ctx.arc(node.x, layer.y + 30, 20, 0, Math.PI * 2)
+        ctx.fillStyle = node.color + '30'; ctx.strokeStyle = node.color; ctx.lineWidth = 2
+        ctx.fill(); ctx.stroke()
+        ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillStyle = '#ffffff'; ctx.fillText(node.icon, node.x, layer.y + 30)
+        ctx.font = '10px sans-serif'; ctx.fillStyle = node.color
+        ctx.fillText(node.label, node.x, layer.y + 55)
+      })
+    })
+    flowAnimId = requestAnimationFrame(animate)
+  }
+  animate()
+}
 
 const tempChartRef = ref<HTMLCanvasElement | null>(null)
 const smokeChartRef = ref<HTMLCanvasElement | null>(null)
@@ -285,8 +342,8 @@ function emergencyAction() { ElMessage.warning('应急联动处置已启动') }
 function toggleDevice(dev: any) { dev.active = !dev.active; ElMessage.success(`${dev.name} 已${dev.active ? '开启' : '关闭'}`) }
 function saveThreshold(t: any) { ElMessage.success(`${t.label} 已保存`) }
 
-onMounted(() => { initCharts() })
-onUnmounted(() => { tempChart?.destroy(); smokeChart?.destroy() })
+onMounted(() => { initCharts(); drawFlowChart() })
+onUnmounted(() => { tempChart?.destroy(); smokeChart?.destroy(); if (flowAnimId) cancelAnimationFrame(flowAnimId) })
 </script>
 
 <style scoped>
@@ -348,6 +405,8 @@ onUnmounted(() => { tempChart?.destroy(); smokeChart?.destroy() })
 .th-unit { font-size: 12px; color: var(--text-secondary); }
 
 .flow-stream-section { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--spacing-xl); }
+
+.flow-canvas { width: 100%; height: 380px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); }
 
 @media (max-width: 1200px) {
   .region-risk-grid { grid-template-columns: 1fr; }

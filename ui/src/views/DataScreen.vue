@@ -554,7 +554,7 @@ onUnmounted(() => {
 .sub-title { font-size: 10px; color: #475569; margin-top: 1px; letter-spacing: 3px; }
 .system-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #22c55d; justify-content: flex-end; }
 
-.screen-main { display: grid; grid-template-columns: 280px 1fr 280px; gap: 10px; padding: 8px 10px; height: calc(100vh - 96px); position: relative; z-index: 1; }
+.screen-main { display: grid; grid-template-columns: 240px 1fr 240px; gap: 10px; padding: 8px 10px; height: calc(100vh - 96px); position: relative; z-index: 1; }
 .left-panel,.right-panel { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
 .left-panel::-webkit-scrollbar,.right-panel::-webkit-scrollbar { width: 2px; }
 .left-panel::-webkit-scrollbar-thumb,.right-panel::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.12); border-radius: 2px; }
@@ -644,6 +644,6 @@ onUnmounted(() => {
 .fade-enter-active,.fade-leave-active { transition: opacity 0.15s; }
 .fade-enter-from,.fade-leave-to { opacity: 0; }
 
-@media (max-width: 1400px) { .screen-main { grid-template-columns: 250px 1fr 250px; } }
+@media (max-width: 1400px) { .screen-main { grid-template-columns: 220px 1fr 220px; } }
 @media (max-width: 1100px) { .screen-main { grid-template-columns: 1fr; } .left-panel,.right-panel { display: none; } }
 </style>

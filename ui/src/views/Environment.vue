@@ -213,11 +213,11 @@ import { ElMessage } from 'element-plus'
 import { Chart, registerables } from 'chart.js'
 import ParticleBackground from '../components/ParticleBackground.vue'
 import AppNavbar from '../components/AppNavbar.vue'
-import DataCard from '../components/DataCard.vue'
 import BaseCard from '../components/BaseCard.vue'
 import CyberButton from '../components/CyberButton.vue'
 import StatusDot from '../components/StatusDot.vue'
 import LiveDataStream from '../components/LiveDataStream.vue'
+import { realtimeApi, type AllSensorData } from '../api/realtime'
 
 Chart.register(...registerables)
 
@@ -394,6 +394,35 @@ function refreshDev(dev: any) { ElMessage.success(`${dev.name} 已刷新`) }
 function toggleCtrl(ctrl: any) { ctrl.active = !ctrl.active; ElMessage.success(`${ctrl.name} 已${ctrl.active ? '开启' : '关闭'}`) }
 function saveThresholds() { showThresholds.value = false; ElMessage.success('阈值已保存') }
 
+// C++ 实时数据轮询
+let realtimeTimer: ReturnType<typeof setInterval> | null = null
+const cppOnline = ref(false)
+
+async function fetchRealtimeData() {
+  try {
+    const res = await realtimeApi.getAllData() as any
+    const d = res.data || res
+    if (d) {
+      cppOnline.value = true
+      envCards[0].value = d.temperature !== undefined ? d.temperature / 10 : envCards[0].value
+      envCards[1].value = d.humidity !== undefined ? d.humidity / 10 : envCards[1].value
+      envCards[2].value = d.pm25 !== undefined ? d.pm25 : envCards[2].value
+      envCards[3].value = d.co2 !== undefined ? d.co2 : envCards[3].value
+      devices[0].online = d.temperature_online !== undefined ? d.temperature_online : devices[0].online
+      devices[1].online = d.humidity_online !== undefined ? d.humidity_online : devices[1].online
+      devices[2].online = d.pm25_online !== undefined ? d.pm25_online : devices[2].online
+      devices[3].online = d.co2_online !== undefined ? d.co2_online : devices[3].online
+      devices[0].value = `${envCards[0].value}℃`
+      devices[1].value = `${envCards[1].value}%`
+      devices[2].value = `${envCards[2].value}μg/m³`
+      devices[3].value = `${envCards[3].value}ppm`
+    }
+  } catch {
+    cppOnline.value = false
+    // 保持mock数据运行
+  }
+}
+
 function addDevice() {
   if (!newDevice.name || !newDevice.model) {
     ElMessage.warning('请填写必填项')
@@ -420,8 +449,8 @@ function addDevice() {
   newDevice.unit = ''
 }
 
-onMounted(() => { initCharts(); drawFlowChart() })
-onUnmounted(() => { tempChart?.destroy(); humiChart?.destroy(); if (flowAnimId) cancelAnimationFrame(flowAnimId) })
+onMounted(() => { initCharts(); drawFlowChart(); fetchRealtimeData(); realtimeTimer = setInterval(fetchRealtimeData, 2000) })
+onUnmounted(() => { tempChart?.destroy(); humiChart?.destroy(); if (flowAnimId) cancelAnimationFrame(flowAnimId); if (realtimeTimer) clearInterval(realtimeTimer) })
 </script>
 
 <style scoped>

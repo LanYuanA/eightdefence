@@ -160,6 +160,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import ParticleBackground from '../components/ParticleBackground.vue'
 import AppNavbar from '../components/AppNavbar.vue'
+import { realtimeApi } from '../api/realtime'
 import BaseCard from '../components/BaseCard.vue'
 import CyberButton from '../components/CyberButton.vue'
 import StatusDot from '../components/StatusDot.vue'
@@ -295,8 +296,36 @@ function drawFlowChart() {
   animate()
 }
 
-onMounted(() => { drawFlowChart() })
-onUnmounted(() => { if (flowAnimId) cancelAnimationFrame(flowAnimId) })
+onMounted(() => { drawFlowChart(); fetchSecurityData() })
+onUnmounted(() => { if (flowAnimId) cancelAnimationFrame(flowAnimId); if (secTimer) clearInterval(secTimer) })
+
+// C++ 实时安防数据轮询
+let secTimer: ReturnType<typeof setInterval> | null = null
+const secCppOnline = ref(false)
+
+async function fetchSecurityData() {
+  try {
+    const res = await realtimeApi.getAllData() as any
+    const d = res.data || res
+    if (d) {
+      secCppOnline.value = true
+      waterOnline.value = d.water_online !== undefined ? d.water_online : waterOnline.value
+      waterDetected.value = (d.water || 0) > 0
+      intrusionOnline.value = d.ir_online !== undefined ? d.ir_online : intrusionOnline.value
+      infraredDetected.value = (d.ir || 0) > 0
+      radarDetected.value = (d.radar || 0) > 0
+      if (d.tvoc !== undefined) tvocValue.value = d.tvoc
+      if (d.ch2o !== undefined) ch2oValue.value = d.ch2o
+      if (d.co2 !== undefined) co2Value.value = d.co2
+      // 更新在线计数
+      const allOnline = [d.pm25_online,d.humidity_online,d.temperature_online,d.co2_online,d.smoke_online,d.water_online,d.ir_online,d.light_online].filter(Boolean).length
+      onlineCount.value = allOnline
+    }
+  } catch {
+    secCppOnline.value = false
+  }
+}
+secTimer = setInterval(fetchSecurityData, 2000)
 
 // 模拟操作
 function simulateWater() {

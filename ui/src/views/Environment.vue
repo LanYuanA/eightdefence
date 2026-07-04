@@ -217,7 +217,7 @@ import BaseCard from '../components/BaseCard.vue'
 import CyberButton from '../components/CyberButton.vue'
 import StatusDot from '../components/StatusDot.vue'
 import LiveDataStream from '../components/LiveDataStream.vue'
-import { realtimeApi, type AllSensorData } from '../api/realtime'
+import { realtimeApi } from '../api/realtime'
 
 Chart.register(...registerables)
 

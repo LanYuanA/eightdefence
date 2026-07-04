@@ -318,7 +318,7 @@ function drawBg(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) 
   }
 }
 
-function drawTopo(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) {
+function drawTopo(ctx: CanvasRenderingContext2D, w: number, h: number, _t: number) {
   ctx.clearRect(0, 0, w, h)
   if (!isTopoDrag) rotY += 0.15
   const cx = w / 2, cy = h / 2

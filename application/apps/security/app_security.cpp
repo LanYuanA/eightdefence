@@ -98,20 +98,17 @@ HttpResponse AppSecurity::handleGetStatus(const HttpRequest& /*req*/) {
     // 读取云测仪有害气体传感器
     bool tvocOnline = dev_tvoc.isOnline();
     bool ch2oOnline = dev_ch2o.isOnline();
-    bool o3Online   = dev_o3.isOnline();
     bool co2Online  = dev_co2.isOnline();
-    bool gasOnline  = tvocOnline || ch2oOnline || o3Online || co2Online;
+    bool gasOnline  = tvocOnline || ch2oOnline || co2Online;
 
-    int tvocVal, ch2oVal, o3Val, co2Val;
+    int tvocVal, ch2oVal, co2Val;
     if (m_state.gasSimulated.load()) {
         tvocVal = m_state.simTvoc.load();
         ch2oVal = m_state.simCh2o.load();
-        o3Val   = m_state.simO3.load();
         co2Val  = m_state.simCo2.load();
     } else {
         tvocVal = dev_tvoc.getValue();
         ch2oVal = dev_ch2o.getValue();
-        o3Val   = dev_o3.getValue();
         co2Val  = dev_co2.getValue();
     }
 
@@ -145,7 +142,6 @@ HttpResponse AppSecurity::handleGetStatus(const HttpRequest& /*req*/) {
         "\"online\":%s,"
         "\"tvoc\":{\"value\":%d,\"unit\":\"ppb\",\"online\":%s},"
         "\"ch2o\":{\"value\":%d,\"unit\":\"ppb\",\"online\":%s},"
-        "\"o3\":{\"value\":%d,\"unit\":\"ppb\",\"online\":%s},"
         "\"co2\":{\"value\":%d,\"unit\":\"ppm\",\"online\":%s},"
         "\"risk\":\"%s\","
         "\"ventilationActive\":%s"
@@ -178,7 +174,6 @@ HttpResponse AppSecurity::handleGetStatus(const HttpRequest& /*req*/) {
         gasOnline ? "true" : "false",
         tvocVal, tvocOnline ? "true" : "false",
         ch2oVal, ch2oOnline ? "true" : "false",
-        o3Val,   o3Online   ? "true" : "false",
         co2Val,  co2Online  ? "true" : "false",
         riskStr[static_cast<int>(m_state.gasRisk)],
         m_state.ventilationActive.load() ? "true" : "false",
@@ -210,7 +205,6 @@ HttpResponse AppSecurity::handleGetSensors(const HttpRequest& /*req*/) {
         "{\"name\":\"雷达探测器\",\"type\":\"radar\",\"state\":%d,\"value\":%d,\"unit\":\"\",\"online\":%s},"
         "{\"name\":\"TVOC传感器\",\"type\":\"tvoc\",\"value\":%d,\"unit\":\"ppb\",\"online\":%s},"
         "{\"name\":\"甲醛传感器\",\"type\":\"ch2o\",\"value\":%d,\"unit\":\"ppb\",\"online\":%s},"
-        "{\"name\":\"臭氧传感器\",\"type\":\"o3\",\"value\":%d,\"unit\":\"ppb\",\"online\":%s},"
         "{\"name\":\"CO2传感器\",\"type\":\"co2\",\"value\":%d,\"unit\":\"ppm\",\"online\":%s}"
         "]",
         waterState, m_state.waterLevel.load(), waterOnline ? "true" : "false",
@@ -218,7 +212,6 @@ HttpResponse AppSecurity::handleGetSensors(const HttpRequest& /*req*/) {
         radarState, radarState, irOnline ? "true" : "false",
         dev_tvoc.getValue(), dev_tvoc.isOnline() ? "true" : "false",
         dev_ch2o.getValue(), dev_ch2o.isOnline() ? "true" : "false",
-        dev_o3.getValue(),   dev_o3.isOnline()   ? "true" : "false",
         dev_co2.getValue(),  dev_co2.isOnline()  ? "true" : "false"
     );
 
@@ -299,14 +292,14 @@ HttpResponse AppSecurity::handlePostControl(const HttpRequest& req) {
             m_state.gasSimulated.store(true);
             m_state.simTvoc.store(680);   // >500 ppb 高风险
             m_state.simCh2o.store(150);   // >100 ppb 高风险
-            m_state.simO3.store(130);     // >100 ppb 高风险
+            // O3 removed;     // >100 ppb 高风险
             m_state.simCo2.store(1200);   // >1000 ppm 高风险
             // 通过 evaluateRisk 触发真实的原子服务联动
             int waterState = dev_water.getWaterState();
             int irState = dev_infrared.getInfraredState();
             int radarState = dev_infrared.getRadarState();
             evaluateRisk(waterState, irState, radarState);
-            APP_LOG_WARNING("有害气体警报: 检测到多种有害气体浓度超限(TVOC:680ppb CH2O:150ppb O3:130ppb CO2:1200ppm)");
+            APP_LOG_WARNING("有害气体警报: 检测到多种有害气体浓度超限(TVOC:680ppb CH2O:150ppb CO2:1200ppm)");
             addLog("alarm", "有害气体警报",
                 "检测到多种有害气体浓度超限, 触发安防风险评估(高风险)");
             return HttpResponse::json("{\"status\":\"success\",\"message\":\"气体泄漏模拟已触发\"}");
@@ -314,7 +307,7 @@ HttpResponse AppSecurity::handlePostControl(const HttpRequest& req) {
             m_state.gasSimulated.store(false);
             m_state.simTvoc.store(0);
             m_state.simCh2o.store(0);
-            m_state.simO3.store(0);
+            // O3 removed;
             m_state.simCo2.store(0);
             int waterState = dev_water.getWaterState();
             int irState = dev_infrared.getInfraredState();
@@ -368,12 +361,11 @@ void AppSecurity::evaluateRisk(int waterState, int irState, int radarState) {
     if (m_state.gasSimulated.load()) {
         maxGasRisk = std::max(maxGasRisk, calcSingleGasRisk(m_state.simTvoc.load(), 200, 500));
         maxGasRisk = std::max(maxGasRisk, calcSingleGasRisk(m_state.simCh2o.load(), 50, 100));
-        maxGasRisk = std::max(maxGasRisk, calcSingleGasRisk(m_state.simO3.load(), 60, 100));
+        // O3 removed;
         maxGasRisk = std::max(maxGasRisk, calcSingleGasRisk(m_state.simCo2.load(), 800, 1000));
     } else {
         if (dev_tvoc.isOnline()) maxGasRisk = std::max(maxGasRisk, calcSingleGasRisk(dev_tvoc.getValue(), 200, 500));
         if (dev_ch2o.isOnline()) maxGasRisk = std::max(maxGasRisk, calcSingleGasRisk(dev_ch2o.getValue(), 50, 100));
-        if (dev_o3.isOnline())   maxGasRisk = std::max(maxGasRisk, calcSingleGasRisk(dev_o3.getValue(), 60, 100));
         if (dev_co2.isOnline())  maxGasRisk = std::max(maxGasRisk, calcSingleGasRisk(dev_co2.getValue(), 800, 1000));
     }
     m_state.gasRisk = maxGasRisk;
@@ -382,7 +374,7 @@ void AppSecurity::evaluateRisk(int waterState, int irState, int radarState) {
     if (!waterOnline) m_state.waterRisk = SecurityRiskLevel::MEDIUM;
     if (!irOnline) m_state.intrusionRisk = SecurityRiskLevel::MEDIUM;
 
-    bool gasOnline = dev_tvoc.isOnline() || dev_ch2o.isOnline() || dev_o3.isOnline() || dev_co2.isOnline();
+    bool gasOnline = dev_tvoc.isOnline() || dev_ch2o.isOnline() || dev_co2.isOnline();
     if (!gasOnline && !m_state.gasSimulated.load()) m_state.gasRisk = SecurityRiskLevel::MEDIUM;
 
     int maxRisk = std::max({

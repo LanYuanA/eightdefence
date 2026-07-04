@@ -531,9 +531,9 @@ function drawFlowChart() {
   const nodeR = 13  // 小节点半径
 
   // 下层37个原子服务 —— 四类分组grid布局
-  function makeGrid(svcs: string[][], startX: number, baseY: number, color: string, rowH: number) {
+  function makeGrid(svcs: string[][], startX: number, _baseY: number, color: string, _rowH: number) {
     const nodes: any[] = []
-    svcs.forEach((row, ri) => {
+    svcs.forEach((row, _ri) => {
       row.forEach((name, ci) => {
         nodes.push({ id: 'svc-' + name, x: startX + ci * 52, icon: '•', label: name, color })
       })

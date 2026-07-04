@@ -23,6 +23,12 @@ CXX_SRCS = service/modbus_service.cpp service/parse_service.cpp \
            devices/dev_alarm_device.cpp \
            application/web_server.cpp application/app_base.cpp \
            application/apps/security/app_security.cpp \
+           application/apps/environment/app_environment.cpp \
+           application/apps/fire_fighting/app_fire_fighting.cpp \
+           service/atomic/svc_air_quality_alert.cpp \
+           service/atomic/svc_evacuation.cpp \
+           service/atomic/svc_fire_suppression.cpp \
+           service/atomic/svc_ventilation.cpp \
            core/serial_bus.cpp core/async_bus.cpp core/polling_manager.cpp \
            core/logger.cpp core/app_logger.cpp core/command_queue.cpp \
            core/main.cpp

@@ -599,13 +599,15 @@ function drawFlowChart() {
     ...['abs-temp','abs-humi','abs-pm25','abs-co2','abs-tvoc','abs-ch2o','abs-pm10'].map(id=>({from:'sensor-cloud',to:id,active:true,color:'#3b82f6'})),
     {from:'sensor-smoke',to:'abs-smoke',active:true,color:'#ef4444'},{from:'sensor-water',to:'abs-water',active:true,color:'#06b6d4'},
     {from:'sensor-infrared',to:'abs-ir',active:true,color:'#8b5cf6'},{from:'sensor-light',to:'abs-light',active:true,color:'#f59e0b'},
-    // === 向上流: 抽象层→数据采集服务 ===
-    {from:'abs-temp',to:'upper-collect',active:true,color:'#3b82f6'},{from:'abs-humi',to:'upper-collect',active:true,color:'#06b6d4'},
-    {from:'abs-pm25',to:'upper-collect',active:true,color:'#f59e0b'},{from:'abs-co2',to:'upper-collect',active:true,color:'#8b5cf6'},
-    {from:'abs-tvoc',to:'upper-collect',active:true,color:'#ec4899'},{from:'abs-ch2o',to:'upper-collect',active:true,color:'#14b8a6'},
-    {from:'abs-pm10',to:'upper-collect',active:true,color:'#f59e0b'},
-    {from:'abs-smoke',to:'upper-fireid',active:true,color:'#ef4444'},{from:'abs-water',to:'upper-alarm',active:true,color:'#06b6d4'},
-    {from:'abs-ir',to:'upper-fireid',active:true,color:'#8b5cf6'},{from:'abs-light',to:'upper-collect',active:true,color:'#f59e0b'},
+    // === 向上流: 抽象层→原子服务下层(数据采集类节点) ===
+    {from:'abs-temp',to:'svc-数据采集类-温度',active:true,color:'#3b82f6'},{from:'abs-humi',to:'svc-数据采集类-湿度',active:true,color:'#06b6d4'},
+    {from:'abs-pm25',to:'svc-数据采集类-PM2.5',active:true,color:'#f59e0b'},{from:'abs-co2',to:'svc-数据采集类-CO₂',active:true,color:'#8b5cf6'},
+    {from:'abs-tvoc',to:'svc-数据采集类-TVOC',active:true,color:'#ec4899'},{from:'abs-ch2o',to:'svc-数据采集类-甲醛',active:true,color:'#14b8a6'},
+    {from:'abs-pm10',to:'svc-数据采集类-PM10',active:true,color:'#f59e0b'},
+    {from:'abs-smoke',to:'svc-数据采集类-烟雾',active:true,color:'#ef4444'},{from:'abs-water',to:'svc-数据采集类-水浸',active:true,color:'#06b6d4'},
+    {from:'abs-ir',to:'svc-数据采集类-红外',active:true,color:'#8b5cf6'},{from:'abs-light',to:'svc-数据采集类-光感',active:true,color:'#f59e0b'},
+    // 报警相关抽象→报警判断类下层
+    {from:'abs-smoke',to:'svc-报警判断类-阈值判断',active:true,color:'#ef4444'},{from:'abs-water',to:'svc-报警判断类-状态监测',active:true,color:'#ef4444'},
     // === 向上流: 下层→上层 (子服务汇聚到核心服务) ===
     ...allLowerNodes.filter(n=>n.color==='#3b82f6').map(n=>({from:n.id,to:'upper-collect',active:true,color:'#3b82f6'})),
     ...allLowerNodes.filter(n=>n.color==='#ef4444').map(n=>({from:n.id,to:'upper-alarm',active:true,color:'#ef4444'})),

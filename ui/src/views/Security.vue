@@ -242,19 +242,21 @@ function drawFlowChart() {
       { id: 'sensor-door', x: 700 + ox, icon: '🔌', label: '门禁控制器', color: '#22c55d' },
     ]},
   ]
-  // 向上流: 设备→抽象→服务→上层→应用 (仅联动控制向下)
+  // 向上流: 设备→抽象→下层服务→上层→应用 (仅联动控制向下)
   const connections = [
+    // 设备→抽象
     { from: 'sensor-water', to: 'abs-water' }, { from: 'sensor-infrared', to: 'abs-infrared' },
     { from: 'sensor-gas', to: 'abs-gas' }, { from: 'sensor-door', to: 'abs-door' },
+    // 抽象→原子服务下层
     { from: 'abs-water', to: 'lower-collect' }, { from: 'abs-infrared', to: 'lower-collect' },
     { from: 'abs-gas', to: 'lower-collect' }, { from: 'abs-door', to: 'lower-collect' },
     { from: 'abs-water', to: 'lower-alarm' }, { from: 'abs-infrared', to: 'lower-alarm' },
+    // 下层→上层→应用
     { from: 'lower-collect', to: 'upper-security' }, { from: 'lower-alarm', to: 'upper-security' },
     { from: 'upper-security', to: 'app-security' },
-    // 设备控制向下
+    // 设备控制向下: 应用→下层控制→抽象→设备
     { from: 'app-security', to: 'lower-control' },
-    { from: 'lower-control', to: 'abs-water' }, { from: 'lower-control', to: 'abs-infrared' }, { from: 'lower-control', to: 'abs-door' },
-    { from: 'abs-water', to: 'sensor-water' }, { from: 'abs-door', to: 'sensor-door' },
+    { from: 'lower-control', to: 'abs-water' }, { from: 'lower-control', to: 'abs-door' },
   ]
 
   let time = 0

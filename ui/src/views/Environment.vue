@@ -260,42 +260,53 @@ function drawFlowChart() {
   const container = canvas.parentElement
   if (!container) return
   canvas.width = container.clientWidth
-  canvas.height = 380
+  canvas.height = 520
 
   const ox = 220
   const layers = [
-    { name: '设备层', y: 320, nodes: [
-      { id: 'sensor-cloud', x: 140 + ox, icon: '🌡️', label: '云测仪', color: '#3b82f6' },
-      { id: 'sensor-humidifier', x: 300 + ox, icon: '🌀', label: '恒湿净化', color: '#06b6d4' },
-      { id: 'sensor-conditioner', x: 460 + ox, icon: '❄️', label: '空调控制', color: '#22c55d' }
+    { name: '设备层', y: 480, nodes: [
+      { id: 'sensor-cloud', x: 350 + ox, icon: '☁️', label: '云测仪(SD123)', color: '#3b82f6' },
     ]},
-    { name: '设备抽象层', y: 240, nodes: [
-      { id: 'abs-cloud', x: 200 + ox, icon: '☁️', label: '云测仪抽象', color: '#3b82f6' },
-      { id: 'abs-env', x: 400 + ox, icon: '🌿', label: '环境抽象', color: '#06b6d4' }
+    { name: '设备抽象层（云测仪→7个虚拟传感器）', y: 410, nodes: [
+      { id: 'abs-temp', x: 30+ox, icon:'🌡️', label:'温度', color:'#3b82f6' },
+      { id: 'abs-humi', x: 110+ox, icon:'💧', label:'湿度', color:'#06b6d4' },
+      { id: 'abs-pm25', x: 190+ox, icon:'💨', label:'PM2.5', color:'#f59e0b' },
+      { id: 'abs-co2', x: 270+ox, icon:'☁️', label:'CO₂', color:'#8b5cf6' },
+      { id: 'abs-tvoc', x: 350+ox, icon:'🧪', label:'TVOC', color:'#ec4899' },
+      { id: 'abs-ch2o', x: 430+ox, icon:'⚗️', label:'甲醛', color:'#14b8a6' },
+      { id: 'abs-pm10', x: 510+ox, icon:'💨', label:'PM10', color:'#f59e0b' },
+      { id: 'abs-hum', x: 610+ox, icon:'🌀', label:'净化', color:'#22c55d' },
+      { id: 'abs-ac', x: 690+ox, icon:'❄️', label:'空调', color:'#22c55d' },
     ]},
-    { name: '原子服务下层', y: 160, nodes: [
-      { id: 'lower-collect', x: 200 + ox, icon: '📥', label: '数据采集', color: '#3b82f6' },
-      { id: 'lower-process', x: 400 + ox, icon: '⚙️', label: '数据处理', color: '#8b5cf6' },
-      { id: 'lower-alarm', x: 550 + ox, icon: '🔔', label: '报警判断', color: '#ef4444' }
+    { name: '原子服务下层', y: 330, nodes: [
+      { id: 'lower-collect', x: 200 + ox, icon: '📥', label: '数据采集服务', color: '#3b82f6' },
+      { id: 'lower-process', x: 450 + ox, icon: '⚙️', label: '数据处理服务', color: '#8b5cf6' },
+      { id: 'lower-alarm', x: 650 + ox, icon: '🔔', label: '报警判断服务', color: '#ef4444' },
     ]},
-    { name: '原子服务上层', y: 80, nodes: [
-      { id: 'upper-monitor', x: 350 + ox, icon: '📊', label: '环境监测服务', color: '#3b82f6' }
+    { name: '原子服务上层', y: 260, nodes: [
+      { id: 'upper-monitor', x: 400 + ox, icon: '📊', label: '环境监测服务', color: '#3b82f6' }
     ]},
-    { name: '应用层', y: 20, nodes: [
-      { id: 'app-env', x: 350 + ox, icon: '🌡️', label: '环境监测', color: '#3b82f6' }
+    { name: '应用层', y: 190, nodes: [
+      { id: 'app-env', x: 400 + ox, icon: '🌡️', label: '环境监测应用', color: '#3b82f6' }
     ]}
   ]
-  const connections = [
-    // 应用层 → 原子服务上层
-    { from: 'app-env', to: 'upper-monitor' },
-    // 原子服务上层 → 原子服务下层
-    { from: 'upper-monitor', to: 'lower-process' }, { from: 'upper-monitor', to: 'lower-alarm' },
-    // 原子服务下层间
-    { from: 'lower-collect', to: 'lower-process' }, { from: 'lower-collect', to: 'lower-alarm' },
-    // 原子服务下层 → 设备抽象层
-    { from: 'lower-collect', to: 'abs-cloud' }, { from: 'lower-collect', to: 'abs-env' },
-    // 设备抽象层 → 设备层
-    { from: 'abs-cloud', to: 'sensor-cloud' }, { from: 'abs-env', to: 'sensor-humidifier' }, { from: 'abs-env', to: 'sensor-conditioner' },
+  // 数据流: 设备→抽象(上) + 控制流: 应用→服务→设备(下)
+  const connections: Array<{from:string;to:string;color?:string}> = [
+    { from: 'app-env', to: 'upper-monitor', color: '#3b82f6' },
+    { from: 'upper-monitor', to: 'lower-collect', color: '#3b82f6' }, { from: 'upper-monitor', to: 'lower-process', color: '#8b5cf6' },
+    { from: 'lower-process', to: 'lower-collect' }, { from: 'lower-process', to: 'lower-alarm' },
+    { from: 'lower-collect', to: 'abs-temp' }, { from: 'lower-collect', to: 'abs-humi' },
+    { from: 'lower-collect', to: 'abs-pm25' }, { from: 'lower-collect', to: 'abs-co2' },
+    { from: 'lower-collect', to: 'abs-tvoc' }, { from: 'lower-collect', to: 'abs-ch2o' },
+    { from: 'lower-collect', to: 'abs-pm10' },
+    { from: 'sensor-cloud', to: 'abs-temp', color: '#3b82f6' }, { from: 'sensor-cloud', to: 'abs-humi', color: '#06b6d4' },
+    { from: 'sensor-cloud', to: 'abs-pm25', color: '#f59e0b' }, { from: 'sensor-cloud', to: 'abs-co2', color: '#8b5cf6' },
+    { from: 'sensor-cloud', to: 'abs-tvoc', color: '#ec4899' }, { from: 'sensor-cloud', to: 'abs-ch2o', color: '#14b8a6' },
+    { from: 'sensor-cloud', to: 'abs-pm10', color: '#f59e0b' },
+    { from: 'abs-temp', to: 'lower-collect', color: '#3b82f6' }, { from: 'abs-humi', to: 'lower-collect', color: '#06b6d4' },
+    { from: 'abs-pm25', to: 'lower-collect', color: '#f59e0b' }, { from: 'abs-co2', to: 'lower-collect', color: '#8b5cf6' },
+    { from: 'abs-tvoc', to: 'lower-collect', color: '#ec4899' }, { from: 'abs-ch2o', to: 'lower-collect', color: '#14b8a6' },
+    { from: 'abs-pm10', to: 'lower-collect', color: '#f59e0b' },
   ]
 
   let time = 0
@@ -304,43 +315,48 @@ function drawFlowChart() {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     time += 0.02
 
-    layers.forEach((layer, i) => {
-      ctx.fillStyle = i % 2 === 0 ? 'rgba(34,197,94,0.03)' : 'rgba(59,130,246,0.03)'
-      ctx.fillRect(0, layer.y - 12, canvas.width, 58)
-      ctx.font = '11px sans-serif'; ctx.fillStyle = '#64748b'; ctx.textAlign = 'left'
-      ctx.fillText(layer.name, 10, layer.y + 22)
+    layers.forEach((layer: any, i: number) => {
+      const colors = ['rgba(15,23,42,0.5)','rgba(59,130,246,0.05)','rgba(34,197,94,0.04)','rgba(139,92,246,0.04)','rgba(59,130,246,0.04)']
+      const h = 48
+      ctx.fillStyle = colors[i] || colors[0]
+      ctx.fillRect(0, layer.y - 10, canvas.width, h)
+      ctx.font = 'bold 10px sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'left'
+      ctx.fillText(layer.name, 8, layer.y + 6)
     })
 
-    connections.forEach(conn => {
-      const fromLayer = layers.find(l => l.nodes.some(n => n.id === conn.from))
-      const toLayer = layers.find(l => l.nodes.some(n => n.id === conn.to))
+    connections.forEach((conn: any) => {
+      const fromLayer = layers.find((l: any) => l.nodes.some((n: any) => n.id === conn.from))
+      const toLayer = layers.find((l: any) => l.nodes.some((n: any) => n.id === conn.to))
       if (!fromLayer || !toLayer) return
-      const fromNode = fromLayer.nodes.find(n => n.id === conn.from)
-      const toNode = toLayer.nodes.find(n => n.id === conn.to)
+      const fromNode = fromLayer.nodes.find((n: any) => n.id === conn.from)
+      const toNode = toLayer.nodes.find((n: any) => n.id === conn.to)
       if (!fromNode || !toNode) return
 
-      ctx.beginPath(); ctx.moveTo(fromNode.x, fromLayer.y + 30); ctx.lineTo(toNode.x, toLayer.y + 30)
-      ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2; ctx.globalAlpha = 0.5; ctx.stroke()
+      const col = conn.color || '#3b82f6'
+      const fy = fromLayer.y + 24; const ty = toLayer.y + 24
+      ctx.beginPath(); ctx.moveTo(fromNode.x, fy); ctx.lineTo(toNode.x, ty)
+      ctx.strokeStyle = col + '60'; ctx.lineWidth = 1.5; ctx.stroke()
 
-      const t = (time % 2) / 2
-      const px = fromNode.x + (toNode.x - fromNode.x) * t
-      const py = fromLayer.y + 30 + (toLayer.y + 30 - fromLayer.y - 30) * t
-      ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2)
-      ctx.fillStyle = '#3b82f6'; ctx.globalAlpha = 0.9; ctx.fill()
-      ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2)
-      ctx.fillStyle = '#3b82f6'; ctx.globalAlpha = 0.25; ctx.fill()
+      const prog = ((time * 0.3 + fromNode.x * 0.01) % 1 + 1) % 1
+      const px = fromNode.x + (toNode.x - fromNode.x) * prog
+      const py = fy + (ty - fy) * prog
+      ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2)
+      ctx.fillStyle = col; ctx.fill()
     })
-    ctx.globalAlpha = 1
 
-    layers.forEach(layer => {
-      layer.nodes.forEach(node => {
-        ctx.beginPath(); ctx.arc(node.x, layer.y + 30, 20, 0, Math.PI * 2)
-        ctx.fillStyle = node.color + '30'; ctx.strokeStyle = node.color; ctx.lineWidth = 2
+    layers.forEach((layer: any) => {
+      layer.nodes.forEach((node: any) => {
+        const ny = layer.y + 24; const r = 16
+        const g = ctx.createRadialGradient(node.x, ny, r*0.5, node.x, ny, r*2)
+        g.addColorStop(0, node.color + '25'); g.addColorStop(1, 'transparent')
+        ctx.beginPath(); ctx.arc(node.x, ny, r*2, 0, Math.PI*2); ctx.fillStyle = g; ctx.fill()
+        ctx.beginPath(); ctx.arc(node.x, ny, r, 0, Math.PI*2)
+        ctx.fillStyle = node.color + '35'; ctx.strokeStyle = node.color; ctx.lineWidth = 2
         ctx.fill(); ctx.stroke()
-        ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-        ctx.fillStyle = '#ffffff'; ctx.fillText(node.icon, node.x, layer.y + 30)
-        ctx.font = '10px sans-serif'; ctx.fillStyle = node.color
-        ctx.fillText(node.label, node.x, layer.y + 55)
+        ctx.font = '13px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillStyle = '#fff'; ctx.fillText(node.icon, node.x, ny)
+        ctx.font = '9px sans-serif'; ctx.fillStyle = node.color
+        ctx.fillText(node.label, node.x, ny + r + 11)
       })
     })
     flowAnimId = requestAnimationFrame(animate)
@@ -518,7 +534,7 @@ onUnmounted(() => { tempChart?.destroy(); humiChart?.destroy(); if (flowAnimId) 
 .th-input { width: 70px; padding: 6px; background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: var(--radius-sm); color: var(--text-primary); text-align: center; font-size: 13px; }
 .th-unit { font-size: 12px; color: var(--text-secondary); }
 
-.flow-canvas { width: 100%; height: 380px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); }
+.flow-canvas { width: 100%; height: 520px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); }
 
 @media (max-width: 1200px) {
   .cards-grid { grid-template-columns: repeat(2, 1fr); }

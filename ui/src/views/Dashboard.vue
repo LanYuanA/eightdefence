@@ -533,77 +533,63 @@ function drawFlowChart() {
   if (!container) return
 
   canvas.width = Math.max(container.clientWidth, 1400)
-  canvas.height = 620
+  canvas.height = 560
 
   const ox = 220
 
-  // 简化的下层服务列表（只显示代表性的，避免过于密集）
   const lowerSvcGroups = [
     { label: '数据采集类', color: '#3b82f6', x: ox + 20, svcs: ['温度','湿度','PM2.5','PM10','CO₂','TVOC','甲醛','烟雾','水浸','光感','红外','雷达','空气等级'] },
-    { label: '设备控制类', color: '#22c55d', x: ox + 420, svcs: ['空调开关','风速','温控模式','温度设定','加湿','除湿','恒湿','净化开关','净化控制','排烟风机','喷淋','报警器','舱门'] },
-    { label: '报警判断类', color: '#ef4444', x: ox + 810, svcs: ['阈值判断','状态监测','火情确认','风险评估','多源融合'] },
-    { label: '管理支撑类', color: '#8b5cf6', x: ox + 810, svcs: ['日志管理','信息推送','数据备份','设备登记','在线监测'], yOff: 30 },
+    { label: '设备控制类', color: '#22c55d', x: ox + 440, svcs: ['空调开关','风速','温控模式','温度设定','加湿','除湿','恒湿','净化开关','净化控制','排烟风机','喷淋','报警器','舱门'] },
+    { label: '报警判断类', color: '#ef4444', x: ox + 830, svcs: ['阈值判断','状态监测','火情确认','风险评估','多源融合'] },
+    { label: '管理支撑类', color: '#8b5cf6', x: ox + 830, svcs: ['日志管理','信息推送','数据备份','设备登记','在线监测'], yOff: 28 },
   ]
 
-  // 为下层服务生成节点（小色块+文字标签）
-  function makeLowerNodes(group: any, _baseY: number): any[] {
+  function makeLowerNodes(group: any): any[] {
     const nodes: any[] = []
-    const cols = 7
-    const spacing = 47
+    const spacing = 48
     group.svcs.forEach((name: string, i: number) => {
-      const row = Math.floor(i / cols)
-      const col = i % cols
-      nodes.push({
-        id: 'svc-' + group.label + '-' + name,
-        x: group.x + col * spacing,
-        label: name,
-        shortLabel: name.length > 3 ? name.substring(0, 3) : name,
-        yOff: group.yOff || 0,
-        row,
-        color: group.color
-      })
+      const row = Math.floor(i / 7)
+      const col = i % 7
+      nodes.push({ id: 'svc-' + group.label + '-' + name, x: group.x + col * spacing, label: name, yOff: group.yOff || 0, row, color: group.color })
     })
     return nodes
   }
 
-  const lowerBaseY = 400
+  const lowerBaseY = 380
   const allLowerNodes: any[] = []
-  lowerSvcGroups.forEach(g => {
-    allLowerNodes.push(...makeLowerNodes(g, lowerBaseY))
-  })
+  lowerSvcGroups.forEach(g => { allLowerNodes.push(...makeLowerNodes(g)) })
 
-  const layers = [
-    { name: '设备层', y: 560, nodes: [
-      { id: 'sensor-cloud', x: 80+ox, icon:'☁️', label:'云测仪', color:'#3b82f6' },
-      { id: 'sensor-smoke', x: 230+ox, icon:'🔥', label:'烟雾报警器', color:'#ef4444' },
-      { id: 'sensor-water', x: 380+ox, icon:'💧', label:'水浸传感器', color:'#06b6d4' },
-      { id: 'sensor-infrared', x: 530+ox, icon:'👤', label:'红外探测器', color:'#8b5cf6' },
-      { id: 'sensor-light', x: 680+ox, icon:'💡', label:'弱光传感器', color:'#f59e0b' },
+  const layers: any[] = [
+    { name: '设备层', y: 500, nodes: [
+      { id: 'sensor-cloud', x: 80+ox, icon:'☁️', label:'云测仪(SD123)', color:'#3b82f6' },
+      { id: 'sensor-smoke', x: 260+ox, icon:'🔥', label:'烟雾报警器', color:'#ef4444' },
+      { id: 'sensor-water', x: 440+ox, icon:'💧', label:'水浸传感器', color:'#06b6d4' },
+      { id: 'sensor-infrared', x: 620+ox, icon:'👤', label:'红外探测器', color:'#8b5cf6' },
+      { id: 'sensor-light', x: 780+ox, icon:'💡', label:'弱光传感器', color:'#f59e0b' },
     ]},
-    { name: '设备抽象层', y: 505, nodes: [
-      { id: 'abs-temp',x:25+ox,icon:'🌡️',label:'温度',color:'#3b82f6'},{ id: 'abs-humi',x:90+ox,icon:'💧',label:'湿度',color:'#06b6d4'},
-      { id: 'abs-pm25',x:155+ox,icon:'💨',label:'PM2.5',color:'#f59e0b'},{ id: 'abs-co2',x:220+ox,icon:'☁️',label:'CO2',color:'#8b5cf6'},
-      { id: 'abs-tvoc',x:285+ox,icon:'🧪',label:'TVOC',color:'#ec4899'},{ id: 'abs-ch2o',x:350+ox,icon:'⚗️',label:'甲醛',color:'#14b8a6'},
-      { id: 'abs-pm10',x:415+ox,icon:'💨',label:'PM10',color:'#f59e0b'},
-      { id: 'abs-smoke',x:500+ox,icon:'🔥',label:'烟雾',color:'#ef4444'},{ id: 'abs-water',x:565+ox,icon:'💧',label:'水浸',color:'#06b6d4'},
-      { id: 'abs-ir',x:630+ox,icon:'👤',label:'红外',color:'#8b5cf6'},{ id: 'abs-light',x:695+ox,icon:'💡',label:'光照',color:'#f59e0b'},
+    { name: '设备抽象层（一对一解耦）', y: 435, nodes: [
+      { id: 'abs-temp',x:15+ox,icon:'🌡️',label:'温度',color:'#3b82f6'},{ id: 'abs-humi',x:85+ox,icon:'💧',label:'湿度',color:'#06b6d4'},
+      { id: 'abs-pm25',x:155+ox,icon:'💨',label:'PM2.5',color:'#f59e0b'},{ id: 'abs-co2',x:225+ox,icon:'☁️',label:'CO₂',color:'#8b5cf6'},
+      { id: 'abs-tvoc',x:295+ox,icon:'🧪',label:'TVOC',color:'#ec4899'},{ id: 'abs-ch2o',x:365+ox,icon:'⚗️',label:'甲醛',color:'#14b8a6'},
+      { id: 'abs-pm10',x:435+ox,icon:'💨',label:'PM10',color:'#f59e0b'},
+      { id: 'abs-smoke',x:520+ox,icon:'🔥',label:'烟雾',color:'#ef4444'},{ id: 'abs-water',x:590+ox,icon:'💧',label:'水浸',color:'#06b6d4'},
+      { id: 'abs-ir',x:660+ox,icon:'👤',label:'红外',color:'#8b5cf6'},{ id: 'abs-light',x:730+ox,icon:'💡',label:'光照',color:'#f59e0b'},
     ]},
     { name: '原子服务下层', y: lowerBaseY - 5, nodes: allLowerNodes, isLower: true },
-    { name: '组合上层', y: 320, nodes: [
+    { name: '组合上层', y: 310, nodes: [
       { id: 'upper-collect', x:110+ox,icon:'📥',label:'数据采集服务',color:'#3b82f6'},
       { id: 'upper-fireid', x:280+ox,icon:'🔥',label:'火灾识别服务',color:'#ef4444'},
       { id: 'upper-store', x:450+ox,icon:'💾',label:'数据存储服务',color:'#f59e0b'},
       { id: 'upper-alarm', x:600+ox,icon:'🔔',label:'报警服务',color:'#ef4444'},
       { id: 'upper-control', x:750+ox,icon:'🎮',label:'设备控制服务',color:'#22c55d'}
     ]},
-    { name: '应用层', y: 255, nodes: [
+    { name: '应用层', y: 240, nodes: [
       { id: 'app-env', x:200+ox, icon:'🌡️', label:'环境监测应用', color:'#3b82f6' },
       { id: 'app-security', x:450+ox, icon:'🛡️', label:'安防系统应用', color:'#8b5cf6' },
-      { id: 'app-fire', x:680+ox, icon:'🔥', label:'智能火灾预警应用', color:'#ef4444' }
+      { id: 'app-fire', x:680+ox, icon:'🔥', label:'火灾预警应用', color:'#ef4444' }
     ]}
   ]
 
-  // 连线 — 自上而下
   const connections: Array<{from:string;to:string;active:boolean;color?:string}> = [
     ...['upper-collect','upper-fireid','upper-store','upper-alarm','upper-control'].flatMap(id=>[
       {from:'app-env',to:id,active:true,color:'#3b82f6'},{from:'app-security',to:id,active:true,color:'#8b5cf6'},{from:'app-fire',to:id,active:true,color:'#ef4444'}
@@ -619,6 +605,7 @@ function drawFlowChart() {
     ...['abs-temp','abs-humi','abs-pm25','abs-co2','abs-tvoc','abs-ch2o','abs-pm10'].map(id=>({from:id,to:'sensor-cloud',active:true})),
     {from:'abs-smoke',to:'sensor-smoke',active:true},{from:'abs-water',to:'sensor-water',active:true},
     {from:'abs-ir',to:'sensor-infrared',active:true},{from:'abs-light',to:'sensor-light',active:true},
+    {from:'upper-control',to:'abs-temp',active:true,color:'#22c55d'},{from:'upper-control',to:'abs-humi',active:true,color:'#22c55d'},{from:'upper-control',to:'abs-smoke',active:true,color:'#22c55d'},
   ]
 
   let time = 0
@@ -627,34 +614,31 @@ function drawFlowChart() {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     time += 0.02
 
-    // 层级背景
     layers.forEach((layer: any, index: number) => {
-      const colors = ['rgba(15,23,42,0.5)','rgba(59,130,246,0.04)','rgba(139,92,246,0.05)','rgba(139,92,246,0.04)','rgba(59,130,246,0.04)']
-      const h = layer.isLower ? 50 : 42
+      const colors = ['rgba(15,23,42,0.5)','rgba(59,130,246,0.05)','rgba(139,92,246,0.06)','rgba(139,92,246,0.04)','rgba(59,130,246,0.04)']
+      const h = layer.isLower ? 52 : 46
       ctx.fillStyle = colors[index] || colors[0]
-      ctx.fillRect(0, layer.y - 8, canvas.width, h)
-      ctx.font = '10px sans-serif'; ctx.fillStyle = '#475569'; ctx.textAlign = 'left'
+      ctx.fillRect(0, layer.y - 10, canvas.width, h)
+      ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'left'
       ctx.fillText(layer.name, 8, layer.y + 6)
     })
 
-    // 分组标签
     lowerSvcGroups.forEach(g => {
-      ctx.font = 'bold 9px sans-serif'; ctx.fillStyle = g.color; ctx.textAlign = 'left'
-      ctx.fillText(g.label, g.x, lowerBaseY - 6)
+      ctx.font = 'bold 10px sans-serif'; ctx.fillStyle = g.color; ctx.textAlign = 'left'
+      ctx.fillText(g.label, g.x, lowerBaseY - 8)
     })
 
-    // 下层节点：小圆点+标签
+    // 下层节点
     allLowerNodes.forEach(node => {
-      const ny = lowerBaseY + 10 + node.row * 18 + (node.yOff || 0)
-      const r = 7
-      ctx.beginPath(); ctx.arc(node.x, ny, r, 0, Math.PI * 2)
-      ctx.fillStyle = node.color + '50'; ctx.strokeStyle = node.color; ctx.lineWidth = 1
+      const ny = lowerBaseY + 12 + node.row * 20 + (node.yOff || 0)
+      ctx.beginPath(); ctx.arc(node.x, ny, 7, 0, Math.PI * 2)
+      ctx.fillStyle = node.color + '60'; ctx.strokeStyle = node.color; ctx.lineWidth = 1.3
       ctx.fill(); ctx.stroke()
-      ctx.font = '8px sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = node.color
-      ctx.fillText(node.label, node.x + 10, ny + 3)
+      ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = node.color
+      ctx.fillText(node.label, node.x + 11, ny + 3.5)
     })
 
-    // 连线
+    // 连线 — 更清晰的颜色
     const drawnEdges = new Set<string>()
     connections.forEach(conn => {
       const fromLayer = layers.find((l: any) => l.nodes.some((n: any) => n.id === conn.from))
@@ -667,38 +651,41 @@ function drawFlowChart() {
       if (drawnEdges.has(key)) return; drawnEdges.add(key)
 
       const col = conn.color || '#3b82f6'
-      const fy = fromLayer.isLower ? (lowerBaseY + 10 + (fromNode.row || 0) * 18 + (fromNode.yOff || 0)) : (fromLayer.y + 22)
-      const ty = toLayer.isLower ? (lowerBaseY + 10 + (toNode.row || 0) * 18 + (toNode.yOff || 0)) : (toLayer.y + 22)
+      const fy = fromLayer.isLower ? (lowerBaseY + 12 + (fromNode.row || 0) * 20 + (fromNode.yOff || 0)) : (fromLayer.y + 23)
+      const ty = toLayer.isLower ? (lowerBaseY + 12 + (toNode.row || 0) * 20 + (toNode.yOff || 0)) : (toLayer.y + 23)
 
-      // 只为跨层连接画线（下层内部不画）
       if (!fromLayer.isLower || !toLayer.isLower) {
         ctx.beginPath(); ctx.moveTo(fromNode.x, fy); ctx.lineTo(toNode.x, ty)
-        ctx.strokeStyle = conn.active ? col + '25' : '#33415510'
-        ctx.lineWidth = conn.active ? 0.8 : 0.3; ctx.stroke()
+        ctx.strokeStyle = conn.active ? col + '55' : '#33415520'
+        ctx.lineWidth = conn.active ? 1.2 : 0.4; ctx.stroke()
 
-        if (conn.active && Math.random() < 0.1) {
-          const prog = ((time * 0.3 + fromNode.x * 0.01) % 1 + 1) % 1
+        if (conn.active) {
+          const prog = ((time * 0.25 + fromNode.x * 0.008) % 1 + 1) % 1
           const px = fromNode.x + (toNode.x - fromNode.x) * prog
           const py = fy + (ty - fy) * prog
-          ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI * 2)
-          ctx.fillStyle = col; ctx.globalAlpha = 0.6; ctx.fill()
+          ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2)
+          ctx.fillStyle = col; ctx.globalAlpha = 0.8; ctx.fill()
         }
       }
     })
     ctx.globalAlpha = 1
 
-    // 上层节点（带emoji图标）
     layers.forEach((layer: any) => {
       if (layer.isLower) return
       layer.nodes.forEach((node: any) => {
-        const ny = layer.y + 22; const r = 16
+        const ny = layer.y + 23; const r = 17
+        // 发光环
+        const g = ctx.createRadialGradient(node.x, ny, r * 0.6, node.x, ny, r * 2)
+        g.addColorStop(0, node.color + '30'); g.addColorStop(1, 'transparent')
+        ctx.beginPath(); ctx.arc(node.x, ny, r * 2, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill()
+        // 主体
         ctx.beginPath(); ctx.arc(node.x, ny, r, 0, Math.PI * 2)
-        ctx.fillStyle = node.color + '30'; ctx.strokeStyle = node.color; ctx.lineWidth = 1.5
+        ctx.fillStyle = node.color + '30'; ctx.strokeStyle = node.color; ctx.lineWidth = 2
         ctx.fill(); ctx.stroke()
-        ctx.font = '14px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.font = '15px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
         ctx.fillStyle = '#fff'; ctx.fillText(node.icon, node.x, ny)
-        ctx.font = '9px sans-serif'; ctx.fillStyle = node.color
-        ctx.fillText(node.label, node.x, ny + r + 11)
+        ctx.font = '10px sans-serif'; ctx.fillStyle = node.color
+        ctx.fillText(node.label, node.x, ny + r + 12)
       })
     })
 

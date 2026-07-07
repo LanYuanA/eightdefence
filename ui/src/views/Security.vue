@@ -214,41 +214,44 @@ function drawFlowChart() {
   const container = canvas.parentElement
   if (!container) return
   canvas.width = container.clientWidth
-  canvas.height = 380
+  canvas.height = 500
 
   const ox = 220
   const layers = [
-    { name: '设备层', y: 320, nodes: [
-      { id: 'sensor-water', x: 140 + ox, icon: '💧', label: '水浸传感器', color: '#06b6d4' },
-      { id: 'sensor-infrared', x: 300 + ox, icon: '👤', label: '红外探测', color: '#8b5cf6' },
-      { id: 'sensor-gas', x: 460 + ox, icon: '☁️', label: '气体传感', color: '#f59e0b' }
+    { name: '设备层', y: 460, nodes: [
+      { id: 'sensor-water', x: 160 + ox, icon: '💧', label: '水浸传感器', color: '#06b6d4' },
+      { id: 'sensor-infrared', x: 350 + ox, icon: '👤', label: '红外探测器', color: '#8b5cf6' },
+      { id: 'sensor-gas', x: 540 + ox, icon: '☁️', label: '气体传感器', color: '#f59e0b' },
+      { id: 'sensor-door', x: 700 + ox, icon: '🔌', label: '门禁控制器', color: '#22c55d' },
     ]},
-    { name: '设备抽象层', y: 240, nodes: [
-      { id: 'abs-alarm', x: 300 + ox, icon: '🔔', label: '报警抽象', color: '#ef4444' }
+    { name: '设备抽象层', y: 390, nodes: [
+      { id: 'abs-water', x: 160 + ox, icon: '💧', label: '虚拟水浸', color: '#06b6d4' },
+      { id: 'abs-infrared', x: 350 + ox, icon: '👤', label: '虚拟红外', color: '#8b5cf6' },
+      { id: 'abs-gas', x: 540 + ox, icon: '☁️', label: '虚拟气体', color: '#f59e0b' },
+      { id: 'abs-door', x: 700 + ox, icon: '🔌', label: '虚拟门禁', color: '#22c55d' },
     ]},
-    { name: '原子服务下层', y: 160, nodes: [
-      { id: 'lower-collect', x: 200 + ox, icon: '📥', label: '数据采集', color: '#3b82f6' },
-      { id: 'lower-alarm', x: 400 + ox, icon: '🔔', label: '报警判断', color: '#ef4444' },
-      { id: 'lower-control', x: 550 + ox, icon: '🎮', label: '设备控制', color: '#22c55d' }
+    { name: '原子服务下层', y: 310, nodes: [
+      { id: 'lower-collect', x: 200 + ox, icon: '📥', label: '数据采集服务', color: '#3b82f6' },
+      { id: 'lower-alarm', x: 450 + ox, icon: '🔔', label: '报警判断服务', color: '#ef4444' },
+      { id: 'lower-control', x: 650 + ox, icon: '🎮', label: '联动控制服务', color: '#22c55d' },
     ]},
-    { name: '原子服务上层', y: 80, nodes: [
-      { id: 'upper-security', x: 350 + ox, icon: '🛡️', label: '安防监控服务', color: '#8b5cf6' }
+    { name: '原子服务上层', y: 240, nodes: [
+      { id: 'upper-security', x: 400 + ox, icon: '🛡️', label: '安防监控服务', color: '#8b5cf6' }
     ]},
-    { name: '应用层', y: 20, nodes: [
-      { id: 'app-security', x: 350 + ox, icon: '🛡️', label: '安防系统', color: '#8b5cf6' }
+    { name: '应用层', y: 170, nodes: [
+      { id: 'app-security', x: 400 + ox, icon: '🛡️', label: '安防系统应用', color: '#8b5cf6' }
     ]}
   ]
   const connections = [
-    // 应用层 → 原子服务上层
     { from: 'app-security', to: 'upper-security' },
-    // 原子服务上层 → 原子服务下层
     { from: 'upper-security', to: 'lower-collect' }, { from: 'upper-security', to: 'lower-alarm' }, { from: 'upper-security', to: 'lower-control' },
-    // 原子服务下层间
-    { from: 'lower-collect', to: 'lower-alarm' }, { from: 'lower-alarm', to: 'lower-control' },
-    // 原子服务下层 → 设备抽象层
-    { from: 'lower-collect', to: 'abs-alarm' },
-    // 设备抽象层 → 设备层
-    { from: 'abs-alarm', to: 'sensor-water' }, { from: 'abs-alarm', to: 'sensor-infrared' }, { from: 'abs-alarm', to: 'sensor-gas' },
+    { from: 'lower-collect', to: 'lower-alarm' },
+    { from: 'lower-collect', to: 'abs-water' }, { from: 'lower-collect', to: 'abs-infrared' },
+    { from: 'lower-collect', to: 'abs-gas' }, { from: 'lower-collect', to: 'abs-door' },
+    { from: 'lower-alarm', to: 'abs-water' }, { from: 'lower-alarm', to: 'abs-infrared' }, { from: 'lower-alarm', to: 'abs-gas' },
+    { from: 'lower-control', to: 'abs-water' }, { from: 'lower-control', to: 'abs-infrared' }, { from: 'lower-control', to: 'abs-door' },
+    { from: 'abs-water', to: 'sensor-water' }, { from: 'abs-infrared', to: 'sensor-infrared' },
+    { from: 'abs-gas', to: 'sensor-gas' }, { from: 'abs-door', to: 'sensor-door' },
   ]
 
   let time = 0
@@ -272,28 +275,30 @@ function drawFlowChart() {
       const toNode = toLayer.nodes.find(n => n.id === conn.to)
       if (!fromNode || !toNode) return
 
-      ctx.beginPath(); ctx.moveTo(fromNode.x, fromLayer.y + 30); ctx.lineTo(toNode.x, toLayer.y + 30)
-      ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 2; ctx.globalAlpha = 0.5; ctx.stroke()
+      const fy = fromLayer.y + 25; const ty = toLayer.y + 25
+      ctx.beginPath(); ctx.moveTo(fromNode.x, fy); ctx.lineTo(toNode.x, ty)
+      ctx.strokeStyle = '#8b5cf670'; ctx.lineWidth = 1.8; ctx.stroke()
 
-      const t = (time % 2) / 2
-      const px = fromNode.x + (toNode.x - fromNode.x) * t
-      const py = fromLayer.y + 30 + (toLayer.y + 30 - fromLayer.y - 30) * t
-      ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2)
-      ctx.fillStyle = '#8b5cf6'; ctx.globalAlpha = 0.9; ctx.fill()
-      ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2)
-      ctx.fillStyle = '#8b5cf6'; ctx.globalAlpha = 0.25; ctx.fill()
+      const prog = ((time * 0.3 + fromNode.x * 0.01) % 1 + 1) % 1
+      const px = fromNode.x + (toNode.x - fromNode.x) * prog
+      const py = fy + (ty - fy) * prog
+      ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2)
+      ctx.fillStyle = '#8b5cf6'; ctx.fill()
     })
-    ctx.globalAlpha = 1
 
     layers.forEach(layer => {
       layer.nodes.forEach(node => {
-        ctx.beginPath(); ctx.arc(node.x, layer.y + 30, 20, 0, Math.PI * 2)
-        ctx.fillStyle = node.color + '30'; ctx.strokeStyle = node.color; ctx.lineWidth = 2
+        const ny = layer.y + 25; const r = 17
+        const g = ctx.createRadialGradient(node.x, ny, r*0.5, node.x, ny, r*2)
+        g.addColorStop(0, node.color + '25'); g.addColorStop(1, 'transparent')
+        ctx.beginPath(); ctx.arc(node.x, ny, r*2, 0, Math.PI*2); ctx.fillStyle = g; ctx.fill()
+        ctx.beginPath(); ctx.arc(node.x, ny, r, 0, Math.PI*2)
+        ctx.fillStyle = node.color + '35'; ctx.strokeStyle = node.color; ctx.lineWidth = 2
         ctx.fill(); ctx.stroke()
-        ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-        ctx.fillStyle = '#ffffff'; ctx.fillText(node.icon, node.x, layer.y + 30)
-        ctx.font = '10px sans-serif'; ctx.fillStyle = node.color
-        ctx.fillText(node.label, node.x, layer.y + 55)
+        ctx.font = '13px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillStyle = '#fff'; ctx.fillText(node.icon, node.x, ny)
+        ctx.font = '9px sans-serif'; ctx.fillStyle = node.color
+        ctx.fillText(node.label, node.x, ny + r + 11)
       })
     })
     flowAnimId = requestAnimationFrame(animate)
@@ -419,7 +424,7 @@ function resetGas() {
 .scenario-actions { display: flex; gap: var(--spacing-sm); padding-top: var(--spacing-md); border-top: 1px solid var(--border-primary); }
 
 .monitor-section { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--spacing-xl); }
-.flow-canvas { width: 100%; height: 380px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); }
+.flow-canvas { width: 100%; height: 500px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); }
 
 @media (max-width: 1200px) {
   .status-grid { grid-template-columns: repeat(2, 1fr); }

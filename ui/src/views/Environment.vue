@@ -260,14 +260,22 @@ function drawFlowChart() {
   const container = canvas.parentElement
   if (!container) return
   canvas.width = container.clientWidth
-  canvas.height = 520
+  canvas.height = 370
 
   const ox = 220
   const layers = [
-    { name: '设备层', y: 480, nodes: [
-      { id: 'sensor-cloud', x: 350 + ox, icon: '☁️', label: '云测仪(SD123)', color: '#3b82f6' },
+    { name: '应用层', y: 20, nodes: [
+      { id: 'app-env', x: 400 + ox, icon: '🌡️', label: '环境监测应用', color: '#3b82f6' }
     ]},
-    { name: '设备抽象层（云测仪→7个虚拟传感器）', y: 410, nodes: [
+    { name: '原子服务上层', y: 85, nodes: [
+      { id: 'upper-monitor', x: 400 + ox, icon: '📊', label: '环境监测服务', color: '#3b82f6' }
+    ]},
+    { name: '原子服务下层', y: 155, nodes: [
+      { id: 'lower-collect', x: 200 + ox, icon: '📥', label: '数据采集服务', color: '#3b82f6' },
+      { id: 'lower-process', x: 450 + ox, icon: '⚙️', label: '数据处理服务', color: '#8b5cf6' },
+      { id: 'lower-alarm', x: 650 + ox, icon: '🔔', label: '报警判断服务', color: '#ef4444' },
+    ]},
+    { name: '设备抽象层（云测仪→7个虚拟传感器）', y: 230, nodes: [
       { id: 'abs-temp', x: 30+ox, icon:'🌡️', label:'温度', color:'#3b82f6' },
       { id: 'abs-humi', x: 110+ox, icon:'💧', label:'湿度', color:'#06b6d4' },
       { id: 'abs-pm25', x: 190+ox, icon:'💨', label:'PM2.5', color:'#f59e0b' },
@@ -278,17 +286,9 @@ function drawFlowChart() {
       { id: 'abs-hum', x: 610+ox, icon:'🌀', label:'净化', color:'#22c55d' },
       { id: 'abs-ac', x: 690+ox, icon:'❄️', label:'空调', color:'#22c55d' },
     ]},
-    { name: '原子服务下层', y: 330, nodes: [
-      { id: 'lower-collect', x: 200 + ox, icon: '📥', label: '数据采集服务', color: '#3b82f6' },
-      { id: 'lower-process', x: 450 + ox, icon: '⚙️', label: '数据处理服务', color: '#8b5cf6' },
-      { id: 'lower-alarm', x: 650 + ox, icon: '🔔', label: '报警判断服务', color: '#ef4444' },
+    { name: '设备层', y: 310, nodes: [
+      { id: 'sensor-cloud', x: 350 + ox, icon: '☁️', label: '云测仪(SD123)', color: '#3b82f6' },
     ]},
-    { name: '原子服务上层', y: 260, nodes: [
-      { id: 'upper-monitor', x: 400 + ox, icon: '📊', label: '环境监测服务', color: '#3b82f6' }
-    ]},
-    { name: '应用层', y: 190, nodes: [
-      { id: 'app-env', x: 400 + ox, icon: '🌡️', label: '环境监测应用', color: '#3b82f6' }
-    ]}
   ]
   // 数据流: 设备→抽象(上) + 控制流: 应用→服务→设备(下)
   const connections: Array<{from:string;to:string;color?:string}> = [
@@ -534,7 +534,7 @@ onUnmounted(() => { tempChart?.destroy(); humiChart?.destroy(); if (flowAnimId) 
 .th-input { width: 70px; padding: 6px; background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: var(--radius-sm); color: var(--text-primary); text-align: center; font-size: 13px; }
 .th-unit { font-size: 12px; color: var(--text-secondary); }
 
-.flow-canvas { width: 100%; height: 520px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); }
+.flow-canvas { width: 100%; height: 370px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); }
 
 @media (max-width: 1200px) {
   .cards-grid { grid-template-columns: repeat(2, 1fr); }

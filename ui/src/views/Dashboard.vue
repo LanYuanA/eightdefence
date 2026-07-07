@@ -541,12 +541,12 @@ function drawFlowChart() {
     { label: '数据采集类', color: '#3b82f6', x: ox + 20, svcs: ['温度','湿度','PM2.5','PM10','CO₂','TVOC','甲醛','烟雾','水浸','光感','红外','雷达','空气等级'] },
     { label: '设备控制类', color: '#22c55d', x: ox + 440, svcs: ['空调开关','风速','温控模式','温度设定','加湿','除湿','恒湿','净化开关','净化控制','排烟风机','喷淋','报警器','舱门'] },
     { label: '报警判断类', color: '#ef4444', x: ox + 830, svcs: ['阈值判断','状态监测','火情确认','风险评估','多源融合'] },
-    { label: '管理支撑类', color: '#8b5cf6', x: ox + 830, svcs: ['日志管理','信息推送','数据备份','设备登记','在线监测'], yOff: 28 },
+    { label: '管理支撑类', color: '#8b5cf6', x: ox + 830, svcs: ['日志管理','信息推送','数据备份','设备登记','在线监测'], yOff: 30 },
   ]
 
   function makeLowerNodes(group: any): any[] {
     const nodes: any[] = []
-    const spacing = 48
+    const spacing = 55
     group.svcs.forEach((name: string, i: number) => {
       const row = Math.floor(i / 7)
       const col = i % 7
@@ -555,19 +555,25 @@ function drawFlowChart() {
     return nodes
   }
 
-  const lowerBaseY = 380
+  const lowerBaseY = 190
   const allLowerNodes: any[] = []
   lowerSvcGroups.forEach(g => { allLowerNodes.push(...makeLowerNodes(g)) })
 
   const layers: any[] = [
-    { name: '设备层', y: 500, nodes: [
-      { id: 'sensor-cloud', x: 80+ox, icon:'☁️', label:'云测仪(SD123)', color:'#3b82f6' },
-      { id: 'sensor-smoke', x: 260+ox, icon:'🔥', label:'烟雾报警器', color:'#ef4444' },
-      { id: 'sensor-water', x: 440+ox, icon:'💧', label:'水浸传感器', color:'#06b6d4' },
-      { id: 'sensor-infrared', x: 620+ox, icon:'👤', label:'红外探测器', color:'#8b5cf6' },
-      { id: 'sensor-light', x: 780+ox, icon:'💡', label:'弱光传感器', color:'#f59e0b' },
+    { name: '应用层', y: 25, nodes: [
+      { id: 'app-env', x:200+ox, icon:'🌡️', label:'环境监测应用', color:'#3b82f6' },
+      { id: 'app-security', x:450+ox, icon:'🛡️', label:'安防系统应用', color:'#8b5cf6' },
+      { id: 'app-fire', x:680+ox, icon:'🔥', label:'火灾预警应用', color:'#ef4444' }
     ]},
-    { name: '设备抽象层（一对一解耦）', y: 435, nodes: [
+    { name: '组合上层', y: 95, nodes: [
+      { id: 'upper-collect', x:110+ox,icon:'📥',label:'数据采集服务',color:'#3b82f6'},
+      { id: 'upper-fireid', x:280+ox,icon:'🔥',label:'火灾识别服务',color:'#ef4444'},
+      { id: 'upper-store', x:450+ox,icon:'💾',label:'数据存储服务',color:'#f59e0b'},
+      { id: 'upper-alarm', x:600+ox,icon:'🔔',label:'报警服务',color:'#ef4444'},
+      { id: 'upper-control', x:750+ox,icon:'🎮',label:'设备控制服务',color:'#22c55d'}
+    ]},
+    { name: '原子服务下层', y: lowerBaseY - 5, nodes: allLowerNodes, isLower: true },
+    { name: '设备抽象层（一对一解耦）', y: 320, nodes: [
       { id: 'abs-temp',x:15+ox,icon:'🌡️',label:'温度',color:'#3b82f6'},{ id: 'abs-humi',x:85+ox,icon:'💧',label:'湿度',color:'#06b6d4'},
       { id: 'abs-pm25',x:155+ox,icon:'💨',label:'PM2.5',color:'#f59e0b'},{ id: 'abs-co2',x:225+ox,icon:'☁️',label:'CO₂',color:'#8b5cf6'},
       { id: 'abs-tvoc',x:295+ox,icon:'🧪',label:'TVOC',color:'#ec4899'},{ id: 'abs-ch2o',x:365+ox,icon:'⚗️',label:'甲醛',color:'#14b8a6'},
@@ -575,19 +581,13 @@ function drawFlowChart() {
       { id: 'abs-smoke',x:520+ox,icon:'🔥',label:'烟雾',color:'#ef4444'},{ id: 'abs-water',x:590+ox,icon:'💧',label:'水浸',color:'#06b6d4'},
       { id: 'abs-ir',x:660+ox,icon:'👤',label:'红外',color:'#8b5cf6'},{ id: 'abs-light',x:730+ox,icon:'💡',label:'光照',color:'#f59e0b'},
     ]},
-    { name: '原子服务下层', y: lowerBaseY - 5, nodes: allLowerNodes, isLower: true },
-    { name: '组合上层', y: 310, nodes: [
-      { id: 'upper-collect', x:110+ox,icon:'📥',label:'数据采集服务',color:'#3b82f6'},
-      { id: 'upper-fireid', x:280+ox,icon:'🔥',label:'火灾识别服务',color:'#ef4444'},
-      { id: 'upper-store', x:450+ox,icon:'💾',label:'数据存储服务',color:'#f59e0b'},
-      { id: 'upper-alarm', x:600+ox,icon:'🔔',label:'报警服务',color:'#ef4444'},
-      { id: 'upper-control', x:750+ox,icon:'🎮',label:'设备控制服务',color:'#22c55d'}
+    { name: '设备层', y: 395, nodes: [
+      { id: 'sensor-cloud', x: 80+ox, icon:'☁️', label:'云测仪(SD123)', color:'#3b82f6' },
+      { id: 'sensor-smoke', x: 260+ox, icon:'🔥', label:'烟雾报警器', color:'#ef4444' },
+      { id: 'sensor-water', x: 440+ox, icon:'💧', label:'水浸传感器', color:'#06b6d4' },
+      { id: 'sensor-infrared', x: 620+ox, icon:'👤', label:'红外探测器', color:'#8b5cf6' },
+      { id: 'sensor-light', x: 780+ox, icon:'💡', label:'弱光传感器', color:'#f59e0b' },
     ]},
-    { name: '应用层', y: 240, nodes: [
-      { id: 'app-env', x:200+ox, icon:'🌡️', label:'环境监测应用', color:'#3b82f6' },
-      { id: 'app-security', x:450+ox, icon:'🛡️', label:'安防系统应用', color:'#8b5cf6' },
-      { id: 'app-fire', x:680+ox, icon:'🔥', label:'火灾预警应用', color:'#ef4444' }
-    ]}
   ]
 
   const connections: Array<{from:string;to:string;active:boolean;color?:string}> = [
@@ -628,14 +628,19 @@ function drawFlowChart() {
       ctx.fillText(g.label, g.x, lowerBaseY - 8)
     })
 
-    // 下层节点
+    // 下层节点 — 加大尺寸
     allLowerNodes.forEach(node => {
-      const ny = lowerBaseY + 12 + node.row * 20 + (node.yOff || 0)
-      ctx.beginPath(); ctx.arc(node.x, ny, 7, 0, Math.PI * 2)
-      ctx.fillStyle = node.color + '60'; ctx.strokeStyle = node.color; ctx.lineWidth = 1.3
-      ctx.fill(); ctx.stroke()
-      ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = node.color
-      ctx.fillText(node.label, node.x + 11, ny + 3.5)
+      const ny = lowerBaseY + 15 + node.row * 24 + (node.yOff || 0)
+      ctx.beginPath(); ctx.arc(node.x, ny, 10, 0, Math.PI * 2)
+      ctx.fillStyle = node.color + '50'
+      ctx.fill()
+      ctx.strokeStyle = node.color; ctx.lineWidth = 1.5
+      ctx.stroke()
+      // 内圈
+      ctx.beginPath(); ctx.arc(node.x, ny, 5, 0, Math.PI * 2)
+      ctx.fillStyle = node.color + '80'; ctx.fill()
+      ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = node.color
+      ctx.fillText(node.label, node.x + 13, ny + 4)
     })
 
     // 连线 — 更清晰的颜色
@@ -651,8 +656,8 @@ function drawFlowChart() {
       if (drawnEdges.has(key)) return; drawnEdges.add(key)
 
       const col = conn.color || '#3b82f6'
-      const fy = fromLayer.isLower ? (lowerBaseY + 12 + (fromNode.row || 0) * 20 + (fromNode.yOff || 0)) : (fromLayer.y + 23)
-      const ty = toLayer.isLower ? (lowerBaseY + 12 + (toNode.row || 0) * 20 + (toNode.yOff || 0)) : (toLayer.y + 23)
+      const fy = fromLayer.isLower ? (lowerBaseY + 15 + (fromNode.row || 0) * 24 + (fromNode.yOff || 0)) : (fromLayer.y + 23)
+      const ty = toLayer.isLower ? (lowerBaseY + 15 + (toNode.row || 0) * 24 + (toNode.yOff || 0)) : (toLayer.y + 23)
 
       if (!fromLayer.isLower || !toLayer.isLower) {
         ctx.beginPath(); ctx.moveTo(fromNode.x, fy); ctx.lineTo(toNode.x, ty)

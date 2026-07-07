@@ -214,33 +214,33 @@ function drawFlowChart() {
   const container = canvas.parentElement
   if (!container) return
   canvas.width = container.clientWidth
-  canvas.height = 500
+  canvas.height = 370
 
   const ox = 220
   const layers = [
-    { name: '设备层', y: 460, nodes: [
-      { id: 'sensor-water', x: 160 + ox, icon: '💧', label: '水浸传感器', color: '#06b6d4' },
-      { id: 'sensor-infrared', x: 350 + ox, icon: '👤', label: '红外探测器', color: '#8b5cf6' },
-      { id: 'sensor-gas', x: 540 + ox, icon: '☁️', label: '气体传感器', color: '#f59e0b' },
-      { id: 'sensor-door', x: 700 + ox, icon: '🔌', label: '门禁控制器', color: '#22c55d' },
+    { name: '应用层', y: 20, nodes: [
+      { id: 'app-security', x: 400 + ox, icon: '🛡️', label: '安防系统应用', color: '#8b5cf6' }
     ]},
-    { name: '设备抽象层', y: 390, nodes: [
+    { name: '原子服务上层', y: 85, nodes: [
+      { id: 'upper-security', x: 400 + ox, icon: '🛡️', label: '安防监控服务', color: '#8b5cf6' }
+    ]},
+    { name: '原子服务下层', y: 155, nodes: [
+      { id: 'lower-collect', x: 200 + ox, icon: '📥', label: '数据采集服务', color: '#3b82f6' },
+      { id: 'lower-alarm', x: 450 + ox, icon: '🔔', label: '报警判断服务', color: '#ef4444' },
+      { id: 'lower-control', x: 650 + ox, icon: '🎮', label: '联动控制服务', color: '#22c55d' },
+    ]},
+    { name: '设备抽象层', y: 230, nodes: [
       { id: 'abs-water', x: 160 + ox, icon: '💧', label: '虚拟水浸', color: '#06b6d4' },
       { id: 'abs-infrared', x: 350 + ox, icon: '👤', label: '虚拟红外', color: '#8b5cf6' },
       { id: 'abs-gas', x: 540 + ox, icon: '☁️', label: '虚拟气体', color: '#f59e0b' },
       { id: 'abs-door', x: 700 + ox, icon: '🔌', label: '虚拟门禁', color: '#22c55d' },
     ]},
-    { name: '原子服务下层', y: 310, nodes: [
-      { id: 'lower-collect', x: 200 + ox, icon: '📥', label: '数据采集服务', color: '#3b82f6' },
-      { id: 'lower-alarm', x: 450 + ox, icon: '🔔', label: '报警判断服务', color: '#ef4444' },
-      { id: 'lower-control', x: 650 + ox, icon: '🎮', label: '联动控制服务', color: '#22c55d' },
+    { name: '设备层', y: 310, nodes: [
+      { id: 'sensor-water', x: 160 + ox, icon: '💧', label: '水浸传感器', color: '#06b6d4' },
+      { id: 'sensor-infrared', x: 350 + ox, icon: '👤', label: '红外探测器', color: '#8b5cf6' },
+      { id: 'sensor-gas', x: 540 + ox, icon: '☁️', label: '气体传感器', color: '#f59e0b' },
+      { id: 'sensor-door', x: 700 + ox, icon: '🔌', label: '门禁控制器', color: '#22c55d' },
     ]},
-    { name: '原子服务上层', y: 240, nodes: [
-      { id: 'upper-security', x: 400 + ox, icon: '🛡️', label: '安防监控服务', color: '#8b5cf6' }
-    ]},
-    { name: '应用层', y: 170, nodes: [
-      { id: 'app-security', x: 400 + ox, icon: '🛡️', label: '安防系统应用', color: '#8b5cf6' }
-    ]}
   ]
   const connections = [
     { from: 'app-security', to: 'upper-security' },
@@ -424,7 +424,7 @@ function resetGas() {
 .scenario-actions { display: flex; gap: var(--spacing-sm); padding-top: var(--spacing-md); border-top: 1px solid var(--border-primary); }
 
 .monitor-section { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--spacing-xl); }
-.flow-canvas { width: 100%; height: 500px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); }
+.flow-canvas { width: 100%; height: 370px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); }
 
 @media (max-width: 1200px) {
   .status-grid { grid-template-columns: repeat(2, 1fr); }

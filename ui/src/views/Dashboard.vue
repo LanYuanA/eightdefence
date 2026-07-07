@@ -151,7 +151,8 @@
               <div v-for="evt in realtimeEvents.slice(0, 20)" :key="evt.id" class="realtime-event-row">
                 <span class="evt-time">{{ evt.time }}</span>
                 <span class="evt-src" :style="{color: evt.color}">{{ evt.source }}</span>
-                <span class="evt-val">{{ evt.value }}{{ evt.unit }}</span>
+                <span class="evt-val" v-if="evt.numeric !== false">{{ evt.value }}{{ evt.unit }}</span>
+                <span class="evt-val" v-else :class="evt.value > 0 ? 'alarm' : 'normal'">{{ evt.value > 0 ? '⚠ 告警' : '✓ 正常' }}</span>
                 <span class="evt-status" :class="evt.online ? 'online' : 'offline'">{{ evt.online ? '在线' : '离线' }}</span>
               </div>
             </div>
@@ -962,7 +963,7 @@ function loadCustomApps() {
 }
 
 // 实时事件（从C++获取）
-const realtimeEvents = reactive<Array<{id:number;time:string;source:string;value:number;unit:string;online:boolean;color:string}>>([])
+const realtimeEvents = reactive<Array<{id:number;time:string;source:string;value:number;unit:string;online:boolean;color:string;numeric?:boolean}>>([])
 let eventIdCounter = 1000
 let realtimeTimer: ReturnType<typeof setInterval> | null = null
 
@@ -973,19 +974,21 @@ async function pollRealtimeData() {
     if (!d) return
     const now = new Date().toLocaleTimeString('zh-CN', { hour12: false })
     const items = [
-      { s:'云测仪-温度', v: d.temperature, u:'℃', o: d.temperature_online, c:'#3b82f6' },
-      { s:'云测仪-湿度', v: d.humidity, u:'%', o: d.humidity_online, c:'#06b6d4' },
-      { s:'云测仪-PM2.5', v: d.pm25, u:'μg/m³', o: d.pm25_online, c:'#f59e0b' },
-      { s:'云测仪-CO₂', v: d.co2, u:'ppm', o: d.co2_online, c:'#8b5cf6' },
-      { s:'烟雾报警器', v: d.smoke, u:'', o: d.smoke_online, c:'#ef4444' },
-      { s:'水浸传感器', v: d.water, u:'cm', o: d.water_online, c:'#06b6d4' },
-      { s:'弱光传感器', v: d.lux, u:'lux', o: d.light_online, c:'#f59e0b' },
+      { s:'温度', v: Math.round(d.temperature)/10, u:'℃', o: d.temperature_online, c:'#3b82f6', numeric:true },
+      { s:'湿度', v: Math.round(d.humidity)/10, u:'%', o: d.humidity_online, c:'#06b6d4', numeric:true },
+      { s:'PM2.5', v: d.pm25||0, u:'μg/m³', o: d.pm25_online, c:'#f59e0b', numeric:true },
+      { s:'CO₂', v: d.co2||0, u:'ppm', o: d.co2_online, c:'#8b5cf6', numeric:true },
+      { s:'烟雾报警', v: d.smoke, u:'', o: d.smoke_online, c:'#ef4444', numeric:false },
+      { s:'水浸检测', v: d.water, u:'', o: d.water_online, c:'#06b6d4', numeric:false },
+      { s:'红外探测', v: d.ir, u:'', o: d.ir_online, c:'#8b5cf6', numeric:false },
+      { s:'光照强度', v: d.lux||0, u:'lux', o: d.light_online, c:'#f59e0b', numeric:true },
     ]
     items.forEach(item => {
       realtimeEvents.unshift({
         id: eventIdCounter++, time: now, source: item.s,
         value: typeof item.v === 'number' ? Math.round(item.v * 10) / 10 : 0,
-        unit: item.u, online: !!item.o, color: item.c
+        unit: item.u, online: !!item.o, color: item.c,
+        numeric: item.numeric !== false
       })
     })
     if (realtimeEvents.length > 100) realtimeEvents.length = 100
@@ -1018,6 +1021,8 @@ onUnmounted(() => {
 .evt-status { font-size: 10px; width: 28px; text-align: center; flex-shrink: 0; }
 .evt-status.online { color: #22c55d; }
 .evt-status.offline { color: #ef4444; }
+.evt-val.alarm { color: #ef4444; font-weight: bold; }
+.evt-val.normal { color: #22c55d; }
 .empty-stream { text-align: center; color: #475569; padding: 20px; }
 
 .dashboard-root { min-height: 100vh; background: var(--bg-primary); position: relative; }

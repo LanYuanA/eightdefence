@@ -214,10 +214,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import ParticleBackground from '../components/ParticleBackground.vue'
 import AppNavbar from '../components/AppNavbar.vue'
+import { realtimeApi } from '../api/realtime'
 import CyberButton from '../components/CyberButton.vue'
 
 const menuItems = [
@@ -495,6 +496,41 @@ function exportDevices() {
   URL.revokeObjectURL(url)
   ElMessage.success('设备配置已导出')
 }
+
+// C++ 真实数据轮询 — 更新真实设备值
+let devTimer: ReturnType<typeof setInterval> | null = null
+async function fetchDeviceData() {
+  try {
+    const res = await realtimeApi.getAllData() as any
+    const d = res.data || res
+    if (!d) return
+    // 映射C++数据到前端设备
+    const map: Record<string, [number, string, boolean]> = {
+      'dev-001': [Math.round(d.temperature)/10, '℃', !!d.temperature_online],
+      'dev-002': [Math.round(d.humidity)/10, '%', !!d.humidity_online],
+      'dev-003': [d.pm25||0, 'μg/m³', !!d.pm25_online],
+      'dev-004': [d.co2||0, 'ppm', !!d.co2_online],
+      'dev-005': [d.tvoc||0, 'ppb', !!d.tvoc_online],
+      'dev-006': [d.ch2o||0, 'ppb', !!d.ch2o_online],
+      'dev-007': [d.pm10||0, 'μg/m³', !!d.pm10_online],
+      'dev-009': [d.smoke||0, '', !!d.smoke_online],
+      'dev-010': [d.water||0, 'cm', !!d.water_online],
+      'dev-011': [d.ir||0, '', !!d.ir_online],
+      'dev-012': [d.lux||0, 'lux', !!d.light_online],
+    }
+    Object.entries(map).forEach(([id, [val, unit, online]]) => {
+      const dev = devices.find(d => d.id === id)
+      if (dev) {
+        dev.value = val
+        dev.unit = unit
+        dev.status = online ? 'online' : 'offline'
+        dev.lastUpdate = new Date().toLocaleString('zh-CN')
+      }
+    })
+  } catch { /* C++不可用 */ }
+}
+onMounted(() => { fetchDeviceData(); devTimer = setInterval(fetchDeviceData, 2000) })
+onUnmounted(() => { if (devTimer) clearInterval(devTimer) })
 </script>
 
 <style scoped>

@@ -597,23 +597,28 @@ function drawFlowChart() {
     ]}
   ]
 
-  // 连线
+  // 连线 — 软件定义架构: 应用层自上而下驱动设备
   const connections: Array<{from:string;to:string;active:boolean;color?:string}> = [
-    ...['abs-temp','abs-humi','abs-pm25','abs-co2','abs-tvoc','abs-ch2o','abs-pm10'].map(id=>({from:'sensor-cloud',to:id,active:true})),
-    {from:'sensor-smoke',to:'abs-smoke',active:true},{from:'sensor-water',to:'abs-water',active:true},
-    {from:'sensor-infrared',to:'abs-ir',active:true},{from:'sensor-light',to:'abs-light',active:true},{from:'sensor-humi',to:'abs-hum',active:true},
-    ...['abs-temp','abs-humi','abs-pm25','abs-co2','abs-tvoc','abs-ch2o','abs-pm10','abs-smoke','abs-water','abs-ir','abs-light','abs-hum'].map(id=>({from:id,to:'upper-collect',active:true,color:'#3b82f6'})),
-    {from:'abs-smoke',to:'upper-fireid',active:true,color:'#ef4444'},{from:'abs-ir',to:'upper-fireid',active:true,color:'#ef4444'},
-    {from:'abs-water',to:'upper-alarm',active:true,color:'#ef4444'},
-    ...dataSvc.nodes.map(n=>({from:n.id,to:'upper-collect',active:true,color:'#3b82f6'})),
-    ...ctrlSvc.nodes.map(n=>({from:n.id,to:'upper-control',active:true,color:'#22c55d'})),
-    ...alarmSvc.nodes.map(n=>({from:n.id,to:'upper-alarm',active:true,color:'#ef4444'})),
-    ...mgmtSvc.nodes.map(n=>({from:n.id,to:'upper-store',active:true,color:'#8b5cf6'})),
-    {from:'upper-collect',to:'upper-fireid',active:true},{from:'upper-collect',to:'upper-store',active:true},{from:'upper-collect',to:'upper-alarm',active:true},
-    {from:'upper-fireid',to:'upper-alarm',active:true},{from:'upper-alarm',to:'upper-control',active:true},{from:'upper-store',to:'upper-fireid',active:true},
+    // 应用层 → 组合上层 (应用驱动服务)
     ...['upper-collect','upper-fireid','upper-store','upper-alarm','upper-control'].flatMap(id=>[
-      {from:id,to:'app-env',active:true,color:'#3b82f6'},{from:id,to:'app-security',active:true,color:'#8b5cf6'},{from:id,to:'app-fire',active:true,color:'#ef4444'}
+      {from:'app-env',to:id,active:true,color:'#3b82f6'},{from:'app-security',to:id,active:true,color:'#8b5cf6'},{from:'app-fire',to:id,active:true,color:'#ef4444'}
     ]),
+    // 组合上层 → 原子服务下层 (核心服务调度子服务)
+    ...dataSvc.nodes.map(n=>({from:'upper-collect',to:n.id,active:true,color:'#3b82f6'})),
+    ...ctrlSvc.nodes.map(n=>({from:'upper-control',to:n.id,active:true,color:'#22c55d'})),
+    ...alarmSvc.nodes.map(n=>({from:'upper-alarm',to:n.id,active:true,color:'#ef4444'})),
+    ...mgmtSvc.nodes.map(n=>({from:'upper-store',to:n.id,active:true,color:'#8b5cf6'})),
+    // 上层服务间联动
+    {from:'upper-collect',to:'upper-fireid',active:true},{from:'upper-collect',to:'upper-store',active:true},
+    {from:'upper-fireid',to:'upper-alarm',active:true},{from:'upper-alarm',to:'upper-control',active:true},
+    // 原子服务下层 → 设备抽象层 (服务控制虚拟设备)
+    ...['abs-temp','abs-humi','abs-pm25','abs-co2','abs-tvoc','abs-ch2o','abs-pm10','abs-smoke','abs-water','abs-ir','abs-light','abs-hum'].map(id=>({from:'upper-collect',to:id,active:true,color:'#3b82f6'})),
+    {from:'upper-fireid',to:'abs-smoke',active:true,color:'#ef4444'},{from:'upper-fireid',to:'abs-ir',active:true,color:'#ef4444'},
+    {from:'upper-alarm',to:'abs-water',active:true,color:'#ef4444'},
+    // 设备抽象层 → 设备层 (虚拟设备映射物理设备)
+    ...['abs-temp','abs-humi','abs-pm25','abs-co2','abs-tvoc','abs-ch2o','abs-pm10'].map(id=>({from:id,to:'sensor-cloud',active:true})),
+    {from:'abs-smoke',to:'sensor-smoke',active:true},{from:'abs-water',to:'sensor-water',active:true},
+    {from:'abs-ir',to:'sensor-infrared',active:true},{from:'abs-light',to:'sensor-light',active:true},{from:'abs-hum',to:'sensor-humi',active:true},
   ]
 
   let time = 0

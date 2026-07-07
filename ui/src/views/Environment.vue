@@ -286,11 +286,16 @@ function drawFlowChart() {
     ]}
   ]
   const connections = [
-    { from: 'sensor-cloud', to: 'abs-cloud' }, { from: 'sensor-humidifier', to: 'abs-env' }, { from: 'sensor-conditioner', to: 'abs-env' },
-    { from: 'abs-cloud', to: 'lower-collect' }, { from: 'abs-env', to: 'lower-collect' },
+    // 应用层 → 原子服务上层
+    { from: 'app-env', to: 'upper-monitor' },
+    // 原子服务上层 → 原子服务下层
+    { from: 'upper-monitor', to: 'lower-process' }, { from: 'upper-monitor', to: 'lower-alarm' },
+    // 原子服务下层间
     { from: 'lower-collect', to: 'lower-process' }, { from: 'lower-collect', to: 'lower-alarm' },
-    { from: 'lower-process', to: 'upper-monitor' }, { from: 'lower-alarm', to: 'upper-monitor' },
-    { from: 'upper-monitor', to: 'app-env' }
+    // 原子服务下层 → 设备抽象层
+    { from: 'lower-collect', to: 'abs-cloud' }, { from: 'lower-collect', to: 'abs-env' },
+    // 设备抽象层 → 设备层
+    { from: 'abs-cloud', to: 'sensor-cloud' }, { from: 'abs-env', to: 'sensor-humidifier' }, { from: 'abs-env', to: 'sensor-conditioner' },
   ]
 
   let time = 0

@@ -239,11 +239,16 @@ function drawFlowChart() {
     ]}
   ]
   const connections = [
-    { from: 'sensor-water', to: 'abs-alarm' }, { from: 'sensor-infrared', to: 'abs-alarm' }, { from: 'sensor-gas', to: 'abs-alarm' },
-    { from: 'abs-alarm', to: 'lower-collect' },
+    // 应用层 → 原子服务上层
+    { from: 'app-security', to: 'upper-security' },
+    // 原子服务上层 → 原子服务下层
+    { from: 'upper-security', to: 'lower-collect' }, { from: 'upper-security', to: 'lower-alarm' }, { from: 'upper-security', to: 'lower-control' },
+    // 原子服务下层间
     { from: 'lower-collect', to: 'lower-alarm' }, { from: 'lower-alarm', to: 'lower-control' },
-    { from: 'lower-collect', to: 'upper-security' }, { from: 'lower-alarm', to: 'upper-security' }, { from: 'lower-control', to: 'upper-security' },
-    { from: 'upper-security', to: 'app-security' }
+    // 原子服务下层 → 设备抽象层
+    { from: 'lower-collect', to: 'abs-alarm' },
+    // 设备抽象层 → 设备层
+    { from: 'abs-alarm', to: 'sensor-water' }, { from: 'abs-alarm', to: 'sensor-infrared' }, { from: 'abs-alarm', to: 'sensor-gas' },
   ]
 
   let time = 0

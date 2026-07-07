@@ -258,12 +258,16 @@ function drawFlowChart() {
     ]}
   ]
   const connections = [
-    { from: 'sensor-smoke', to: 'abs-fire' }, { from: 'sensor-temp', to: 'abs-fire' },
-    { from: 'sensor-spray', to: 'abs-fire' }, { from: 'sensor-fan', to: 'abs-fire' },
-    { from: 'abs-fire', to: 'lower-collect' },
+    // 应用层 → 原子服务上层
+    { from: 'app-fire', to: 'upper-fire' },
+    // 原子服务上层 → 原子服务下层
+    { from: 'upper-fire', to: 'lower-collect' }, { from: 'upper-fire', to: 'lower-alarm' }, { from: 'upper-fire', to: 'lower-control' },
+    // 原子服务下层间
     { from: 'lower-collect', to: 'lower-alarm' }, { from: 'lower-alarm', to: 'lower-control' },
-    { from: 'lower-collect', to: 'upper-fire' }, { from: 'lower-alarm', to: 'upper-fire' }, { from: 'lower-control', to: 'upper-fire' },
-    { from: 'upper-fire', to: 'app-fire' }
+    // 原子服务下层 → 设备抽象层
+    { from: 'lower-collect', to: 'abs-fire' },
+    // 设备抽象层 → 设备层
+    { from: 'abs-fire', to: 'sensor-smoke' }, { from: 'abs-fire', to: 'sensor-temp' }, { from: 'abs-fire', to: 'sensor-spray' }, { from: 'abs-fire', to: 'sensor-fan' },
   ]
 
   let time = 0

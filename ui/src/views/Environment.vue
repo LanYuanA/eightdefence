@@ -291,14 +291,8 @@ function drawFlowChart() {
     ]},
   ]
   // 数据流: 设备→抽象(上) + 控制流: 应用→服务→设备(下)
+  // 向上流: 设备→抽象→数据采集→上层→应用
   const connections: Array<{from:string;to:string;color?:string}> = [
-    { from: 'app-env', to: 'upper-monitor', color: '#3b82f6' },
-    { from: 'upper-monitor', to: 'lower-collect', color: '#3b82f6' }, { from: 'upper-monitor', to: 'lower-process', color: '#8b5cf6' },
-    { from: 'lower-process', to: 'lower-collect' }, { from: 'lower-process', to: 'lower-alarm' },
-    { from: 'lower-collect', to: 'abs-temp' }, { from: 'lower-collect', to: 'abs-humi' },
-    { from: 'lower-collect', to: 'abs-pm25' }, { from: 'lower-collect', to: 'abs-co2' },
-    { from: 'lower-collect', to: 'abs-tvoc' }, { from: 'lower-collect', to: 'abs-ch2o' },
-    { from: 'lower-collect', to: 'abs-pm10' },
     { from: 'sensor-cloud', to: 'abs-temp', color: '#3b82f6' }, { from: 'sensor-cloud', to: 'abs-humi', color: '#06b6d4' },
     { from: 'sensor-cloud', to: 'abs-pm25', color: '#f59e0b' }, { from: 'sensor-cloud', to: 'abs-co2', color: '#8b5cf6' },
     { from: 'sensor-cloud', to: 'abs-tvoc', color: '#ec4899' }, { from: 'sensor-cloud', to: 'abs-ch2o', color: '#14b8a6' },
@@ -307,6 +301,9 @@ function drawFlowChart() {
     { from: 'abs-pm25', to: 'lower-collect', color: '#f59e0b' }, { from: 'abs-co2', to: 'lower-collect', color: '#8b5cf6' },
     { from: 'abs-tvoc', to: 'lower-collect', color: '#ec4899' }, { from: 'abs-ch2o', to: 'lower-collect', color: '#14b8a6' },
     { from: 'abs-pm10', to: 'lower-collect', color: '#f59e0b' },
+    { from: 'lower-collect', to: 'lower-process' }, { from: 'lower-process', to: 'lower-alarm' },
+    { from: 'lower-collect', to: 'upper-monitor', color: '#3b82f6' }, { from: 'lower-process', to: 'upper-monitor', color: '#8b5cf6' },
+    { from: 'upper-monitor', to: 'app-env', color: '#3b82f6' },
   ]
 
   let time = 0

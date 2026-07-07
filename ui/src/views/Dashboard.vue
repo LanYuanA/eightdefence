@@ -533,20 +533,21 @@ function drawFlowChart() {
   if (!container) return
 
   canvas.width = Math.max(container.clientWidth, 1400)
-  canvas.height = 560
+  canvas.height = 520
 
   const ox = 220
+  const GAP = 75 // 层间距，均匀分布5层
 
   const lowerSvcGroups = [
     { label: '数据采集类', color: '#3b82f6', x: ox + 20, svcs: ['温度','湿度','PM2.5','PM10','CO₂','TVOC','甲醛','烟雾','水浸','光感','红外','雷达','空气等级'] },
     { label: '设备控制类', color: '#22c55d', x: ox + 440, svcs: ['空调开关','风速','温控模式','温度设定','加湿','除湿','恒湿','净化开关','净化控制','排烟风机','喷淋','报警器','舱门'] },
     { label: '报警判断类', color: '#ef4444', x: ox + 830, svcs: ['阈值判断','状态监测','火情确认','风险评估','多源融合'] },
-    { label: '管理支撑类', color: '#8b5cf6', x: ox + 830, svcs: ['日志管理','信息推送','数据备份','设备登记','在线监测'], yOff: 30 },
+    { label: '管理支撑类', color: '#8b5cf6', x: ox + 830, svcs: ['日志管理','信息推送','数据备份','设备登记','在线监测'], yOff: 28 },
   ]
 
   function makeLowerNodes(group: any): any[] {
     const nodes: any[] = []
-    const spacing = 55
+    const spacing = 56
     group.svcs.forEach((name: string, i: number) => {
       const row = Math.floor(i / 7)
       const col = i % 7
@@ -555,25 +556,25 @@ function drawFlowChart() {
     return nodes
   }
 
-  const lowerBaseY = 190
   const allLowerNodes: any[] = []
   lowerSvcGroups.forEach(g => { allLowerNodes.push(...makeLowerNodes(g)) })
 
+  // 均匀分布5层
   const layers: any[] = [
-    { name: '应用层', y: 25, nodes: [
+    { name: '应用层', y: 30, nodes: [
       { id: 'app-env', x:200+ox, icon:'🌡️', label:'环境监测应用', color:'#3b82f6' },
       { id: 'app-security', x:450+ox, icon:'🛡️', label:'安防系统应用', color:'#8b5cf6' },
       { id: 'app-fire', x:680+ox, icon:'🔥', label:'火灾预警应用', color:'#ef4444' }
     ]},
-    { name: '组合上层', y: 95, nodes: [
+    { name: '组合上层', y: 30 + GAP, nodes: [
       { id: 'upper-collect', x:110+ox,icon:'📥',label:'数据采集服务',color:'#3b82f6'},
       { id: 'upper-fireid', x:280+ox,icon:'🔥',label:'火灾识别服务',color:'#ef4444'},
       { id: 'upper-store', x:450+ox,icon:'💾',label:'数据存储服务',color:'#f59e0b'},
       { id: 'upper-alarm', x:600+ox,icon:'🔔',label:'报警服务',color:'#ef4444'},
       { id: 'upper-control', x:750+ox,icon:'🎮',label:'设备控制服务',color:'#22c55d'}
     ]},
-    { name: '原子服务下层', y: lowerBaseY - 5, nodes: allLowerNodes, isLower: true },
-    { name: '设备抽象层（一对一解耦）', y: 320, nodes: [
+    { name: '原子服务下层', y: 30 + GAP * 2 - 5, nodes: allLowerNodes, isLower: true },
+    { name: '设备抽象层', y: 30 + GAP * 3 + 20, nodes: [
       { id: 'abs-temp',x:15+ox,icon:'🌡️',label:'温度',color:'#3b82f6'},{ id: 'abs-humi',x:85+ox,icon:'💧',label:'湿度',color:'#06b6d4'},
       { id: 'abs-pm25',x:155+ox,icon:'💨',label:'PM2.5',color:'#f59e0b'},{ id: 'abs-co2',x:225+ox,icon:'☁️',label:'CO₂',color:'#8b5cf6'},
       { id: 'abs-tvoc',x:295+ox,icon:'🧪',label:'TVOC',color:'#ec4899'},{ id: 'abs-ch2o',x:365+ox,icon:'⚗️',label:'甲醛',color:'#14b8a6'},
@@ -581,7 +582,7 @@ function drawFlowChart() {
       { id: 'abs-smoke',x:520+ox,icon:'🔥',label:'烟雾',color:'#ef4444'},{ id: 'abs-water',x:590+ox,icon:'💧',label:'水浸',color:'#06b6d4'},
       { id: 'abs-ir',x:660+ox,icon:'👤',label:'红外',color:'#8b5cf6'},{ id: 'abs-light',x:730+ox,icon:'💡',label:'光照',color:'#f59e0b'},
     ]},
-    { name: '设备层', y: 395, nodes: [
+    { name: '设备层', y: 30 + GAP * 4 + 30, nodes: [
       { id: 'sensor-cloud', x: 80+ox, icon:'☁️', label:'云测仪(SD123)', color:'#3b82f6' },
       { id: 'sensor-smoke', x: 260+ox, icon:'🔥', label:'烟雾报警器', color:'#ef4444' },
       { id: 'sensor-water', x: 440+ox, icon:'💧', label:'水浸传感器', color:'#06b6d4' },
@@ -590,22 +591,37 @@ function drawFlowChart() {
     ]},
   ]
 
+  const lowerBaseY = layers[2].y + 5 // 原子服务下层的绘制基点
+
+  // 数据流: 大部分向上(设备→应用), 仅设备控制服务向下(应用→设备)
   const connections: Array<{from:string;to:string;active:boolean;color?:string}> = [
-    ...['upper-collect','upper-fireid','upper-store','upper-alarm','upper-control'].flatMap(id=>[
-      {from:'app-env',to:id,active:true,color:'#3b82f6'},{from:'app-security',to:id,active:true,color:'#8b5cf6'},{from:'app-fire',to:id,active:true,color:'#ef4444'}
-    ]),
-    {from:'upper-collect',to:'upper-fireid',active:true},{from:'upper-collect',to:'upper-store',active:true},
-    {from:'upper-fireid',to:'upper-alarm',active:true},{from:'upper-alarm',to:'upper-control',active:true},
-    ...allLowerNodes.filter(n=>n.color==='#3b82f6').map(n=>({from:'upper-collect',to:n.id,active:true,color:'#3b82f6'})),
+    // === 向上流: 设备层→抽象层 (传感器数据上报) ===
+    ...['abs-temp','abs-humi','abs-pm25','abs-co2','abs-tvoc','abs-ch2o','abs-pm10'].map(id=>({from:'sensor-cloud',to:id,active:true,color:'#3b82f6'})),
+    {from:'sensor-smoke',to:'abs-smoke',active:true,color:'#ef4444'},{from:'sensor-water',to:'abs-water',active:true,color:'#06b6d4'},
+    {from:'sensor-infrared',to:'abs-ir',active:true,color:'#8b5cf6'},{from:'sensor-light',to:'abs-light',active:true,color:'#f59e0b'},
+    // === 向上流: 抽象层→数据采集服务 ===
+    {from:'abs-temp',to:'upper-collect',active:true,color:'#3b82f6'},{from:'abs-humi',to:'upper-collect',active:true,color:'#06b6d4'},
+    {from:'abs-pm25',to:'upper-collect',active:true,color:'#f59e0b'},{from:'abs-co2',to:'upper-collect',active:true,color:'#8b5cf6'},
+    {from:'abs-tvoc',to:'upper-collect',active:true,color:'#ec4899'},{from:'abs-ch2o',to:'upper-collect',active:true,color:'#14b8a6'},
+    {from:'abs-pm10',to:'upper-collect',active:true,color:'#f59e0b'},
+    {from:'abs-smoke',to:'upper-fireid',active:true,color:'#ef4444'},{from:'abs-water',to:'upper-alarm',active:true,color:'#06b6d4'},
+    {from:'abs-ir',to:'upper-fireid',active:true,color:'#8b5cf6'},{from:'abs-light',to:'upper-collect',active:true,color:'#f59e0b'},
+    // === 向上流: 下层→上层 (子服务汇聚到核心服务) ===
+    ...allLowerNodes.filter(n=>n.color==='#3b82f6').map(n=>({from:n.id,to:'upper-collect',active:true,color:'#3b82f6'})),
+    ...allLowerNodes.filter(n=>n.color==='#ef4444').map(n=>({from:n.id,to:'upper-alarm',active:true,color:'#ef4444'})),
+    ...allLowerNodes.filter(n=>n.color==='#8b5cf6').map(n=>({from:n.id,to:'upper-store',active:true,color:'#8b5cf6'})),
+    // === 向上流: 上层→应用 (数据呈现) ===
+    {from:'upper-collect',to:'app-env',active:true,color:'#3b82f6'},{from:'upper-collect',to:'app-security',active:true,color:'#8b5cf6'},{from:'upper-collect',to:'app-fire',active:true,color:'#ef4444'},
+    {from:'upper-fireid',to:'app-fire',active:true,color:'#ef4444'},{from:'upper-fireid',to:'app-security',active:true,color:'#8b5cf6'},
+    {from:'upper-alarm',to:'app-security',active:true,color:'#ef4444'},{from:'upper-alarm',to:'app-fire',active:true,color:'#ef4444'},
+    {from:'upper-store',to:'app-env',active:true,color:'#f59e0b'},{from:'upper-store',to:'app-security',active:true,color:'#f59e0b'},
+    // === 向下流: 仅设备控制服务(应用→设备) ===
+    {from:'app-env',to:'upper-control',active:true,color:'#22c55d'},{from:'app-security',to:'upper-control',active:true,color:'#22c55d'},{from:'app-fire',to:'upper-control',active:true,color:'#22c55d'},
     ...allLowerNodes.filter(n=>n.color==='#22c55d').map(n=>({from:'upper-control',to:n.id,active:true,color:'#22c55d'})),
-    ...allLowerNodes.filter(n=>n.color==='#ef4444').map(n=>({from:'upper-alarm',to:n.id,active:true,color:'#ef4444'})),
-    ...allLowerNodes.filter(n=>n.color==='#8b5cf6').map(n=>({from:'upper-store',to:n.id,active:true,color:'#8b5cf6'})),
-    ...['abs-temp','abs-humi','abs-pm25','abs-co2','abs-tvoc','abs-ch2o','abs-pm10'].map(id=>({from:'upper-collect',to:id,active:true,color:'#3b82f6'})),
-    {from:'upper-fireid',to:'abs-smoke',active:true,color:'#ef4444'},{from:'upper-alarm',to:'abs-water',active:true,color:'#ef4444'},
-    ...['abs-temp','abs-humi','abs-pm25','abs-co2','abs-tvoc','abs-ch2o','abs-pm10'].map(id=>({from:id,to:'sensor-cloud',active:true})),
-    {from:'abs-smoke',to:'sensor-smoke',active:true},{from:'abs-water',to:'sensor-water',active:true},
-    {from:'abs-ir',to:'sensor-infrared',active:true},{from:'abs-light',to:'sensor-light',active:true},
     {from:'upper-control',to:'abs-temp',active:true,color:'#22c55d'},{from:'upper-control',to:'abs-humi',active:true,color:'#22c55d'},{from:'upper-control',to:'abs-smoke',active:true,color:'#22c55d'},
+    {from:'abs-temp',to:'sensor-cloud',active:true,color:'#22c55d'},{from:'abs-humi',to:'sensor-cloud',active:true,color:'#22c55d'},
+    // === 横向: 服务间联动 ===
+    {from:'upper-collect',to:'upper-store',active:true},{from:'upper-fireid',to:'upper-alarm',active:true},{from:'upper-alarm',to:'upper-control',active:true},
   ]
 
   let time = 0

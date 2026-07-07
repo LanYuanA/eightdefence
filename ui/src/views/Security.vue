@@ -147,7 +147,15 @@
                 <div><h3 class="card-title">安防事件流</h3><p class="card-subtitle">实时告警监控</p></div>
               </div>
             </template>
-            <LiveDataStream :max-items="20" />
+            <div class="realtime-events">
+              <div v-if="secEvents.length === 0" class="empty-stream">等待数据流...</div>
+              <div v-for="evt in secEvents.slice(0, 15)" :key="evt.id" class="realtime-event-row">
+                <span class="evt-time">{{ evt.time }}</span>
+                <span class="evt-src" :style="{color: evt.color}">{{ evt.source }}</span>
+                <span class="evt-val">{{ evt.value }}{{ evt.unit }}</span>
+                <span class="evt-status" :class="evt.online ? 'online' : 'offline'">{{ evt.online ? '在线' : '离线' }}</span>
+              </div>
+            </div>
           </BaseCard>
         </div>
       </section>
@@ -156,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import ParticleBackground from '../components/ParticleBackground.vue'
 import AppNavbar from '../components/AppNavbar.vue'
@@ -164,7 +172,6 @@ import { realtimeApi } from '../api/realtime'
 import BaseCard from '../components/BaseCard.vue'
 import CyberButton from '../components/CyberButton.vue'
 import StatusDot from '../components/StatusDot.vue'
-import LiveDataStream from '../components/LiveDataStream.vue'
 
 const menuItems = [
   { path: '/', label: '主控台' },
@@ -314,28 +321,40 @@ function drawFlowChart() {
 onMounted(() => { drawFlowChart(); fetchSecurityData() })
 onUnmounted(() => { if (flowAnimId) cancelAnimationFrame(flowAnimId); if (secTimer) clearInterval(secTimer) })
 
-// C++ 实时安防数据轮询
+// C++ 实时安防数据轮询 + 事件流
 let secTimer: ReturnType<typeof setInterval> | null = null
 const secCppOnline = ref(false)
+const secEvents = reactive<Array<{id:number;time:string;source:string;value:number;unit:string;online:boolean;color:string}>>([])
+let secEventId = 5000
 
 async function fetchSecurityData() {
   try {
     const res = await realtimeApi.getAllData() as any
     const d = res.data || res
-    if (d) {
-      secCppOnline.value = true
-      waterOnline.value = d.water_online !== undefined ? d.water_online : waterOnline.value
-      waterDetected.value = (d.water || 0) > 0
-      intrusionOnline.value = d.ir_online !== undefined ? d.ir_online : intrusionOnline.value
-      infraredDetected.value = (d.ir || 0) > 0
-      radarDetected.value = (d.radar || 0) > 0
-      if (d.tvoc !== undefined) tvocValue.value = d.tvoc
-      if (d.ch2o !== undefined) ch2oValue.value = d.ch2o
-      if (d.co2 !== undefined) co2Value.value = d.co2
-      // 更新在线计数
-      const allOnline = [d.pm25_online,d.humidity_online,d.temperature_online,d.co2_online,d.smoke_online,d.water_online,d.ir_online,d.light_online].filter(Boolean).length
-      onlineCount.value = allOnline
-    }
+    if (!d) return
+    secCppOnline.value = true
+    const now = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+    waterOnline.value = !!d.water_online
+    waterDetected.value = (d.water || 0) > 0
+    intrusionOnline.value = !!d.ir_online
+    infraredDetected.value = (d.ir || 0) > 0
+    radarDetected.value = (d.radar || 0) > 0
+    if (d.tvoc !== undefined) tvocValue.value = d.tvoc
+    if (d.ch2o !== undefined) ch2oValue.value = d.ch2o
+    if (d.co2 !== undefined) co2Value.value = d.co2
+    const allOnline = [d.pm25_online,d.humidity_online,d.temperature_online,d.co2_online,d.smoke_online,d.water_online,d.ir_online,d.light_online].filter(Boolean).length
+    onlineCount.value = allOnline
+    // 事件流
+    const items = [
+      { s:'水浸传感器', v:d.water||0, u:'cm', o:!!d.water_online, c:'#06b6d4' },
+      { s:'红外探测器', v:d.ir||0, u:'', o:!!d.ir_online, c:'#8b5cf6' },
+      { s:'雷达探测器', v:d.radar||0, u:'', o:!!d.ir_online, c:'#8b5cf6' },
+      { s:'烟雾报警器', v:d.smoke||0, u:'', o:!!d.smoke_online, c:'#ef4444' },
+    ]
+    items.forEach(item => {
+      secEvents.unshift({ id: secEventId++, time: now, source: item.s, value: item.v, unit: item.u, online: item.o, color: item.c })
+    })
+    if (secEvents.length > 60) secEvents.length = 60
   } catch {
     secCppOnline.value = false
   }
@@ -440,4 +459,5 @@ function resetGas() {
   .security-main { padding: var(--spacing-md); }
   .status-grid { grid-template-columns: 1fr; }
 }
+.realtime-events{max-height:280px;overflow-y:auto;font-size:11px}.realtime-events::-webkit-scrollbar{width:3px}.realtime-events::-webkit-scrollbar-thumb{background:rgba(59,130,246,.15);border-radius:2px}.realtime-event-row{display:flex;align-items:center;gap:6px;padding:3px 4px;border-bottom:1px solid rgba(255,255,255,.03)}.realtime-event-row:hover{background:rgba(255,255,255,.02)}.evt-time{font-family:'JetBrains Mono',monospace;font-size:9px;color:#475569;width:55px;flex-shrink:0}.evt-src{width:70px;flex-shrink:0;font-size:10px}.evt-val{font-family:'JetBrains Mono',monospace;font-size:10px;color:#e2e8f0;width:60px;text-align:right;flex-shrink:0}.evt-status{font-size:9px;width:26px;text-align:center;flex-shrink:0}.evt-status.online{color:#22c55d}.evt-status.offline{color:#ef4444}.empty-stream{text-align:center;color:#475569;padding:16px}
 </style>

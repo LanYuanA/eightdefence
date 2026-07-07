@@ -121,7 +121,15 @@
               <div><h3 class="card-title">实时数据流</h3><p class="card-subtitle">系统事件监控</p></div>
             </div>
           </template>
-          <LiveDataStream :max-items="30" />
+            <div class="realtime-events">
+              <div v-if="envEvents.length === 0" class="empty-stream">等待数据流...</div>
+              <div v-for="evt in envEvents.slice(0, 15)" :key="evt.id" class="realtime-event-row">
+                <span class="evt-time">{{ evt.time }}</span>
+                <span class="evt-src" :style="{color: evt.color}">{{ evt.source }}</span>
+                <span class="evt-val">{{ evt.value }}{{ evt.unit }}</span>
+                <span class="evt-status" :class="evt.online ? 'online' : 'offline'">{{ evt.online ? '在线' : '离线' }}</span>
+              </div>
+            </div>
         </BaseCard>
       </section>
     </main>
@@ -216,7 +224,6 @@ import AppNavbar from '../components/AppNavbar.vue'
 import BaseCard from '../components/BaseCard.vue'
 import CyberButton from '../components/CyberButton.vue'
 import StatusDot from '../components/StatusDot.vue'
-import LiveDataStream from '../components/LiveDataStream.vue'
 import { realtimeApi } from '../api/realtime'
 
 Chart.register(...registerables)
@@ -276,15 +283,13 @@ function drawFlowChart() {
       { id: 'lower-alarm', x: 650 + ox, icon: '🔔', label: '报警判断服务', color: '#ef4444' },
     ]},
     { name: '设备抽象层（云测仪→7个虚拟传感器）', y: 230, nodes: [
-      { id: 'abs-temp', x: 30+ox, icon:'🌡️', label:'温度', color:'#3b82f6' },
+      { id: 'abs-temp', x: 25+ox, icon:'🌡️', label:'温度', color:'#3b82f6' },
       { id: 'abs-humi', x: 110+ox, icon:'💧', label:'湿度', color:'#06b6d4' },
-      { id: 'abs-pm25', x: 190+ox, icon:'💨', label:'PM2.5', color:'#f59e0b' },
-      { id: 'abs-co2', x: 270+ox, icon:'☁️', label:'CO₂', color:'#8b5cf6' },
-      { id: 'abs-tvoc', x: 350+ox, icon:'🧪', label:'TVOC', color:'#ec4899' },
-      { id: 'abs-ch2o', x: 430+ox, icon:'⚗️', label:'甲醛', color:'#14b8a6' },
-      { id: 'abs-pm10', x: 510+ox, icon:'💨', label:'PM10', color:'#f59e0b' },
-      { id: 'abs-hum', x: 610+ox, icon:'🌀', label:'净化', color:'#22c55d' },
-      { id: 'abs-ac', x: 690+ox, icon:'❄️', label:'空调', color:'#22c55d' },
+      { id: 'abs-pm25', x: 195+ox, icon:'💨', label:'PM2.5', color:'#f59e0b' },
+      { id: 'abs-co2', x: 280+ox, icon:'☁️', label:'CO₂', color:'#8b5cf6' },
+      { id: 'abs-tvoc', x: 365+ox, icon:'🧪', label:'TVOC', color:'#ec4899' },
+      { id: 'abs-ch2o', x: 450+ox, icon:'⚗️', label:'甲醛', color:'#14b8a6' },
+      { id: 'abs-pm10', x: 535+ox, icon:'💨', label:'PM10', color:'#f59e0b' },
     ]},
     { name: '设备层', y: 310, nodes: [
       { id: 'sensor-cloud', x: 350 + ox, icon: '☁️', label: '云测仪(SD123)', color: '#3b82f6' },
@@ -412,33 +417,40 @@ function refreshDev(dev: any) { ElMessage.success(`${dev.name} 已刷新`) }
 function toggleCtrl(ctrl: any) { ctrl.active = !ctrl.active; ElMessage.success(`${ctrl.name} 已${ctrl.active ? '开启' : '关闭'}`) }
 function saveThresholds() { showThresholds.value = false; ElMessage.success('阈值已保存') }
 
-// C++ 实时数据轮询
+// C++ 实时数据轮询 + 事件流
 let realtimeTimer: ReturnType<typeof setInterval> | null = null
 const cppOnline = ref(false)
+const envEvents = reactive<Array<{id:number;time:string;source:string;value:number;unit:string;online:boolean;color:string}>>([])
+let envEventId = 3000
 
 async function fetchRealtimeData() {
   try {
     const res = await realtimeApi.getAllData() as any
     const d = res.data || res
-    if (d) {
-      cppOnline.value = true
-      envCards[0].value = d.temperature !== undefined ? d.temperature / 10 : envCards[0].value
-      envCards[1].value = d.humidity !== undefined ? d.humidity / 10 : envCards[1].value
-      envCards[2].value = d.pm25 !== undefined ? d.pm25 : envCards[2].value
-      envCards[3].value = d.co2 !== undefined ? d.co2 : envCards[3].value
-      devices[0].online = d.temperature_online !== undefined ? d.temperature_online : devices[0].online
-      devices[1].online = d.humidity_online !== undefined ? d.humidity_online : devices[1].online
-      devices[2].online = d.pm25_online !== undefined ? d.pm25_online : devices[2].online
-      devices[3].online = d.co2_online !== undefined ? d.co2_online : devices[3].online
-      devices[0].value = `${envCards[0].value}℃`
-      devices[1].value = `${envCards[1].value}%`
-      devices[2].value = `${envCards[2].value}μg/m³`
-      devices[3].value = `${envCards[3].value}ppm`
-    }
-  } catch {
-    cppOnline.value = false
-    // 保持mock数据运行
-  }
+    if (!d) return
+    cppOnline.value = true
+    const now = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+    const t = d.temperature !== undefined ? Math.round(d.temperature) / 10 : envCards[0].value
+    const h = d.humidity !== undefined ? Math.round(d.humidity) / 10 : envCards[1].value
+    envCards[0].value = t; envCards[1].value = h
+    envCards[2].value = d.pm25 !== undefined ? d.pm25 : envCards[2].value
+    envCards[3].value = d.co2 !== undefined ? d.co2 : envCards[3].value
+    devices[0].online = !!d.temperature_online; devices[0].value = `${t}℃`
+    devices[1].online = !!d.humidity_online; devices[1].value = `${h}%`
+    devices[2].online = !!d.pm25_online; devices[2].value = `${d.pm25||0}μg/m³`
+    devices[3].online = !!d.co2_online; devices[3].value = `${d.co2||0}ppm`
+    const items = [
+      { s:'温度', v:t, u:'℃', o:!!d.temperature_online, c:'#ef4444' },
+      { s:'湿度', v:h, u:'%', o:!!d.humidity_online, c:'#3b82f6' },
+      { s:'PM2.5', v:d.pm25||0, u:'μg/m³', o:!!d.pm25_online, c:'#f59e0b' },
+      { s:'CO₂', v:d.co2||0, u:'ppm', o:!!d.co2_online, c:'#8b5cf6' },
+      { s:'光照', v:d.lux||0, u:'lux', o:!!d.light_online, c:'#f59e0b' },
+    ]
+    items.forEach(item => {
+      envEvents.unshift({ id: envEventId++, time: now, source: item.s, value: item.v, unit: item.u, online: item.o, color: item.c })
+    })
+    if (envEvents.length > 60) envEvents.length = 60
+  } catch { /* C++不可用 */ }
 }
 
 function addDevice() {
@@ -542,4 +554,5 @@ onUnmounted(() => { tempChart?.destroy(); humiChart?.destroy(); if (flowAnimId) 
   .env-main { padding: var(--spacing-md); }
   .cards-grid { grid-template-columns: 1fr; }
 }
+.realtime-events{max-height:280px;overflow-y:auto;font-size:11px}.realtime-events::-webkit-scrollbar{width:3px}.realtime-events::-webkit-scrollbar-thumb{background:rgba(59,130,246,.15);border-radius:2px}.realtime-event-row{display:flex;align-items:center;gap:6px;padding:3px 4px;border-bottom:1px solid rgba(255,255,255,.03)}.realtime-event-row:hover{background:rgba(255,255,255,.02)}.evt-time{font-family:'JetBrains Mono',monospace;font-size:9px;color:#475569;width:55px;flex-shrink:0}.evt-src{width:70px;flex-shrink:0;font-size:10px}.evt-val{font-family:'JetBrains Mono',monospace;font-size:10px;color:#e2e8f0;width:60px;text-align:right;flex-shrink:0}.evt-status{font-size:9px;width:26px;text-align:center;flex-shrink:0}.evt-status.online{color:#22c55d}.evt-status.offline{color:#ef4444}.empty-stream{text-align:center;color:#475569;padding:16px}
 </style>

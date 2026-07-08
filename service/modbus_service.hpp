@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file modbus_service.hpp
  * @brief 原子服务层 - Modbus通信服务 (C++封装)
  *
@@ -76,6 +76,11 @@ public:
     /**
      * @brief 写入单个保持寄存器 (功能码 0x06)
      */
+        /** @brief 写多个保持寄存器 (功能码 0x10) */
+    int writeMultiReg(uint8_t dev_addr, uint16_t reg_addr, uint16_t reg_count,
+                      const uint16_t *values,
+                      uint8_t *resp, size_t resp_max, size_t *resp_len);
+
     int writeReg(uint8_t dev_addr, uint16_t reg_addr, uint16_t value,
                  uint8_t *resp, size_t resp_max, size_t *resp_len);
 
@@ -107,6 +112,10 @@ public:
 
     static int buildReadRegFrame(uint8_t devAddr, uint16_t regAddr, uint16_t count,
                                   uint8_t *frame, size_t frameCap, size_t *frameLen);
+
+        static int buildWriteMultiRegFrame(uint8_t devAddr, uint16_t regAddr, uint16_t count,
+                                       const uint16_t *values,
+                                       uint8_t *frame, size_t frameCap, size_t *frameLen);
 
     static int buildWriteRegFrame(uint8_t devAddr, uint16_t regAddr, uint16_t value,
                                    uint8_t *frame, size_t frameCap, size_t *frameLen);

@@ -217,6 +217,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import axios from "axios"
 import { ElMessage } from 'element-plus'
 import { Chart, registerables } from 'chart.js'
 import ParticleBackground from '../components/ParticleBackground.vue'
@@ -414,7 +415,17 @@ function initCharts() {
 function refreshData() { ElMessage.success('数据已刷新') }
 function viewDev(dev: any) { ElMessage.info(`查看: ${dev.name}`) }
 function refreshDev(dev: any) { ElMessage.success(`${dev.name} 已刷新`) }
-function toggleCtrl(ctrl: any) { ctrl.active = !ctrl.active; ElMessage.success(`${ctrl.name} 已${ctrl.active ? '开启' : '关闭'}`) }
+function toggleCtrl(ctrl: any) {
+  const idMap: Record<number, string> = { 1: 'ac', 2: 'humidifier', 3: 'purifier' }
+  const target = idMap[ctrl.id] || ''
+  const action = ctrl.active ? 'off' : 'on'
+  axios.get('/environment/api/control', { params: { target, action } }).then(() => {
+    ctrl.active = !ctrl.active
+    ElMessage.success(ctrl.name + ' 已' + (ctrl.active ? '开启' : '关闭'))
+  }).catch((e: any) => {
+    ElMessage.error('设备控制失败: ' + (e?.message || e))
+  })
+}
 function saveThresholds() { showThresholds.value = false; ElMessage.success('阈值已保存') }
 
 // C++ 实时数据轮询 + 事件流

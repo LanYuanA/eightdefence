@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file app_fire_fighting.hpp
  * @brief 消防系统应用 - 烟雾/温度火灾检测与应急处置
  *
@@ -15,9 +15,10 @@
 
 #include "../../app_base.hpp"
 #include "service/atomic/svc_sound_light_alarm.hpp"
-#include "service/atomic/svc_fire_suppression.hpp"
-#include "service/atomic/svc_evacuation.hpp"
+#include "service/atomic/svc_fire_sprinkler.hpp"
+#include "service/atomic/svc_fire_fan.hpp"
 #include "service/atomic/svc_command_center.hpp"
+#include "service/atomic/svc_fire_cabin.hpp"
 #include <string>
 #include <atomic>
 #include <thread>
@@ -52,13 +53,15 @@ struct FireFightingState {
 
     // 服务状态
     std::atomic<bool>  alarmActive{false};
-    std::atomic<bool>  suppressionActive{false};
-    std::atomic<bool>  evacuationActive{false};
+    std::atomic<bool>  sprinklerActive{false};
+    std::atomic<bool>  exhaustActive{false};
     std::atomic<bool>  centerAlarmActive{false};
 
     // 整体状态
     FireRiskLevel      overallRisk{FireRiskLevel::LOW};
     std::atomic<bool>  systemNormal{true};
+    std::atomic<int>   riskPercent{15};
+    std::atomic<bool>  alarmAcknowledged{false};
 };
 
 class AppFireFighting : public AppBase {
@@ -75,8 +78,7 @@ public:
     HttpResponse handleApi(const HttpRequest& request) override;
 
     // 服务注入
-    void setServices(SvcSoundLightAlarm* a1, SvcFireSuppression* a2,
-                     SvcEvacuation* a3, SvcCommandCenter* a4);
+    void setServices(SvcSoundLightAlarm* a1, SvcFireSprinkler* a2, SvcFireFan* a3, SvcCommandCenter* a4, SvcFireCabin* a5 = nullptr);
 
 private:
     // API 处理函数
@@ -84,6 +86,7 @@ private:
     HttpResponse handleGetSensors(const HttpRequest& req);
     HttpResponse handlePostControl(const HttpRequest& req);
     HttpResponse handleGetLogs(const HttpRequest& req);
+    HttpResponse handleGetFireActions(const HttpRequest& req);
 
     // 风险评估
     void evaluateRisk();
@@ -109,11 +112,24 @@ private:
 
     // 原子服务指针
     SvcSoundLightAlarm*    m_svcSoundLight = nullptr;
-    SvcFireSuppression*    m_svcSuppression = nullptr;
-    SvcEvacuation*         m_svcEvacuation = nullptr;
-    SvcCommandCenter*      m_svcCmdCenter = nullptr;
+    SvcFireSprinkler*   m_svcSprinkler = nullptr;
+    SvcFireFan*         m_svcExhaust = nullptr;
+    SvcCommandCenter*      m_svcCmdCenter  = nullptr;
+    SvcFireCabin*          m_svcCabin      = nullptr;
+
+    float m_prevHumidity{60.0f};
+    int   m_prevCo2{400};
+    int   m_prevRiskPercent{15};
 
     // 风险响应
+    struct FireActionRecord {
+        std::string timestamp, action, operatorName;
+    };
+    std::vector<FireActionRecord> m_fireActions;
+    mutable std::mutex m_actionMutex;
+
+    void loadFireActions();
+    void saveFireActions();
     void handleRiskResponse();
 };
 

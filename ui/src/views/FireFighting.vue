@@ -16,6 +16,10 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               应急联动
             </CyberButton>
+             <CyberButton variant="secondary" size="sm" @click="exportData" style="margin-left:8px">
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+               数据导出
+             </CyberButton>
           </div>
         </div>
 
@@ -64,13 +68,13 @@
             </template>
             <div class="chart-box"><canvas ref="tempChartRef"></canvas></div>
           </BaseCard>
-          <BaseCard title="烟雾浓度" subtitle="实时监测" icon-color="yellow">
+          <BaseCard title="烟雾状态" subtitle="实时监测" icon-color="yellow">
             <template #header>
               <div class="flex items-center gap-3">
                 <div class="card-icon icon-yellow">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.5 8c.83 0 1.5-.67 1.5-1.5S19.33 5 18.5 5c-.17 0-.34.03-.5.08A2.5 2.5 0 0 0 16 3a2.5 2.5 0 0 0-2 4v.02A1.5 1.5 0 0 0 13 8.5c0 .83.67 1.5 1.5 1.5h4z"/></svg>
                 </div>
-                <div><h3 class="card-title">烟雾浓度</h3><p class="card-subtitle">实时监测</p></div>
+                <div><h3 class="card-title">烟雾状态</h3><p class="card-subtitle">实时监测</p></div>
               </div>
             </template>
             <div class="chart-box"><canvas ref="smokeChartRef"></canvas></div>
@@ -161,6 +165,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import axios from "axios"
 import { ElMessage } from 'element-plus'
 import { Chart, registerables } from 'chart.js'
 import ParticleBackground from '../components/ParticleBackground.vue'
@@ -189,7 +194,7 @@ const regions = [
 
 // 风险计算
 const riskLevel = computed(() => {
-  const temp = fireCards[0].value
+  const temp = fireCards[0].value as number
   if (temp > 60) return 'critical'
   if (temp > 45) return 'high'
   if (temp > 35) return 'medium'
@@ -202,7 +207,7 @@ const riskPercent = computed(() => ({ critical: 95, high: 70, medium: 40, low: 1
 
 const fireCards = reactive([
   { label: '当前温度', value: 28.5, unit: '℃', icon: '<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>', iconColor: 'red' as const, status: 'normal' as const, trend: '上升', trendDirection: 'up' as const, miniChartData: [26,27,27.5,28,28.2,28.5,28.5] },
-  { label: '烟雾浓度', value: 0.3, unit: '%obs/m', icon: '<path d="M18.5 8c.83 0 1.5-.67 1.5-1.5S19.33 5 18.5 5c-.17 0-.34.03-.5.08A2.5 2.5 0 0 0 16 3a2.5 2.5 0 0 0-2 4v.02A1.5 1.5 0 0 0 13 8.5c0 .83.67 1.5 1.5 1.5h4z"/>', iconColor: 'yellow' as const, status: 'normal' as const, trend: '稳定', trendDirection: 'stable' as const, miniChartData: [0.2,0.25,0.3,0.28,0.3,0.32,0.3] },
+  { label: '烟雾状态', value: 0, unit: '正常', icon: '<path d="M18.5 8c.83 0 1.5-.67 1.5-1.5S19.33 5 18.5 5c-.17 0-.34.03-.5.08A2.5 2.5 0 0 0 16 3a2.5 2.5 0 0 0-2 4v.02A1.5 1.5 0 0 0 13 8.5c0 .83.67 1.5 1.5 1.5h4z"/>', iconColor: 'yellow' as const, status: 'normal' as const, trend: '稳定', trendDirection: 'stable' as const, miniChartData: [0.2,0.25,0.3,0.28,0.3,0.32,0.3] },
   { label: 'CO₂浓度', value: 520, unit: 'ppm', icon: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>', iconColor: 'purple' as const, status: 'normal' as const, trend: '正常', trendDirection: 'stable' as const, miniChartData: [510,515,520,518,522,520,520] },
   { label: '湿度', value: 45, unit: '%', icon: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>', iconColor: 'blue' as const, status: 'normal' as const, trend: '下降', trendDirection: 'down' as const, miniChartData: [50,48,47,46,45.5,45,45] }
 ])
@@ -216,7 +221,6 @@ const fireDevices = reactive([
 
 const thresholds = reactive([
   { key: 'temp', label: '温度报警阈值', value: 55, unit: '℃', peak: 42.5 },
-  { key: 'smoke', label: '烟雾报警阈值', value: 2.0, unit: '%obs/m', peak: 1.2 },
   { key: 'co2', label: 'CO₂报警阈值', value: 1000, unit: 'ppm', peak: 680 }
 ])
 
@@ -336,14 +340,57 @@ function initCharts() {
   if (smokeChartRef.value) {
     smokeChart = new Chart(smokeChartRef.value, {
       type: 'line',
-      data: { labels: ['00:00','04:00','08:00','12:00','16:00','20:00'], datasets: [{ label: '烟雾', data: [0.2,0.25,0.3,0.28,0.3,0.32], borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 2, tension: 0.4, fill: true }] },
+      data: { labels: ['00:00','04:00','08:00','12:00','16:00','20:00'], datasets: [{ label: '烟雾状态', data: [0,0,0,0,0,0], borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 2, tension: 0.4, fill: true }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 2 } } }
     })
   }
 }
 
-function emergencyAction() { ElMessage.warning('应急联动处置已启动') }
-function toggleDevice(dev: any) { dev.active = !dev.active; ElMessage.success(`${dev.name} 已${dev.active ? '开启' : '关闭'}`) }
+async function exportData() {
+  try {
+    const logsRes = await axios.get('/fire/api/logs', { params: { limit: 500 } })
+    const actionsRes = await axios.get('/fire/api/fire_actions')
+    const data = {
+      exportTime: new Date().toISOString(),
+      logs: logsRes.data || [],
+      fireActions: actionsRes.data || []
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'fire_data_' + new Date().toISOString().slice(0,10) + '.json'
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('数据导出成功')
+  } catch (e: any) {
+    ElMessage.error('导出失败: ' + (e?.message || e))
+  }
+}
+
+function emergencyAction() {
+  fireDevices.forEach(dev => {
+    if (!dev.active) {
+      const idMap: Record<number, string> = { 1: 'cabin', 2: 'fan', 3: 'sprinkler', 4: 'horn' }
+      const target = idMap[dev.id] || ''
+      axios.get('/fire/api/control', { params: { target, action: 'on', speed: 200 } }).then(() => {
+        dev.active = true
+      }).catch(() => {})
+    }
+  })
+  ElMessage.success('应急联动已启动，所有设备已开启')
+}
+function toggleDevice(dev: any) {
+  const idMap: Record<number, string> = { 1: 'cabin', 2: 'fan', 3: 'sprinkler', 4: 'horn' }
+  const target = idMap[dev.id] || ''
+  const action = dev.active ? 'off' : 'on'
+  axios.get('/fire/api/control', { params: { target, action, speed: 200 } }).then(() => {
+    dev.active = !dev.active
+    ElMessage.success(dev.name + ' 已' + (dev.active ? '开启' : '关闭'))
+  }).catch((e: any) => {
+    ElMessage.error('设备控制失败: ' + (e?.message || e))
+  })
+}
 function saveThreshold(t: any) { ElMessage.success(`${t.label} 已保存`) }
 
 onMounted(() => { initCharts(); drawFlowChart() })

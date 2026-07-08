@@ -16,6 +16,7 @@
     "@vue-flow/core": "^1.26.0",
     "@vue-flow/minimap": "^1.4.0",
     "axios": "^1.16.1",
+    "chart.js": "^4.5.1",
     "echarts": "^6.1.0",
     "element-plus": "^2.14.0",
     "tailwindcss": "^4.3.0",

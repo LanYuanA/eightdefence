@@ -501,35 +501,32 @@ function exportDevices() {
 let devTimer: ReturnType<typeof setInterval> | null = null
 async function fetchDeviceData() {
   try {
-    const res = await realtimeApi.getAllData() as any
-    const d = res.data || res
-    if (!d) return
-    // 映射C++数据到前端设备
+    const d: any = await realtimeApi.getAllData()
+    if (!d || typeof d.temperature === 'undefined') { console.warn('[Devices] 数据格式异常:', d); return }
+    console.log('[Devices] C++数据:', {t: d.temperature, h: d.humidity, pm25: d.pm25, co2: d.co2, lux: d.lux})
     const map: Record<string, [number, string, boolean]> = {
-      'dev-001': [Math.round(d.temperature)/10, '℃', !!d.temperature_online],
-      'dev-002': [Math.round(d.humidity)/10, '%', !!d.humidity_online],
-      'dev-003': [d.pm25||0, 'μg/m³', !!d.pm25_online],
-      'dev-004': [d.co2||0, 'ppm', !!d.co2_online],
-      'dev-005': [d.tvoc||0, 'ppb', !!d.tvoc_online],
-      'dev-006': [d.ch2o||0, 'ppb', !!d.ch2o_online],
-      'dev-007': [d.pm10||0, 'μg/m³', !!d.pm10_online],
-      'dev-009': [d.smoke||0, '', !!d.smoke_online],
-      'dev-010': [d.water||0, 'cm', !!d.water_online],
-      'dev-011': [d.ir||0, '', !!d.ir_online],
-      'dev-012': [d.lux||0, 'lux', !!d.light_online],
+      'dev-001': [Math.round(Number(d.temperature))/10, '℃', !!d.temperature_online],
+      'dev-002': [Math.round(Number(d.humidity))/10, '%', !!d.humidity_online],
+      'dev-003': [Number(d.pm25)||0, 'μg/m³', !!d.pm25_online],
+      'dev-004': [Number(d.co2)||0, 'ppm', !!d.co2_online],
+      'dev-005': [Number(d.tvoc)||0, 'ppb', !!d.tvoc_online],
+      'dev-006': [Number(d.ch2o)||0, 'ppb', !!d.ch2o_online],
+      'dev-007': [Number(d.pm10)||0, 'μg/m³', !!d.pm10_online],
+      'dev-009': [Number(d.smoke)||0, '', !!d.smoke_online],
+      'dev-010': [Number(d.water)||0, 'cm', !!d.water_online],
+      'dev-011': [Number(d.ir)||0, '', !!d.ir_online],
+      'dev-012': [Number(d.lux)||0, 'lux', !!d.light_online],
     }
     Object.entries(map).forEach(([id, [val, unit, online]]) => {
       const dev = devices.find(d => d.id === id)
       if (dev) {
-        dev.value = val
-        dev.unit = unit
-        dev.status = online ? 'online' : 'offline'
+        dev.value = val; dev.unit = unit; dev.status = online ? 'online' : 'offline'
         dev.lastUpdate = new Date().toLocaleString('zh-CN')
       }
     })
-  } catch { /* C++不可用 */ }
+  } catch (e) { console.warn('[Devices] C++数据获取失败:', e) }
 }
-onMounted(() => { fetchDeviceData(); devTimer = setInterval(fetchDeviceData, 2000) })
+onMounted(() => { console.log('[Devices] 开始C++数据轮询...'); fetchDeviceData(); devTimer = setInterval(fetchDeviceData, 2000) })
 onUnmounted(() => { if (devTimer) clearInterval(devTimer) })
 </script>
 

@@ -382,14 +382,14 @@ const overviewCards = reactive([
   { label: '自定义应用', value: createdApps.length, unit: '个', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8m-4-4h8"/>', iconColor: 'cyan' as const, status: 'normal' as const, trend: '可扩展', trendDirection: 'stable' as const, miniChartData: [0, 0, 0, 0, 0, 0, createdApps.length] }
 ])
 
-// 设备数据
+// 设备状态卡片（由C++数据驱动）
 const devices = reactive([
-  { name: '云测仪 SD123', type: '环境传感器', icon: '🌡️', value: 24.5, unit: '℃', status: 'online' as const, trend: 'stable' as const, trendText: '稳定', chartData: [24.2, 24.5, 24.3, 24.6, 24.4, 24.5, 24.5], actions: [{ id: 'detail', label: '详情', icon: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>', type: 'primary' as const }] },
-  { name: '烟雾报警器', type: '安防设备', icon: '🔥', value: 0, unit: '', status: 'online' as const, trend: 'stable' as const, trendText: '正常', chartData: [0, 0, 0, 0, 0, 0, 0], actions: [{ id: 'test', label: '测试', icon: '<polygon points="5 3 19 12 5 21 5 3"/>', type: 'primary' as const }] },
-  { name: '水浸传感器', type: '安防设备', icon: '💧', value: 0, unit: 'cm', status: 'online' as const, trend: 'stable' as const, trendText: '正常', chartData: [0, 0, 0, 0, 0, 0, 0], actions: [{ id: 'simulate', label: '模拟', icon: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>', type: 'danger' as const }] },
-  { name: '红外探测器', type: '安防设备', icon: '👤', value: 0, unit: '', status: 'online' as const, trend: 'stable' as const, trendText: '正常', chartData: [0, 0, 1, 0, 0, 0, 0], actions: [{ id: 'detail', label: '详情', icon: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>', type: 'primary' as const }] },
-  { name: '空调控制器', type: '控制设备', icon: '❄️', value: 24, unit: '℃', status: 'online' as const, trend: 'down' as const, trendText: '下降', chartData: [26, 25.5, 25, 24.8, 24.5, 24.2, 24], actions: [{ id: 'on', label: '开启', icon: '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>', type: 'primary' as const }] },
-  { name: '通风净化机', type: '控制设备', icon: '🌀', value: 0, unit: '', status: 'offline' as const, trend: 'stable' as const, trendText: '离线', chartData: [], actions: [{ id: 'restart', label: '重启', icon: '<path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/>', type: 'primary' as const }] }
+  { name: '云测仪 SD123', type: '环境传感器', icon: '🌡️', value: 0, unit: '℃', status: 'offline' as const, trend: 'stable' as const, trendText: '--', chartData: [0,0,0,0,0,0,0], cppKey: 'temperature', cppDiv: 10, cppUnit: '℃', actions: [{ id: 'detail', label: '详情', icon: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>', type: 'primary' as const }] },
+  { name: '烟雾报警器', type: '安防设备', icon: '🔥', value: 0, unit: '', status: 'offline' as const, trend: 'stable' as const, trendText: '--', chartData: [0,0,0,0,0,0,0], cppKey: 'smoke', cppDiv: 1, cppUnit: '', cppBool: true, actions: [{ id: 'test', label: '测试', icon: '<polygon points="5 3 19 12 5 21 5 3"/>', type: 'primary' as const }] },
+  { name: '水浸传感器', type: '安防设备', icon: '💧', value: 0, unit: '', status: 'offline' as const, trend: 'stable' as const, trendText: '--', chartData: [0,0,0,0,0,0,0], cppKey: 'water', cppDiv: 1, cppUnit: '', cppBool: true, actions: [{ id: 'simulate', label: '模拟', icon: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>', type: 'danger' as const }] },
+  { name: '红外探测器', type: '安防设备', icon: '👤', value: 0, unit: '', status: 'offline' as const, trend: 'stable' as const, trendText: '--', chartData: [0,0,0,0,0,0,0], cppKey: 'ir', cppDiv: 1, cppUnit: '', cppBool: true, actions: [{ id: 'detail', label: '详情', icon: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>', type: 'primary' as const }] },
+  { name: '弱光传感器', type: '环境传感器', icon: '💡', value: 0, unit: 'lux', status: 'offline' as const, trend: 'stable' as const, trendText: '--', chartData: [0,0,0,0,0,0,0], cppKey: 'lux', cppDiv: 1, cppUnit: 'lux', actions: [{ id: 'detail', label: '详情', icon: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>', type: 'primary' as const }] },
+  { name: '空调控制器', type: '控制设备', icon: '❄️', value: 0, unit: '', status: 'offline' as const, trend: 'stable' as const, trendText: '--', chartData: [0,0,0,0,0,0,0], cppKey: 'ac_online', cppBool: true, actions: [{ id: 'on', label: '开启', icon: '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>', type: 'primary' as const }] },
 ])
 
 // 资源池设备
@@ -992,7 +992,21 @@ async function pollRealtimeData() {
       })
     })
     if (realtimeEvents.length > 100) realtimeEvents.length = 100
-  } catch { /* C++不可用，保持旧数据 */ }
+    // 更新设备状态卡片
+    devices.forEach(dev => {
+      const k = (dev as any).cppKey
+      if (!k) return
+      const onKey = k + '_online'
+      const online = d[onKey] !== undefined ? !!d[onKey] : false
+      dev.status = online ? 'online' : 'offline'
+      dev.trendText = online ? '在线' : '离线'
+      if (k === 'ac_online') { dev.value = 0; return }
+      const raw = Number(d[k]) || 0
+      const div = (dev as any).cppDiv || 1
+      dev.value = (dev as any).cppBool ? raw : Math.round(raw / div * 10) / 10
+      dev.unit = (dev as any).cppUnit || ''
+    })
+  } catch { /* C++不可用 */ }
 }
 
 onMounted(() => {

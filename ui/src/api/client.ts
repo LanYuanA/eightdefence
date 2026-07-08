@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // C++ 内嵌HTTP服务器 (实时数据) — 端口8080
 const cppClient = axios.create({
-  baseURL: 'http://localhost:8080/api',
+  baseURL: '/api',  // Vite代理到C++ :8080
   timeout: 5000,
   headers: { 'Content-Type': 'application/json' }
 })

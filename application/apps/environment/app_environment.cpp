@@ -262,6 +262,45 @@ HttpResponse AppEnvironment::handlePostControl(const HttpRequest& req) {
         }
     }
 
+    // 设备手动控制
+    if (target == "ac" || target == "humidifier" || target == "purifier") {
+        if (!g_modbus) {
+            addLog("error", "设备控制失败", "Modbus未初始化");
+            return HttpResponse::error(500, "Modbus未初始化");
+        }
+        uint8_t resp[64];
+        size_t respLen = 0;
+        int rc = -1;
+        std::string devName;
+        if (target == "ac") {
+            devName = "空调";
+            if (action == "on")
+                rc = dev_ac.setCoolOn(*g_modbus, resp, &respLen);
+            else
+                rc = dev_ac.setCoolOff(*g_modbus, resp, &respLen);
+        } else if (target == "humidifier") {
+            devName = "恒湿一体机";
+            if (action == "on") {
+                rc = dev_humidifier.setPower(*g_modbus, 1, resp, &respLen);
+                if (rc == 0)
+                    rc = dev_humidifier.setConstHum(*g_modbus, 1, resp, &respLen);
+            } else {
+                rc = dev_humidifier.setPower(*g_modbus, 0, resp, &respLen);
+            }
+        } else if (target == "purifier") {
+            devName = "空气净化器";
+            uint16_t val = (action == "on") ? 1 : 0;
+            rc = dev_purifier.setPower(*g_modbus, val, resp, &respLen);
+        }
+        if (rc == 0) {
+            addLog("normal", devName + (action == "on" ? "启动成功" : "已关闭"), "手动控制");
+            return HttpResponse::json("{\"status\":\"success\"}");
+        } else {
+            addLog("error", devName + (action == "on" ? "启动失败" : "关闭失败"), "rc=" + std::to_string(rc));
+            return HttpResponse::error(500, "设备控制失败");
+        }
+    }
+
     return HttpResponse::error(400, "无效的控制指令");
 }
 

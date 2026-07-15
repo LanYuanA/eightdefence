@@ -20,19 +20,19 @@ std::vector<DeviceTask> DevAirConditioner::getTasks() {
 }
 
 int DevAirConditioner::setCoolOn(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.readReg(DEV_AC_ADDR, REG_AC_COOL_ON, REG_AC_DATA, resp, 512, resp_len);
+    return svc.writeReg(DEV_AC_ADDR, REG_AC_COOL_ON, 1, resp, 512, resp_len);
 }
 
 int DevAirConditioner::setCoolOff(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.readReg(DEV_AC_ADDR, REG_AC_COOL_OFF, REG_AC_DATA, resp, 512, resp_len);
+    return svc.writeReg(DEV_AC_ADDR, REG_AC_COOL_OFF, 1, resp, 512, resp_len);
 }
 
 int DevAirConditioner::setHeatOn(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.readReg(DEV_AC_ADDR, REG_AC_HEAT_ON, REG_AC_DATA, resp, 512, resp_len);
+    return svc.writeReg(DEV_AC_ADDR, REG_AC_HEAT_ON, 1, resp, 512, resp_len);
 }
 
 int DevAirConditioner::setHeatOff(ModbusService &svc, uint8_t *resp, size_t *resp_len) {
-    return svc.readReg(DEV_AC_ADDR, REG_AC_HEAT_OFF, REG_AC_DATA, resp, 512, resp_len);
+    return svc.writeReg(DEV_AC_ADDR, REG_AC_HEAT_OFF, 1, resp, 512, resp_len);
 }
 
 void DevAirConditioner::procACResponse(const uint8_t *resp, size_t resp_len,

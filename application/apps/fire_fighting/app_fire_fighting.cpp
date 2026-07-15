@@ -284,6 +284,9 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
             if (rc == 0) {
                 addLog("normal", turnOn ? "舱门开启" : "舱门关闭", "手动控制");
                 return HttpResponse::json("{\"status\":\"success\"}");
+            } else {
+                addLog("error", turnOn ? "舱门开启失败" : "舱门关闭失败", "rc=" + std::to_string(rc));
+                return HttpResponse::error(500, "设备控制失败");
             }
         } else if (target == "fan" && m_svcExhaust) {
             int rc = m_svcExhaust->control(turnOn);
@@ -291,6 +294,9 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
                 m_state.exhaustActive.store(turnOn);
                 addLog("normal", turnOn ? "排烟风机开启" : "排烟风机关闭", "手动控制");
                 return HttpResponse::json("{\"status\":\"success\"}");
+            } else {
+                addLog("error", turnOn ? "排烟风机启动失败" : "排烟风机停止失败", "rc=" + std::to_string(rc));
+                return HttpResponse::error(500, "设备控制失败");
             }
         } else if (target == "sprinkler" && m_svcSprinkler) {
             int rc = m_svcSprinkler->control(turnOn);
@@ -298,6 +304,9 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
                 m_state.sprinklerActive.store(turnOn);
                 addLog("normal", turnOn ? "水淋系统开启" : "水淋系统关闭", "手动控制");
                 return HttpResponse::json("{\"status\":\"success\"}");
+            } else {
+                addLog("error", turnOn ? "水淋系统启动失败" : "水淋系统停止失败", "rc=" + std::to_string(rc));
+                return HttpResponse::error(500, "设备控制失败");
             }
         } else if (target == "horn") {
             if (turnOn && m_svcSoundLight) m_svcSoundLight->activate();
@@ -305,6 +314,7 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
             addLog("normal", turnOn ? "声光报警器开启" : "声光报警器关闭", "手动控制");
             return HttpResponse::json("{\"status\":\"success\"}");
         }
+        addLog("error", target + (turnOn ? "启动失败" : "停止失败"), "服务未初始化");
         return HttpResponse::error(500, "设备控制失败");
     }
 

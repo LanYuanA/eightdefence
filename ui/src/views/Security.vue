@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="security-root">
     <ParticleBackground :particle-count="50" color="#3b82f6" :opacity="0.4" />
     <AppNavbar title="智能安防系统" subtitle="Security Monitoring System" :menu-items="menuItems" />
@@ -172,6 +172,7 @@ import { realtimeApi } from '../api/realtime'
 import BaseCard from '../components/BaseCard.vue'
 import CyberButton from '../components/CyberButton.vue'
 import StatusDot from '../components/StatusDot.vue'
+import axios from "axios"
 
 const menuItems = [
   { path: '/', label: '主控台' },
@@ -361,55 +362,62 @@ async function fetchSecurityData() {
 }
 secTimer = setInterval(fetchSecurityData, 2000)
 
-// 模拟操作
+// 模拟操作（调用后端API）
 function simulateWater() {
-  waterDetected.value = true
-  waterLevel.value = 5.2
-  waterRisk.value = '高'
-  alarmActive.value = true
-  ElMessage.warning('模拟水浸异常')
+  waterDetected.value = true; waterLevel.value = 5.2; waterRisk.value = "高"; alarmActive.value = true
+  axios.get("/security/api/control", { params: { target: "water", action: "simulate" } }).then(() => {
+    ElMessage.warning("模拟水浸异常")
+  }).catch(() => {
+    ElMessage.warning("模拟水浸异常（后端未响应）")
+  })
 }
 
 function resetWater() {
-  waterDetected.value = false
-  waterLevel.value = 0
-  waterRisk.value = '低'
-  alarmActive.value = false
-  ElMessage.success('水浸状态已重置')
+  axios.get("/security/api/control", { params: { target: "water", action: "reset" } }).then(() => {
+    waterDetected.value = false; waterLevel.value = 0; waterRisk.value = "低"; alarmActive.value = false
+    ElMessage.success("水浸状态已重置")
+  }).catch(() => {
+    waterDetected.value = false; waterLevel.value = 0; waterRisk.value = "低"; alarmActive.value = false
+    ElMessage.success("水浸状态已重置（后端未响应）")
+  })
 }
 
 function simulateIntrusion() {
-  infraredDetected.value = true
-  radarDetected.value = true
-  intrusionRisk.value = '高'
-  alarmActive.value = true
-  ElMessage.warning('模拟人员入侵')
+  infraredDetected.value = true; radarDetected.value = true; intrusionRisk.value = "高"; alarmActive.value = true
+  axios.get("/security/api/control", { params: { target: "intrusion", action: "simulate" } }).then(() => {
+    ElMessage.warning("模拟人员入侵")
+  }).catch(() => {
+    ElMessage.warning("模拟人员入侵（后端未响应）")
+  })
 }
 
 function resetIntrusion() {
-  infraredDetected.value = false
-  radarDetected.value = false
-  intrusionRisk.value = '低'
-  alarmActive.value = false
-  ElMessage.success('入侵状态已重置')
+  axios.get("/security/api/control", { params: { target: "intrusion", action: "reset" } }).then(() => {
+    infraredDetected.value = false; radarDetected.value = false; intrusionRisk.value = "低"; alarmActive.value = false
+    ElMessage.success("入侵状态已重置")
+  }).catch(() => {
+    infraredDetected.value = false; radarDetected.value = false; intrusionRisk.value = "低"; alarmActive.value = false
+    ElMessage.success("入侵状态已重置（后端未响应）")
+  })
 }
 
 function simulateGas() {
-  tvocValue.value = 580
-  ch2oValue.value = 120
-  co2Value.value = 1200
-  gasRisk.value = '高'
-  alarmActive.value = true
-  ElMessage.warning('模拟气体异常')
+  tvocValue.value = 580; ch2oValue.value = 120; co2Value.value = 1200; gasRisk.value = "高"; alarmActive.value = true
+  axios.get("/security/api/control", { params: { target: "gas", action: "simulate" } }).then(() => {
+    ElMessage.warning("模拟气体异常")
+  }).catch(() => {
+    ElMessage.warning("模拟气体异常（后端未响应）")
+  })
 }
 
 function resetGas() {
-  tvocValue.value = 120
-  ch2oValue.value = 30
-  co2Value.value = 450
-  gasRisk.value = '低'
-  alarmActive.value = false
-  ElMessage.success('气体状态已重置')
+  axios.get("/security/api/control", { params: { target: "gas", action: "reset" } }).then(() => {
+    tvocValue.value = 120; ch2oValue.value = 30; co2Value.value = 450; gasRisk.value = "低"; alarmActive.value = false
+    ElMessage.success("气体状态已重置")
+  }).catch(() => {
+    tvocValue.value = 120; ch2oValue.value = 30; co2Value.value = 450; gasRisk.value = "低"; alarmActive.value = false
+    ElMessage.success("气体状态已重置（后端未响应）")
+  })
 }
 </script>
 

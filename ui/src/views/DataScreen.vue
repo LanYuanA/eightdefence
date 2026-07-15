@@ -320,8 +320,13 @@ function drawBg(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) 
 
 function drawTopo(ctx: CanvasRenderingContext2D, w: number, h: number, _t: number) {
   ctx.clearRect(0, 0, w, h)
-  if (!isTopoDrag) rotY += 0.15
+  if (!isTopoDrag) rotY += 0.2
   const cx = w / 2, cy = h / 2
+
+  // 球体光晕背景
+  const bgGrad = ctx.createRadialGradient(cx, cy, 30, cx, cy, 250)
+  bgGrad.addColorStop(0, 'rgba(59,130,246,0.06)'); bgGrad.addColorStop(1, 'transparent')
+  ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, w, h)
 
   const proj = topoNodes.map((n, i) => {
     const p = project3D(n.x, n.y, n.z, cx, cy)
@@ -329,37 +334,58 @@ function drawTopo(ctx: CanvasRenderingContext2D, w: number, h: number, _t: numbe
   })
   proj.sort((a, b) => a.depth - b.depth)
 
-  // 边
+  const pulse = Math.sin(_t * 0.003) * 0.3 + 0.7
+
+  // 边+粒子
+  const drawnEdges = new Set<string>()
   for (const p of proj) {
     for (const e of topoEdges) {
       if (e.from !== p.i && e.to !== p.i) continue
       const oi = e.from === p.i ? e.to : e.from
+      const key = [p.i, oi].sort().join('-')
+      if (drawnEdges.has(key)) continue; drawnEdges.add(key)
       const o = proj.find(pp => pp.i === oi)
       if (!o) continue
+      // 发光连线
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(o.x, o.y)
-      ctx.strokeStyle = e.active ? e.color + '35' : '#33415520'
-      ctx.lineWidth = e.active ? 1 : 0.4; ctx.stroke()
+      ctx.strokeStyle = e.active ? e.color + '25' : '#33415512'
+      ctx.lineWidth = e.active ? 1.5 : 0.3; ctx.stroke()
+      // 粒子
+      if (e.active) {
+        for (let pi = 0; pi < 3; pi++) {
+          const prog = ((_t * 0.0002 + pi * 0.33 + p.i * 0.1) % 1 + 1) % 1
+          const px = p.x + (o.x - p.x) * prog, py = p.y + (o.y - p.y) * prog
+          ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI * 2)
+          ctx.fillStyle = e.color; ctx.fill()
+          ctx.beginPath(); ctx.arc(px, py, 4.5, 0, Math.PI * 2)
+          ctx.fillStyle = e.color + '40'; ctx.fill()
+        }
+      }
     }
   }
 
   // 节点
   for (const p of proj) {
-    const sz = 13 * p.s
+    const sz = 14 * p.s
     if (p.n.status === 'online') {
-      const g = ctx.createRadialGradient(p.x, p.y, sz * 0.5, p.x, p.y, sz * 2.2)
-      g.addColorStop(0, p.n.color + '45'); g.addColorStop(1, 'transparent')
-      ctx.beginPath(); ctx.arc(p.x, p.y, sz * 2.2, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill()
+      const pr = sz * 2.5 * pulse
+      const g = ctx.createRadialGradient(p.x, p.y, sz * 0.3, p.x, p.y, pr)
+      g.addColorStop(0, p.n.color + '55'); g.addColorStop(0.6, p.n.color + '10'); g.addColorStop(1, 'transparent')
+      ctx.beginPath(); ctx.arc(p.x, p.y, pr, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill()
     }
+    // 主体球面效果
+    const grad = ctx.createRadialGradient(p.x - sz*0.3, p.y - sz*0.3, sz*0.05, p.x, p.y, sz)
+    grad.addColorStop(0, '#fff'); grad.addColorStop(0.35, p.n.status === 'online' ? p.n.color : '#475569')
+    grad.addColorStop(1, p.n.status === 'online' ? p.n.color + '50' : '#1e293b')
     ctx.beginPath(); ctx.arc(p.x, p.y, sz, 0, Math.PI * 2)
-    ctx.fillStyle = p.n.status === 'online' ? p.n.color + '35' : '#1e293b'
-    ctx.strokeStyle = p.n.status === 'online' ? p.n.color : '#475569'
-    ctx.lineWidth = 1.3; ctx.fill(); ctx.stroke()
-    const isz = Math.max(9, sz * 0.75)
+    ctx.fillStyle = grad; ctx.fill()
+    ctx.strokeStyle = p.n.status === 'online' ? '#ffffff30' : '#475569'; ctx.lineWidth = 1.3; ctx.stroke()
+    const isz = Math.max(10, sz * 0.7)
     ctx.font = `${isz}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.fillStyle = '#fff'; ctx.fillText(p.n.icon, p.x, p.y)
-    if (p.s > 0.45) {
-      ctx.font = `${Math.max(8, 9 * p.s)}px sans-serif`
-      ctx.fillStyle = p.n.color; ctx.fillText(p.n.name, p.x, p.y + sz + 11 * p.s)
+    if (p.s > 0.4) {
+      ctx.font = `bold ${Math.max(9, 10 * p.s)}px sans-serif`
+      ctx.fillStyle = p.n.color; ctx.fillText(p.n.name, p.x, p.y + sz + 12 * p.s)
     }
   }
 }

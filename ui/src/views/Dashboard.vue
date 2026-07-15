@@ -537,7 +537,7 @@ function drawFlowChart() {
   canvas.height = 520
 
   const ox = 220
-  const GAP = 75 // 层间距，均匀分布5层
+  const GAP = 95 // 层间距，均匀填满画布
 
   const lowerSvcGroups = [
     { label: '数据采集类', color: '#3b82f6', x: ox + 20, svcs: ['温度','湿度','PM2.5','PM10','CO₂','TVOC','甲醛','烟雾','水浸','光感','红外','雷达','空气等级'] },

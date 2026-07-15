@@ -270,7 +270,7 @@ function drawFlowChart() {
   canvas.width = container.clientWidth
   canvas.height = 370
 
-  const ox = 220
+  const ox = 140
   const layers = [
     { name: '应用层', y: 20, nodes: [
       { id: 'app-env', x: 400 + ox, icon: '🌡️', label: '环境监测应用', color: '#3b82f6' }

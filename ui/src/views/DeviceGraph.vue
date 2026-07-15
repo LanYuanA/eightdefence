@@ -249,7 +249,25 @@ function draw(ts: number) {
   const rect = wrapRef.value.getBoundingClientRect()
   canvas.width = rect.width; canvas.height = rect.height
   const w = canvas.width, h = canvas.height, cx = w / 2, cy = h / 2
-  if (autoRotate.value && !isDrag) rotY += 0.2
+  if (autoRotate.value && !isDrag) rotY += 0.25
+
+  // 深空背景
+  ctx.clearRect(0, 0, w, h)
+  const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.7)
+  bgGrad.addColorStop(0, 'rgba(30,64,175,0.08)'); bgGrad.addColorStop(0.5, 'rgba(15,23,42,0.03)'); bgGrad.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, w, h)
+
+  // 层轨道环
+  const orbitRings = [100, 200, 300, 400]
+  orbitRings.forEach((r, i) => {
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2)
+    ctx.strokeStyle = ['rgba(139,92,246,0.08)','rgba(59,130,246,0.06)','rgba(6,182,212,0.06)','rgba(245,158,11,0.05)'][i]
+    ctx.lineWidth = 1; ctx.stroke()
+    // 虚线轨道
+    ctx.setLineDash([4, 20]); ctx.lineDashOffset = ts * 0.02
+    ctx.strokeStyle = ['rgba(139,92,246,0.04)','rgba(59,130,246,0.03)','rgba(6,182,212,0.03)','rgba(245,158,11,0.02)'][i]
+    ctx.stroke(); ctx.setLineDash([])
+  })
 
   // 投影并排序
   const proj = graphData.nodes
@@ -257,21 +275,20 @@ function draw(ts: number) {
     .map(n => ({ ...project(n.x, n.y, n.z, cx, cy), node: n }))
     .sort((a, b) => a.depth - b.depth)
 
-  // 画层级区域标签
+  // 层标签
   const layers = [
     { z: 80, label: '应用层', y: -145, color: '#8b5cf6' },
     { z: 0, label: '原子服务层', y: 10, color: '#3b82f6' },
     { z: -80, label: '设备抽象层', y: 110, color: '#06b6d4' },
     { z: -160, label: '设备层', y: 210, color: '#f59e0b' },
   ]
-  ctx.clearRect(0, 0, w, h)
-  ctx.font = '11px sans-serif'; ctx.textAlign = 'left'
+  ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'left'
   for (const l of layers) {
     const lp = project(0, l.y, l.z, cx, cy)
-    ctx.fillStyle = l.color + '45'; ctx.fillText(l.label, 12, Math.max(18, lp.y - 5))
+    ctx.fillStyle = l.color + '60'; ctx.fillText(l.label, 12, Math.max(18, lp.y - 5))
   }
 
-  // 画边（去重）
+  // 画边+粒子流
   const edgeSet = new Set<string>()
   for (const p of proj) {
     for (const edge of graphData.edges) {
@@ -284,40 +301,66 @@ function draw(ts: number) {
       if (!other) continue
       const ct = connectionTypes.find(c => c.value === edge.type)
       const col = ct?.color || '#475569'
+      // 主连线
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(other.x, other.y)
-      ctx.strokeStyle = edge.active ? col + '40' : '#33415518'
-      ctx.lineWidth = edge.active ? 1.5 : 0.5; ctx.stroke()
-      // 流动粒子
+      ctx.strokeStyle = edge.active ? col + '35' : '#33415512'
+      ctx.lineWidth = edge.active ? 1.8 : 0.5; ctx.stroke()
+      // 发光连线
       if (edge.active) {
-        for (let pi = 0; pi < 2; pi++) {
-          const prog = ((ts * 0.00025 + pi * 0.5 + p.node.id.charCodeAt(0) * 0.01) % 1 + 1) % 1
-          ctx.beginPath(); ctx.arc(p.x + (other.x - p.x) * prog, p.y + (other.y - p.y) * prog, 2.3, 0, Math.PI * 2)
-          ctx.fillStyle = col; ctx.globalAlpha = 0.7; ctx.fill(); ctx.globalAlpha = 1
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(other.x, other.y)
+        ctx.strokeStyle = col + '15'; ctx.lineWidth = 4; ctx.stroke()
+      }
+      // 多个流动粒子
+      if (edge.active) {
+        for (let pi = 0; pi < 4; pi++) {
+          const prog = ((ts * 0.0003 + pi * 0.25 + p.node.id.charCodeAt(0) * 0.005) % 1 + 1) % 1
+          const px = p.x + (other.x - p.x) * prog, py = p.y + (other.y - p.y) * prog
+          // 拖尾
+          const trailProg = Math.max(0, prog - 0.04)
+          const tx = p.x + (other.x - p.x) * trailProg, ty = p.y + (other.y - p.y) * trailProg
+          ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(px, py)
+          ctx.strokeStyle = col + '50'; ctx.lineWidth = 3; ctx.stroke()
+          // 粒子主体
+          ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2)
+          ctx.fillStyle = '#fff'; ctx.fill()
+          ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2)
+          ctx.fillStyle = col + '60'; ctx.fill()
         }
       }
     }
   }
 
   // 画节点
+  const pulse = Math.sin(ts * 0.003) * 0.3 + 0.7 // 0.4~1.0 呼吸
   for (const p of proj) {
-    const sz = 15 * p.s, node = p.node
+    const sz = 16 * p.s; const node = p.node
+    // 外圈脉动光晕
     if (node.status === 'online') {
-      const g = ctx.createRadialGradient(p.x, p.y, sz * 0.4, p.x, p.y, sz * 2.5)
-      g.addColorStop(0, node.color + '50'); g.addColorStop(1, 'transparent')
-      ctx.beginPath(); ctx.arc(p.x, p.y, sz * 2.5, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill()
+      const pr = sz * 2.5 * pulse
+      const g = ctx.createRadialGradient(p.x, p.y, sz * 0.4, p.x, p.y, pr)
+      g.addColorStop(0, node.color + '60'); g.addColorStop(0.5, node.color + '15'); g.addColorStop(1, 'transparent')
+      ctx.beginPath(); ctx.arc(p.x, p.y, pr, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill()
+      // 第二层光晕
+      const g2 = ctx.createRadialGradient(p.x, p.y, sz * 0.2, p.x, p.y, sz * 4)
+      g2.addColorStop(0, node.color + '20'); g2.addColorStop(1, 'transparent')
+      ctx.beginPath(); ctx.arc(p.x, p.y, sz * 4, 0, Math.PI * 2); ctx.fillStyle = g2; ctx.fill()
     }
+    // 节点主体
+    const grad = ctx.createRadialGradient(p.x - sz*0.3, p.y - sz*0.3, sz*0.1, p.x, p.y, sz)
+    const base = node.status === 'online' ? node.color : '#334155'
+    grad.addColorStop(0, '#ffffff'); grad.addColorStop(0.3, base); grad.addColorStop(1, base + '60')
     ctx.beginPath(); ctx.arc(p.x, p.y, sz, 0, Math.PI * 2)
-    ctx.fillStyle = node.status === 'online' ? node.color + '40' : '#1e293b'
-    ctx.strokeStyle = node.status === 'online' ? node.color : '#475569'
-    ctx.lineWidth = 1.5; ctx.fill(); ctx.stroke()
-    const isz = Math.max(10, sz * 0.8)
+    ctx.fillStyle = grad; ctx.fill()
+    ctx.strokeStyle = node.status === 'online' ? '#ffffff40' : '#475569'; ctx.lineWidth = 1.5; ctx.stroke()
+    // 图标
+    const isz = Math.max(11, sz * 0.75)
     ctx.font = `${isz}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillStyle = node.status === 'online' ? '#fff' : '#64748b'
-    ctx.fillText(node.icon, p.x, p.y)
+    ctx.fillStyle = '#fff'; ctx.fillText(node.icon, p.x, p.y)
+    // 标签
     if (showLabels.value && p.s > 0.35) {
-      ctx.font = `${Math.max(8, 10 * p.s)}px sans-serif`
+      ctx.font = `bold ${Math.max(9, 11 * p.s)}px sans-serif`
       ctx.fillStyle = node.status === 'online' ? node.color : '#64748b'
-      ctx.fillText(node.name, p.x, p.y + sz + 12 * p.s)
+      ctx.fillText(node.name, p.x, p.y + sz + 14 * p.s)
     }
   }
 }

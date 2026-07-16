@@ -1,4 +1,4 @@
-﻿#ifndef DEVICE_CONFIG_H
+#ifndef DEVICE_CONFIG_H
 #define DEVICE_CONFIG_H
 
 /* ============================================================
@@ -75,7 +75,7 @@
 /* ============================================================
  * 04. 报警装置 (驱鼠器)  地址: 0x80
  * ============================================================ */
-#define DEV_ALARM_ADDR     0x02
+#define DEV_ALARM_ADDR     0x80
 #define REG_ALARM_READ     0x01   /* 查询操作 (功能码) */
 #define REG_ALARM_CTRL     0x05   /* 控制操作 (功能码) */
 #define REG_ALARM_COIL     0x0000 /* 线圈地址 */

@@ -232,19 +232,21 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
         if (action == "confirm")
             addLog("alarm", "火情已确认", "操作人: " + operatorName + ", 已执行安全防御");
         else
-            addLog("normal", "火情误报", "操作人: " + operatorName + ", 标记为误报, 风险恢复前不再弹窗");
+            addLog("normal", "火情误报", "操作人: " + operatorName + ", 所有设备已停止");
+            // 误报: 停止全部设备
+            if (m_svcCabin)      { m_svcCabin->deactivate(); APP_LOG_INFO("[火情误报] 舱门关闭"); }
+            if (m_svcSprinkler)  { m_svcSprinkler->control(false); APP_LOG_INFO("[火情误报] 水淋关闭"); }
+            if (m_svcExhaust)    { m_svcExhaust->control(false); APP_LOG_INFO("[火情误报] 排烟风机关闭"); }
+            if (m_svcSoundLight) { m_svcSoundLight->deactivate(); APP_LOG_INFO("[火情误报] 声光报警关闭"); }
+            m_state.sprinklerActive.store(false);
+            m_state.exhaustActive.store(false);
+            m_state.alarmActive.store(false);
 
         APP_LOG_INFO("火情%s: 操作人=%s", action == "confirm" ? "确认" : "误报", operatorName.c_str());
 
-        // 确认火情: 开启所有消防设备
+        // 确认火情: 设备已由handleRiskResponse自动启动, 仅记录
         if (action == "confirm") {
-            if (m_svcCabin)      { m_svcCabin->control(true); APP_LOG_INFO("[火情确认] 舱门开启"); }
-            if (m_svcSprinkler)  { m_svcSprinkler->control(true); APP_LOG_INFO("[火情确认] 水淋开启"); }
-            if (m_svcExhaust)    { m_svcExhaust->control(true); APP_LOG_INFO("[火情确认] 排烟风机开启"); }
-            if (m_svcSoundLight) { m_svcSoundLight->activate(); APP_LOG_INFO("[火情确认] 声光报警开启"); }
-            m_state.sprinklerActive.store(true);
-            m_state.exhaustActive.store(true);
-            m_state.alarmActive.store(true);
+            // 设备已运行, 无需重复启动
         }
 
         return HttpResponse::json("{\"status\":\"success\"}");
@@ -271,8 +273,8 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
             if (m_svcSprinkler)  { m_svcSprinkler->control(false); APP_LOG_INFO("[停止模拟] 水淋关闭"); }
             if (m_svcExhaust)    { m_svcExhaust->control(false); APP_LOG_INFO("[停止模拟] 排烟风机关闭"); }
             if (m_svcSoundLight) { m_svcSoundLight->deactivate(); APP_LOG_INFO("[停止模拟] 声光报警关闭"); }
-            m_state.sprinklerActive.store(false);
-            m_state.exhaustActive.store(false);
+            m_state.sprinklerActive.store(true);
+            m_state.exhaustActive.store(true);
             m_state.alarmActive.store(false);
 
             APP_LOG_INFO("火灾模拟取消: 恢复正常");
@@ -430,12 +432,33 @@ HttpResponse AppFireFighting::handleGetFireActions(const HttpRequest& /*req*/) {
     return HttpResponse::json(json);
 }
 void AppFireFighting::evaluateRisk() {
-    // 火情已确认: 锁定风险等级=高, 不再自动重算
+    // 用户已确认/误报: 智能锁定
     if (m_state.alarmAcknowledged.load()) {
-        m_state.riskPercent.store(100);
-        m_state.overallRisk = FireRiskLevel::HIGH;
-        m_state.systemNormal.store(false);
-        return;
+        if (m_state.fireSimulated.load()) {
+            // 模拟火情: 保持高风险直到手动停止
+            m_state.riskPercent.store(100);
+            m_state.overallRisk = FireRiskLevel::HIGH;
+            m_state.systemNormal.store(false);
+            return;
+        }
+        // 真实告警: 数据恢复正常后自动解除锁定
+        if (m_state.smokeState.load() == 0 && m_state.temperature.load() < 50.0f) {
+            int co2Val = dev_co2.isOnline() ? dev_co2.getValue() : 400;
+            if (co2Val < 1000) {
+                m_state.alarmAcknowledged.store(false);
+                // 继续正常计算
+            } else {
+                m_state.riskPercent.store(100);
+                m_state.overallRisk = FireRiskLevel::HIGH;
+                m_state.systemNormal.store(false);
+                return;
+            }
+        } else {
+            m_state.riskPercent.store(100);
+            m_state.overallRisk = FireRiskLevel::HIGH;
+            m_state.systemNormal.store(false);
+            return;
+        }
     }
     m_state.smokeRisk = calcSmokeRisk(m_state.smokeState.load());
     m_state.tempRisk  = calcTempRisk(m_state.temperature.load());
@@ -519,95 +542,34 @@ void AppFireFighting::handleRiskResponse() {
     int rp = m_state.riskPercent.load();
     if (rp == m_prevRiskPercent) return;
     m_prevRiskPercent = rp;
-    // 模拟未确认时不自动响应; 已确认后保持设备状态不再干预
-    if (m_state.fireSimulated.load() && !m_state.alarmAcknowledged.load()) return;
+    // 已经自动启动过或用户已确认/误报, 不再干预
     if (m_state.alarmAcknowledged.load()) return;
-    // 烟雾高风险 = 火灾确认
-    if (m_state.smokeRisk >= FireRiskLevel::HIGH) {
-        // 声光报警
+
+    bool highRisk = (m_state.smokeRisk >= FireRiskLevel::HIGH || m_state.tempRisk >= FireRiskLevel::HIGH);
+
+    if (highRisk) {
+        // 立即启动全部4个设备(control不检查active_, 确保每次都能发出)
+        if (m_svcCabin)      m_svcCabin->control(true);
+        if (m_svcSprinkler)  m_svcSprinkler->control(true);
+        if (m_svcExhaust)    m_svcExhaust->control(true);
         if (m_svcSoundLight) m_svcSoundLight->activate();
         m_state.alarmActive.store(true);
-
-        // 灭火联动
-        if (m_svcSprinkler) m_svcSprinkler->activate();
         m_state.sprinklerActive.store(true);
-
-        // 疏散引导
-        if (m_svcExhaust) m_svcExhaust->activate();
         m_state.exhaustActive.store(true);
-
-        // 指挥中心告警
-        if (m_svcCmdCenter) {
-            m_svcCmdCenter->activate();
-            m_svcCmdCenter->alert("high", "火灾警报",
-                "烟雾探测器检测到烟雾, 火灾风险等级: 高风险, 灭火和疏散系统已启动");
-        }
-        m_state.centerAlarmActive.store(true);
-
-        if (m_prevSmokeRisk < FireRiskLevel::HIGH) {
-            addLog("alarm", "火灾警报",
-                "烟雾探测器检测到烟雾, 触发火灾应急响应: 声光报警+灭火联动+疏散引导+指挥中心告警");
-        }
+        // 自锁: 防止下次轮询再次触发
+        m_state.alarmAcknowledged.store(true);
+        addLog("alarm", "应急响应", "检测到高风险, 全部消防设备已自动启动");
     }
-    // 温度高风险但无烟雾 = 预警
-    else if (m_state.tempRisk >= FireRiskLevel::HIGH) {
-        // 声光报警
-        if (m_svcSoundLight) m_svcSoundLight->activate();
-        m_state.alarmActive.store(true);
-
-        // 指挥中心预警
-        if (m_svcCmdCenter) {
-            m_svcCmdCenter->activate();
-            m_svcCmdCenter->alert("medium", "高温预警",
-                "环境温度超过70°C, 存在火灾风险, 请立即排查");
-        }
-        m_state.centerAlarmActive.store(true);
-
-        // 灭火和疏散暂不启动（仅温度高，无烟雾确认）
-        if (m_svcSprinkler) m_svcSprinkler->deactivate();
-        if (m_svcExhaust) m_svcExhaust->deactivate();
-        m_state.sprinklerActive.store(false);
-        m_state.exhaustActive.store(false);
-
-        if (m_prevTempRisk < FireRiskLevel::HIGH) {
-            addLog("warning", "高温预警",
-                "环境温度超过70°C, 触发高温预警: 声光报警+指挥中心预警");
-        }
-    }
-    // 温度中风险 = 预警
-    else if (m_state.tempRisk >= FireRiskLevel::MEDIUM) {
-        if (m_svcCmdCenter) {
-            m_svcCmdCenter->activate();
-            m_svcCmdCenter->alert("low", "温度偏高",
-                "环境温度超过50°C, 请注意监控");
-        }
-        m_state.centerAlarmActive.store(true);
-
+    else if (m_state.overallRisk == FireRiskLevel::LOW) {
+        // 安全状态: 关闭全部
+        if (m_svcCabin)      m_svcCabin->deactivate();
+        if (m_svcSprinkler)  m_svcSprinkler->deactivate();
+        if (m_svcExhaust)    m_svcExhaust->deactivate();
         if (m_svcSoundLight) m_svcSoundLight->deactivate();
-        if (m_svcSprinkler) m_svcSprinkler->deactivate();
-        if (m_svcExhaust) m_svcExhaust->deactivate();
+        if (m_svcCmdCenter)  m_svcCmdCenter->deactivate();
         m_state.alarmActive.store(false);
         m_state.sprinklerActive.store(false);
         m_state.exhaustActive.store(false);
-
-        if (m_prevTempRisk < FireRiskLevel::MEDIUM) {
-            addLog("warning", "温度偏高", "环境温度超过50°C, 已通知指挥中心");
-        }
-    }
-    // 安全状态
-    else {
-        if (m_svcSoundLight) m_svcSoundLight->deactivate();
-        if (m_svcSprinkler) m_svcSprinkler->deactivate();
-        if (m_svcExhaust) m_svcExhaust->deactivate();
-        if (m_svcCmdCenter) m_svcCmdCenter->deactivate();
-        m_state.alarmActive.store(false);
-        m_state.sprinklerActive.store(false);
-        m_state.exhaustActive.store(false);
-        m_state.centerAlarmActive.store(false);
-
-        if (m_prevSmokeRisk >= FireRiskLevel::HIGH || m_prevTempRisk >= FireRiskLevel::MEDIUM) {
-            addLog("normal", "消防系统恢复", "所有风险已解除, 消防服务已停止");
-        }
     }
 
     m_prevSmokeRisk = m_state.smokeRisk;

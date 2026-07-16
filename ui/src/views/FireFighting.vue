@@ -338,15 +338,9 @@ const confirmThresholdText = ref('')
 const justConfirmed = ref(false)
 function confirmFire() {
   closeModal("fireConfirm")
+  // 设备已由后端自动启动, 确认仅记录
   const operator = localStorage.getItem("loginUser") || "管理员"
-  axios.get("/fire/api/control", { params: { action: "confirm", operator } }).then(() => {
-    fireDevices.forEach(d => { if (!d.active) { d.active = true; addDeviceControlLog(d.name, "开启") } })
-    justConfirmed.value = true
-    setTimeout(() => { justConfirmed.value = false }, 3000)
-  }).catch((err: any) => {
-    console.error("火情确认指令发送失败:", err)
-    ElMessage.error("设备控制指令发送失败，请检查设备连接")
-  })
+  axios.get("/fire/api/control", { params: { action: "confirm", operator } }).catch(() => {})
   alarmDismissed.value = true
   if (alarmDismissTimer) clearTimeout(alarmDismissTimer)
   alarmDismissTimer = setTimeout(() => { alarmDismissed.value = false }, 60000)

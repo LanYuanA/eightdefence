@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file app_fire_fighting.cpp
  * @brief 消防系统应用实现
  */
@@ -235,6 +235,18 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
             addLog("normal", "火情误报", "操作人: " + operatorName + ", 标记为误报, 风险恢复前不再弹窗");
 
         APP_LOG_INFO("火情%s: 操作人=%s", action == "confirm" ? "确认" : "误报", operatorName.c_str());
+
+        // 确认火情: 开启所有消防设备
+        if (action == "confirm") {
+            if (m_svcCabin)      { m_svcCabin->control(true); APP_LOG_INFO("[火情确认] 舱门开启"); }
+            if (m_svcSprinkler)  { m_svcSprinkler->control(true); APP_LOG_INFO("[火情确认] 水淋开启"); }
+            if (m_svcExhaust)    { m_svcExhaust->control(true); APP_LOG_INFO("[火情确认] 排烟风机开启"); }
+            if (m_svcSoundLight) { m_svcSoundLight->activate(); APP_LOG_INFO("[火情确认] 声光报警开启"); }
+            m_state.sprinklerActive.store(true);
+            m_state.exhaustActive.store(true);
+            m_state.alarmActive.store(true);
+        }
+
         return HttpResponse::json("{\"status\":\"success\"}");
     }
 
@@ -251,7 +263,18 @@ HttpResponse AppFireFighting::handlePostControl(const HttpRequest& req) {
             m_state.fireSimulated.store(false);
             m_state.simSmoke.store(0);
             m_state.simTemp.store(25.0f);
+            m_state.alarmAcknowledged.store(false);
             evaluateRisk();
+
+            // 停止模拟: 关闭所有消防设备
+            if (m_svcCabin)      { m_svcCabin->control(false); APP_LOG_INFO("[停止模拟] 舱门关闭"); }
+            if (m_svcSprinkler)  { m_svcSprinkler->control(false); APP_LOG_INFO("[停止模拟] 水淋关闭"); }
+            if (m_svcExhaust)    { m_svcExhaust->control(false); APP_LOG_INFO("[停止模拟] 排烟风机关闭"); }
+            if (m_svcSoundLight) { m_svcSoundLight->deactivate(); APP_LOG_INFO("[停止模拟] 声光报警关闭"); }
+            m_state.sprinklerActive.store(false);
+            m_state.exhaustActive.store(false);
+            m_state.alarmActive.store(false);
+
             APP_LOG_INFO("火灾模拟取消: 恢复正常");
             addLog("normal", "火灾警报解除", "火灾模拟已取消, 恢复正常状态");
             return HttpResponse::json("{\"status\":\"success\",\"message\":\"火灾警报已解除\"}");

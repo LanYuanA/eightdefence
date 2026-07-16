@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file app_fire_fighting.cpp
  * @brief 消防系统应用实现
  */
@@ -430,6 +430,13 @@ HttpResponse AppFireFighting::handleGetFireActions(const HttpRequest& /*req*/) {
     return HttpResponse::json(json);
 }
 void AppFireFighting::evaluateRisk() {
+    // 火情已确认: 锁定风险等级=高, 不再自动重算
+    if (m_state.alarmAcknowledged.load()) {
+        m_state.riskPercent.store(100);
+        m_state.overallRisk = FireRiskLevel::HIGH;
+        m_state.systemNormal.store(false);
+        return;
+    }
     m_state.smokeRisk = calcSmokeRisk(m_state.smokeState.load());
     m_state.tempRisk  = calcTempRisk(m_state.temperature.load());
 
@@ -512,6 +519,9 @@ void AppFireFighting::handleRiskResponse() {
     int rp = m_state.riskPercent.load();
     if (rp == m_prevRiskPercent) return;
     m_prevRiskPercent = rp;
+    // 模拟未确认时不自动响应; 已确认后保持设备状态不再干预
+    if (m_state.fireSimulated.load() && !m_state.alarmAcknowledged.load()) return;
+    if (m_state.alarmAcknowledged.load()) return;
     // 烟雾高风险 = 火灾确认
     if (m_state.smokeRisk >= FireRiskLevel::HIGH) {
         // 声光报警

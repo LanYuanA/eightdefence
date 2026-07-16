@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="fire-root">
     <ParticleBackground :particle-count="30" color="#ef4444" :opacity="0.3" />
     <AppNavbar title="智能消防系统" subtitle="Fire Fighting System" :menu-items="menuItems" />
@@ -214,7 +214,7 @@ const riskLevel = ref('low')
 const riskText = computed(() => ({ critical: '极高', high: '高', medium: '中', low: '低' }[riskLevel.value] || '低'))
 const riskIcon = computed(() => ({ critical: '🔴', high: '🟠', medium: '🟡', low: '🟢' }[riskLevel.value] || '🟢'))
 const riskDescription = computed(() => ({ critical: '立即疏散！', high: '高度警戒', medium: '加强监控', low: '正常运行' }[riskLevel.value] || ''))
-const riskPercent = computed(() => ({ critical: 95, high: 70, medium: 40, low: 15 }[riskLevel.value] || 15))
+const riskPercent = ref(15)  // updated in pollStatus based on sensor values vs thresholds
 const currentRegion = ref('A')
 const regions = [
   { id: 'A', name: '区域 A' },
@@ -316,10 +316,10 @@ function stopSimulation() {
 
 // === 阈值 ===
 const thresholds = reactive([
-  { key: 'temp', label: '温度报警阈值', value: 55, min: 30, max: 80, unit: '°C' },
-  { key: 'co2', label: 'CO₂报警阈值', value: 1000, min: 400, max: 2000, unit: 'ppm' },
+  { key: 'temp', label: '温度报警阈值', value: Number(localStorage.getItem('fire_threshold_temp') || 55), min: 20, max: 80, unit: '°C' },
+  { key: 'co2', label: 'CO₂报警阈值', value: Number(localStorage.getItem('fire_threshold_co2') || 1000), min: 400, max: 2000, unit: 'ppm' },
 ])
-function saveThreshold(t: any) { ElMessage.success(`${t.label} 已保存为 ${t.value}${t.unit}`); addDeviceControlLog(t.label, `设置为${t.value}${t.unit}`) }
+function saveThreshold(t: any) { localStorage.setItem('fire_threshold_' + t.key, String(t.value)); ElMessage.success(`${t.label} 已保存为 ${t.value}${t.unit}`); addDeviceControlLog(t.label, `设置为${t.value}${t.unit}`) }
 
 // === 弹窗管理 ===
 const modals = reactive({
@@ -343,12 +343,14 @@ function confirmFire() {
     fireDevices.forEach(d => { if (!d.active) { d.active = true; addDeviceControlLog(d.name, "开启") } })
     justConfirmed.value = true
     setTimeout(() => { justConfirmed.value = false }, 3000)
-  }).catch(() => {
-    fireDevices.forEach(d => { if (!d.active) { d.active = true; addDeviceControlLog(d.name, "开启") } })
+  }).catch((err: any) => {
+    console.error("火情确认指令发送失败:", err)
+    ElMessage.error("设备控制指令发送失败，请检查设备连接")
   })
   alarmDismissed.value = true
   if (alarmDismissTimer) clearTimeout(alarmDismissTimer)
   alarmDismissTimer = setTimeout(() => { alarmDismissed.value = false }, 60000)
+  riskPercent.value = 100
   ElMessage.success("已确认火情，60秒后可再次告警")
 }
 
@@ -361,6 +363,10 @@ function dismissFireAlarm() {
   alarmDismissTimer = setTimeout(() => { alarmDismissed.value = false }, 60000)
   ElMessage.info('已标记为火情误报，60秒后可再次告警')
 }
+// 30-day peak tracking (collected during polling)
+const temp30Day: {time:string;value:number}[] = []
+const co230Day: {time:string;value:number}[] = []
+
 
 // === 历史日志 ===
 const historyLogs = ref<any[]>([])
@@ -373,33 +379,25 @@ async function fetchHistoryLogs() {
 // === 数据存储导出 ===
 async function exportDataStore() {
   try {
-    const logsRes = await axios.get('/fire/api/logs', { params: { limit: 500 } })
-    const actionsRes = await axios.get('/fire/api/fire_actions')
-    const tempPeaks: {time:string;value:string}[] = []; const co2Peaks: {time:string;value:string}[] = []
-    if (logsRes.data) {
-      const now = Date.now(); const thirtyDays = 30 * 24 * 3600 * 1000
-      logsRes.data.forEach((log: any) => {
-        const t = new Date(log.timestamp).getTime()
-        if (now - t <= thirtyDays) {
-          if (log.event && log.event.includes('温度')) tempPeaks.push({ time: log.timestamp, value: log.details })
-          if (log.event && log.event.includes('CO')) co2Peaks.push({ time: log.timestamp, value: log.details })
-        }
-      })
-    }
+    const logsRes = await axios.get("/fire/api/logs", { params: { limit: 500 } })
+    const actionsRes = await axios.get("/fire/api/fire_actions")
+    const now = Date.now(); const thirtyDays = 30 * 24 * 3600 * 1000
+    const recentTemp = temp30Day.filter(p => now - new Date(p.time).getTime() <= thirtyDays)
+    const recentCO2 = co230Day.filter(p => now - new Date(p.time).getTime() <= thirtyDays)
     const data = {
       exportTime: new Date().toISOString(),
       thresholds: { temp: thresholds[0].value, co2: thresholds[1].value },
-      temp30DayPeaks: tempPeaks.slice(-100),
-      co230DayPeaks: co2Peaks.slice(-100),
+      temp30DayPeaks: recentTemp.slice(-200),
+      co230DayPeaks: recentCO2.slice(-200),
       logs: logsRes.data || [],
       fireActions: actionsRes.data || []
     }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'fire_data_30day_' + new Date().toISOString().slice(0,10) + '.json'; a.click()
+    const a = document.createElement("a"); a.href = url; a.download = "fire_data_30day_" + new Date().toISOString().slice(0,10) + ".json"; a.click()
     URL.revokeObjectURL(url)
-    ElMessage.success('数据已导出为JSON文件(含30天峰值)')
-  } catch { ElMessage.error('数据导出失败') }
+    ElMessage.success("数据已导出为JSON文件(含30天峰值)")
+  } catch { ElMessage.error("数据导出失败") }
 }
 
 
@@ -458,6 +456,7 @@ function drawFlowChart() {
     { from: "dev-smoke", to: "abs-fire" }, { from: "dev-cloud", to: "abs-fire" },
     { from: "dev-alarm", to: "abs-fire" }, { from: "dev-cabin", to: "abs-fire" },
     { from: "dev-sprinkler", to: "abs-fire" }, { from: "dev-exhaust", to: "abs-fire" },
+    { from: "abs-fire", to: "dev-cabin" }, { from: "abs-fire", to: "dev-sprinkler" }, { from: "abs-fire", to: "dev-exhaust" },
     { from: "abs-fire", to: "svc-collect" },
     { from: "svc-collect", to: "svc-judge" },
     { from: "svc-judge", to: "svc-alarm" }, { from: "svc-judge", to: "svc-control" },
@@ -550,21 +549,21 @@ async function pollStatus() {
 
     // Device status from backend (only update if not manually controlled)
     // Backend device running state is authoritative when fire is simulated
-    if (d.system?.fireSimulated === 'true' && !justConfirmed.value) {
-      fireDevices[0].active = d.devices?.cabin?.running === 'true'
-      fireDevices[1].active = d.devices?.exhaustFan?.running === 'true'
-      fireDevices[2].active = d.devices?.sprinkler?.running === 'true'
-      fireDevices[3].active = d.services?.alarmActive === 'true'
+    if ((d.system?.fireSimulated || d.services?.alarmActive) && !justConfirmed.value) {
+      fireDevices[0].active = !!(d.devices?.cabin?.running)
+      fireDevices[1].active = !!(d.devices?.exhaustFan?.running)
+      fireDevices[2].active = !!(d.devices?.sprinkler?.running)
+      fireDevices[3].active = !!(d.services?.alarmActive)
     }
 
     // Event stream
     const now = new Date().toLocaleTimeString('zh-CN', { hour12: false })
     const items = [
-      { s: '烟雾', v: smokeState === 0 ? '正常' : '异常', u: '', o: d.smoke?.online === 'true', c: '#eab308' },
-      { s: '温度', v: (d.temperature?.value ?? 0).toFixed(1), u: '°C', o: d.temperature?.online === 'true', c: '#ef4444' },
-      { s: 'CO₂', v: (d.co2?.value ?? 0).toString(), u: 'ppm', o: d.co2?.online === 'true', c: '#a855f7' },
-      { s: '湿度', v: (d.humidity?.value ?? 0).toFixed(1), u: '%', o: d.humidity?.online === 'true', c: '#06b6d4' },
-      { s: '声光报警', v: d.services?.alarmActive === 'true' ? '激活' : '待机', u: '', o: d.devices?.alarm?.online === 'true', c: '#ef4444' },
+      { s: '烟雾', v: smokeState === 0 ? '正常' : '异常', u: '', o: !!(d.smoke?.online || d.devices?.smoke?.online), c: '#eab308' },
+      { s: '温度', v: (d.temperature?.value ?? 0).toFixed(1), u: '°C', o: !!(d.temperature?.online || d.devices?.temperature?.online), c: '#ef4444' },
+      { s: 'CO₂', v: (d.co2?.value ?? 0).toString(), u: 'ppm', o: !!(d.co2?.online || d.devices?.co2?.online), c: '#a855f7' },
+      { s: '湿度', v: (d.humidity?.value ?? 0).toFixed(1), u: '%', o: !!(d.humidity?.online || d.devices?.humidity?.online), c: '#06b6d4' },
+      { s: '声光报警', v: d.services?.alarmActive ? '激活' : '待机', u: '', o: !!(d.devices?.alarm?.online), c: '#ef4444' },
     ]
     items.forEach(item => {
       fireEvents.unshift({ id: fireEventId++, time: now, source: item.s, value: item.v, unit: item.u, online: item.o, color: item.c })
@@ -575,19 +574,41 @@ async function pollStatus() {
     if (!alarmDismissed.value && !modals.fireConfirm) {
       const tempVal = d.temperature?.value ?? 0
       const smokeVal = d.smoke?.state ?? 0
+      const co2Val = d.co2?.value ?? 0
       if (smokeVal === 1) {
         alarmTypeText.value = '烟雾'; confirmValueText.value = '检测到烟雾'; confirmThresholdText.value = '烟雾报警'
         modals.fireConfirm = true
       } else if (tempVal > (thresholds[0].value)) {
         alarmTypeText.value = '温度'; confirmValueText.value = tempVal.toFixed(1) + '°C'; confirmThresholdText.value = thresholds[0].value + '°C'
         modals.fireConfirm = true
+      } else if (co2Val > thresholds[1].value) {
+        alarmTypeText.value = 'CO₂'; confirmValueText.value = co2Val + 'ppm'; confirmThresholdText.value = thresholds[1].value + 'ppm'
+        modals.fireConfirm = true
       }
     }
+    // Update risk bar based on backend risk level
 
-    // Auto-reset dismissed when data normal
-    if (alarmDismissed.value && d.smoke?.state === 0 && (d.temperature?.value ?? 0) < thresholds[0].value) {
+    // Collect 30-day peaks
+    const nowTs = new Date().toISOString()
+    temp30Day.push({ time: nowTs, value: d.temperature?.value ?? 0 })
+    co230Day.push({ time: nowTs, value: d.co2?.value ?? 0 })
+    if (temp30Day.length > 5000) temp30Day.shift()
+    if (co230Day.length > 5000) co230Day.shift()
+
+    // Calculate continuous risk percentage based on values vs thresholds
+    const tempRatio = Math.min(1, Math.max(0, ((d.temperature?.value ?? 25) - 20) / (thresholds[0].value - 20)))
+    const co2Ratio = Math.min(1, Math.max(0, ((d.co2?.value ?? 400) - 400) / (thresholds[1].value - 400)))
+    const smokeRatio = (d.smoke?.state ?? 0) === 1 ? 1 : 0
+    const weighted = smokeRatio * 0.4 + tempRatio * 0.35 + co2Ratio * 0.25
+    if (!alarmDismissed.value) riskPercent.value = Math.round(weighted * 100)
+    // 根据进度条修正风险等级(覆盖后端可能未更新的情况)
+    if (riskPercent.value >= 80) riskLevel.value = 'high'
+    else if (riskPercent.value >= 50) riskLevel.value = 'medium'
+    else riskLevel.value = 'low'
+
+    // Auto-reset dismissed only after 60s timer expired (data normal but timer inactive)
+    if (alarmDismissed.value && !alarmDismissTimer && d.smoke?.state === 0 && (d.temperature?.value ?? 0) < thresholds[0].value && (d.co2?.value ?? 0) < thresholds[1].value) {
       alarmDismissed.value = false
-      if (alarmDismissTimer) { clearTimeout(alarmDismissTimer); alarmDismissTimer = null }
     }
   } catch { /* ignore poll errors */ }
 }

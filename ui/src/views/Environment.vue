@@ -270,7 +270,7 @@ function drawFlowChart() {
   canvas.width = container.clientWidth
   canvas.height = 370
 
-  const ox = 80
+  const ox = 170
   const layers = [
     { name: '应用层', y: 20, nodes: [
       { id: 'app-env', x: 280 + ox, icon: '🌡️', label: '环境监测应用', color: '#3b82f6' }
@@ -283,7 +283,7 @@ function drawFlowChart() {
       { id: 'lower-process', x: 280 + ox, icon: '⚙️', label: '数据处理服务', color: '#8b5cf6' },
       { id: 'lower-alarm', x: 460 + ox, icon: '🔔', label: '报警判断服务', color: '#ef4444' },
     ]},
-    { name: '设备抽象层（云测仪→7个虚拟传感器）', y: 230, nodes: [
+    { name: '设备抽象层', y: 230, nodes: [
       { id: 'abs-temp', x: 20+ox, icon:'🌡️', label:'温度', color:'#3b82f6' },
       { id: 'abs-humi', x: 90+ox, icon:'💧', label:'湿度', color:'#06b6d4' },
       { id: 'abs-pm25', x: 160+ox, icon:'💨', label:'PM2.5', color:'#f59e0b' },

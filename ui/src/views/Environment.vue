@@ -270,30 +270,30 @@ function drawFlowChart() {
   canvas.width = container.clientWidth
   canvas.height = 370
 
-  const ox = 140
+  const ox = 80
   const layers = [
     { name: '应用层', y: 20, nodes: [
-      { id: 'app-env', x: 400 + ox, icon: '🌡️', label: '环境监测应用', color: '#3b82f6' }
+      { id: 'app-env', x: 280 + ox, icon: '🌡️', label: '环境监测应用', color: '#3b82f6' }
     ]},
     { name: '原子服务上层', y: 85, nodes: [
-      { id: 'upper-monitor', x: 400 + ox, icon: '📊', label: '环境监测服务', color: '#3b82f6' }
+      { id: 'upper-monitor', x: 280 + ox, icon: '📊', label: '环境监测服务', color: '#3b82f6' }
     ]},
     { name: '原子服务下层', y: 155, nodes: [
-      { id: 'lower-collect', x: 200 + ox, icon: '📥', label: '数据采集服务', color: '#3b82f6' },
-      { id: 'lower-process', x: 450 + ox, icon: '⚙️', label: '数据处理服务', color: '#8b5cf6' },
-      { id: 'lower-alarm', x: 650 + ox, icon: '🔔', label: '报警判断服务', color: '#ef4444' },
+      { id: 'lower-collect', x: 100 + ox, icon: '📥', label: '数据采集服务', color: '#3b82f6' },
+      { id: 'lower-process', x: 280 + ox, icon: '⚙️', label: '数据处理服务', color: '#8b5cf6' },
+      { id: 'lower-alarm', x: 460 + ox, icon: '🔔', label: '报警判断服务', color: '#ef4444' },
     ]},
     { name: '设备抽象层（云测仪→7个虚拟传感器）', y: 230, nodes: [
-      { id: 'abs-temp', x: 25+ox, icon:'🌡️', label:'温度', color:'#3b82f6' },
-      { id: 'abs-humi', x: 110+ox, icon:'💧', label:'湿度', color:'#06b6d4' },
-      { id: 'abs-pm25', x: 195+ox, icon:'💨', label:'PM2.5', color:'#f59e0b' },
-      { id: 'abs-co2', x: 280+ox, icon:'☁️', label:'CO₂', color:'#8b5cf6' },
-      { id: 'abs-tvoc', x: 365+ox, icon:'🧪', label:'TVOC', color:'#ec4899' },
-      { id: 'abs-ch2o', x: 450+ox, icon:'⚗️', label:'甲醛', color:'#14b8a6' },
-      { id: 'abs-pm10', x: 535+ox, icon:'💨', label:'PM10', color:'#f59e0b' },
+      { id: 'abs-temp', x: 20+ox, icon:'🌡️', label:'温度', color:'#3b82f6' },
+      { id: 'abs-humi', x: 90+ox, icon:'💧', label:'湿度', color:'#06b6d4' },
+      { id: 'abs-pm25', x: 160+ox, icon:'💨', label:'PM2.5', color:'#f59e0b' },
+      { id: 'abs-co2', x: 230+ox, icon:'☁️', label:'CO₂', color:'#8b5cf6' },
+      { id: 'abs-tvoc', x: 300+ox, icon:'🧪', label:'TVOC', color:'#ec4899' },
+      { id: 'abs-ch2o', x: 370+ox, icon:'⚗️', label:'甲醛', color:'#14b8a6' },
+      { id: 'abs-pm10', x: 440+ox, icon:'💨', label:'PM10', color:'#f59e0b' },
     ]},
     { name: '设备层', y: 310, nodes: [
-      { id: 'sensor-cloud', x: 350 + ox, icon: '☁️', label: '云测仪(SD123)', color: '#3b82f6' },
+      { id: 'sensor-cloud', x: 250 + ox, icon: '☁️', label: '云测仪(SD123)', color: '#3b82f6' },
     ]},
   ]
   // 数据流: 设备→抽象(上) + 控制流: 应用→服务→设备(下)

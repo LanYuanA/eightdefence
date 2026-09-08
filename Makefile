@@ -40,12 +40,9 @@ OBJS = $(C_OBJS) $(CXX_OBJS)
 .PHONY: frontend
 frontend:
 	cd ui && npm run build
-	cp -f ui/dist/assets/*.js public/assets/
-	cp -f ui/dist/assets/*.css public/assets/
-	NEW_JS=$$(ls ui/dist/assets/*.js | head -1 | xargs basename); \
-	NEW_CSS=$$(ls ui/dist/assets/*.css | head -1 | xargs basename); \
-	sed -i "s|src=\"/assets/[^\"]*\.js\"|src=\"/assets/$$NEW_JS\"|" dashboard.html; \
-	sed -i "s|href=\"/assets/[^\"]*\.css\"|href=\"/assets/$$NEW_CSS\"|" dashboard.html
+	mkdir -p public
+	cp -R ui/dist/. public/
+	cp -f ui/dist/index.html dashboard.html
 	@echo "✅ 前端已编译并部署到C++ public目录"
 
 all: frontend $(TARGET)

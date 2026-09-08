@@ -84,6 +84,11 @@
                   <span class="dropdown-label">原子服务</span>
                   <span class="dropdown-desc">管理原子服务</span>
                 </button>
+                <button class="dropdown-item" @click="navigateTo('/hardware-decoupling')">
+                  <span class="dropdown-icon">⇄</span>
+                  <span class="dropdown-label">硬件解耦</span>
+                  <span class="dropdown-desc">执行器在线替换演示</span>
+                </button>
                 <button class="dropdown-item" @click="navigateTo('/device-graph')">
                   <span class="dropdown-icon">🔗</span>
                   <span class="dropdown-label">设备图谱</span>

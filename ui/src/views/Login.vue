@@ -61,10 +61,11 @@
 
 <script setup lang="ts">
 import { ref, h } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+const route = useRoute()
 const loginForm = ref({ username: '', password: '' })
 
 // 简单的图标组件
@@ -96,7 +97,8 @@ const handleLogin = () => {
   if (loginForm.value.username === 'admin' && loginForm.value.password === '123456') {
     localStorage.setItem('isLoggedIn', 'true')
     ElMessage.success('登录成功，欢迎进入系统！')
-    router.push({ name: 'dashboard' })
+    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : '/'
+    router.push(redirect)
   } else {
     ElMessage.error('用户名或密码错误')
   }

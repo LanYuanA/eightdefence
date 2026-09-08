@@ -1,0 +1,86 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import type { MarineApp } from '../../marine/model'
+import type { NodeRun, RunStatus } from '../../marine/runner'
+import type { SensorSnapshot } from '../../marine/sensors'
+import { buildApplicationFlow } from '../../marine/application-flow'
+
+const props = defineProps<{ app: MarineApp; nodes: NodeRun[]; snapshot: SensorSnapshot; status: RunStatus }>()
+const flow = computed(() => buildApplicationFlow(props.app))
+const statusText: Record<string, string> = { waiting: '等待', running: '流动中', completed: '已完成', cancelled: '已停止', failed: '异常' }
+
+function serviceStatus(serviceId: string) {
+  const matches = props.nodes.filter(item => item.node.serviceId === serviceId)
+  if (!matches.length) return 'waiting'
+  if (matches.some(item => item.status === 'running')) return 'running'
+  if (matches.some(item => item.status === 'failed')) return 'failed'
+  if (matches.every(item => item.status === 'completed')) return 'completed'
+  if (matches.every(item => item.status === 'cancelled')) return 'cancelled'
+  return 'waiting'
+}
+
+function endpointStatus(serviceIds: string[]) {
+  const statuses = serviceIds.map(serviceStatus)
+  if (statuses.includes('running')) return 'running'
+  if (statuses.includes('failed')) return 'failed'
+  if (statuses.every(status => status === 'completed')) return 'completed'
+  if (statuses.every(status => status === 'cancelled')) return 'cancelled'
+  return 'waiting'
+}
+</script>
+
+<template>
+  <section class="panel application-flow-panel">
+    <header class="application-flow-heading">
+      <div><p class="eyebrow">APPLICATION DATA FLOW / 自动生成</p><h2>{{ flow.application.name }} · 数据与控制流线图</h2></div>
+      <div class="application-flow-legend"><span><i class="data-color"/>态势数据向上</span><span><i class="control-color"/>控制指令向下</span><strong>{{ snapshot.source === 'live' ? '实时数据' : '演示数据' }}</strong></div>
+    </header>
+
+    <div class="application-flow-map" :class="[`run-${status}`]">
+      <div class="flow-column-label data-label">DATA FLOW <b>↑</b></div>
+      <div class="flow-column-label control-label"><b>↓</b> CONTROL FLOW</div>
+      <div class="vertical-flow data-vertical" aria-hidden="true"><i/><i/><i/><i/></div>
+      <div class="vertical-flow control-vertical" aria-hidden="true"><i/><i/><i/><i/></div>
+
+      <section class="auto-flow-layer application-auto-layer">
+        <span class="auto-layer-index">L4</span><div class="auto-layer-title"><small>APPLICATION</small><strong>应用层</strong></div>
+        <article class="current-application-node" :class="status"><span>APP</span><div><small>当前应用</small><h3>{{ flow.application.name }}</h3><p>{{ flow.awareness.length }} 项态势服务 · {{ flow.actions.length }} 项执行服务</p></div><em>{{ status === 'running' ? '运行中' : status === 'paused' ? '已暂停' : status === 'completed' ? '已完成' : '已装载' }}</em></article>
+      </section>
+
+      <div class="auto-layer-bridge"><span>态势结果汇入应用</span><b>↑</b><i/><b>↓</b><span>任务指令下发</span></div>
+
+      <section class="auto-flow-layer service-auto-layer">
+        <span class="auto-layer-index">L3</span><div class="auto-layer-title"><small>ATOMIC SERVICES</small><strong>原子服务层</strong></div>
+        <div class="auto-flow-channels">
+          <div class="auto-flow-channel awareness-channel"><header><span>态势感知服务</span><small>只显示本应用调用项</small></header><div class="auto-node-grid"><article v-for="service in flow.awareness" :key="service.id" class="auto-service-node" :class="serviceStatus(service.id)" :style="{'--node-color':service.color}"><b>{{ service.id }}</b><div><strong>{{ service.name }}</strong><small>步骤 {{ service.step }} · {{ statusText[serviceStatus(service.id)] }}</small></div></article><p v-if="!flow.awareness.length" class="empty-flow-side">本应用无态势输入</p></div></div>
+          <div class="auto-flow-channel action-channel"><header><span>执行控制服务</span><small>任务参数转为统一调用</small></header><div class="auto-node-grid"><article v-for="service in flow.actions" :key="service.id" class="auto-service-node" :class="serviceStatus(service.id)" :style="{'--node-color':service.color}"><b>{{ service.id }}</b><div><strong>{{ service.name }}</strong><small>步骤 {{ service.step }} · {{ statusText[serviceStatus(service.id)] }}</small></div></article><p v-if="!flow.actions.length" class="empty-flow-side">本应用无执行任务</p></div></div>
+        </div>
+      </section>
+
+      <div class="auto-layer-bridge split-bridge"><span>传感器数据直接形成态势输入</span><b>↑</b><i/><b>↓</b><span>统一执行调用</span></div>
+
+      <section class="auto-flow-layer abstraction-auto-layer">
+        <span class="auto-layer-index">L2</span><div class="auto-layer-title"><small>DEVICE ABSTRACTION</small><strong>设备抽象层</strong></div>
+        <div class="auto-flow-channels">
+          <div class="awareness-bypass"><span>DATA</span><div><strong>态势数据通道</strong><small>传感器不做设备抽象，数据直接供态势服务使用</small></div></div>
+          <div class="abstraction-node-grid"><article v-for="item in flow.abstractions" :key="item.id" class="auto-endpoint-node" :class="endpointStatus(item.serviceIds)"><b>{{ item.id }}</b><div><strong>{{ item.name }}</strong><small>屏蔽地址、协议与型号差异</small></div></article><p v-if="!flow.abstractions.length" class="empty-flow-side">无执行器抽象调用</p></div>
+        </div>
+      </section>
+
+      <div class="auto-layer-bridge"><span>现场数据上传</span><b>↑</b><i/><b>↓</b><span>硬件执行</span></div>
+
+      <section class="auto-flow-layer physical-auto-layer">
+        <span class="auto-layer-index">L1</span><div class="auto-layer-title"><small>PHYSICAL RESOURCES</small><strong>态势感知与执行器硬件层</strong></div>
+        <div class="auto-flow-channels">
+          <div class="physical-group sensor-physical-group"><header><span>本应用使用的传感器</span><small>{{ flow.sensors.length }} 路</small></header><div class="sensor-chip-grid"><article v-for="sensor in flow.sensors" :key="sensor.key" :class="{offline:!snapshot.values[sensor.key]?.online}"><i/><div><strong>{{ sensor.label }}</strong><small>{{ snapshot.values[sensor.key]?.online ? `${snapshot.values[sensor.key]?.value}${snapshot.values[sensor.key]?.unit}` : '设备离线' }}</small></div></article><p v-if="!flow.sensors.length" class="empty-flow-side">无传感器输入</p></div></div>
+          <div class="physical-group hardware-physical-group"><header><span>本应用调用的执行器硬件</span><small>{{ flow.hardware.length }} 项</small></header><div class="hardware-chip-grid"><article v-for="item in flow.hardware" :key="item.id" :class="endpointStatus(item.serviceIds)"><span>HW</span><div><strong>{{ item.name }}</strong><small>{{ statusText[endpointStatus(item.serviceIds)] }}</small></div></article><p v-if="!flow.hardware.length" class="empty-flow-side">无执行器调用</p></div></div>
+        </div>
+      </section>
+    </div>
+    <footer class="application-flow-summary"><span><b>{{ flow.sensors.length }}</b> 路传感器数据</span><i>→</i><span><b>{{ flow.awareness.length + flow.actions.length }}</b> 项原子服务</span><i>→</i><span><b>{{ flow.abstractions.length }}</b> 个设备抽象</span><i>→</i><span><b>{{ flow.hardware.length }}</b> 项执行器硬件</span><strong>由应用编排自动生成</strong></footer>
+  </section>
+</template>
+
+<style scoped>
+.application-flow-panel{--flow-data:#58d8e8;--flow-control:#70e0ad;margin:20px 0;padding:20px 22px;background:radial-gradient(circle at 50% 35%,rgba(35,91,114,.18),transparent 50%),#0d1d2c}.application-flow-heading{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:13px}.application-flow-heading h2{margin-top:3px;font-size:21px}.application-flow-legend{display:flex;align-items:center;gap:18px;color:#91a8bb;font-size:12px}.application-flow-legend span{display:flex;align-items:center;gap:7px}.application-flow-legend i{width:24px;height:2px}.application-flow-legend .data-color{background:var(--flow-data);box-shadow:0 0 8px var(--flow-data)}.application-flow-legend .control-color{background:var(--flow-control);box-shadow:0 0 8px var(--flow-control)}.application-flow-legend strong{padding:4px 9px;border:1px solid #50d2c45c;border-radius:20px;color:#75ddcd;font-weight:500}.application-flow-map{position:relative;min-width:880px;padding:0 58px}.auto-flow-layer{position:relative;z-index:2;display:grid;grid-template-columns:40px 135px 1fr;align-items:center;gap:10px;padding:10px 14px;border:1px solid #2e485c;border-radius:9px;background:linear-gradient(120deg,rgba(20,43,59,.98),rgba(10,27,40,.98))}.auto-layer-index{display:grid;place-items:center;width:32px;height:29px;border:1px solid #45637a;border-radius:5px;color:#809cb1;font:600 11px/1 monospace}.auto-layer-title{line-height:1.1}.auto-layer-title small{display:block;color:#607f96;font:600 9px/1.2 monospace;letter-spacing:1.2px}.auto-layer-title strong{display:block;margin-top:4px;color:#d6e4ef;font-size:14px}.application-auto-layer{border-color:#768ff15e}.current-application-node{display:flex;align-items:center;gap:13px;max-width:650px;padding:8px 12px;border:1px solid #7995f06b;border-radius:7px;background:linear-gradient(100deg,rgba(102,128,224,.13),rgba(45,80,110,.06))}.current-application-node>span{display:grid;place-items:center;width:36px;height:36px;border-radius:7px;background:#7a91ed1a;color:#91a9ff;font:700 11px monospace}.current-application-node h3{margin:0;font-size:17px}.current-application-node p,.current-application-node small{font-size:10px}.current-application-node em{margin-left:auto;padding:3px 8px;border-radius:12px;background:#263d52;color:#91a8ba;font-size:10px;font-style:normal}.current-application-node.running{border-color:#6de1cd}.current-application-node.running em{background:#6de1cd1f;color:#75e0cf}.auto-layer-bridge{position:relative;z-index:2;height:23px;display:flex;align-items:center;justify-content:center;gap:8px;color:#7591a5;font-size:10px}.auto-layer-bridge b{color:#88b3c6;font-size:13px}.auto-layer-bridge i{width:28px;height:1px;background:#38566b}.auto-flow-channels{display:grid;grid-template-columns:1.15fr 1fr;gap:12px}.auto-flow-channel,.physical-group{padding:7px 9px;border:1px solid #2c4659;border-radius:7px;background:#07172480}.auto-flow-channel>header,.physical-group>header{display:flex;justify-content:space-between;margin-bottom:6px;color:#bed0dd;font-size:11px}.auto-flow-channel>header small,.physical-group>header small{color:#6f8da2}.awareness-channel{border-color:#51d1e246}.action-channel{border-color:#6de1a846}.auto-node-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:6px}.auto-service-node{min-width:0}.auto-service-node{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid color-mix(in srgb,var(--node-color) 33%,transparent);border-left:2px solid var(--node-color);border-radius:5px;background:color-mix(in srgb,var(--node-color) 6%,#0a1926)}.auto-service-node>b{display:grid;place-items:center;width:29px;height:27px;border-radius:4px;background:color-mix(in srgb,var(--node-color) 11%,transparent);color:var(--node-color);font:600 10px monospace}.auto-service-node strong,.auto-endpoint-node strong,.sensor-chip-grid strong,.hardware-chip-grid strong{display:block;color:#c8d9e5;font-size:11px;white-space:nowrap}.auto-service-node small,.auto-endpoint-node small,.sensor-chip-grid small,.hardware-chip-grid small{display:block;color:#718ca1;font-size:9px}.auto-service-node.running,.auto-endpoint-node.running,.hardware-chip-grid article.running{box-shadow:0 0 14px color-mix(in srgb,var(--node-color,#6de1a8) 22%,transparent);animation:node-active 1s ease-in-out infinite alternate}.auto-service-node.completed,.auto-endpoint-node.completed{opacity:.72}.auto-service-node.failed,.auto-endpoint-node.failed{border-color:#ee7e72}.abstraction-auto-layer{border-color:#aa98ff59}.awareness-bypass{display:flex;align-items:center;gap:10px;padding:8px 11px;border:1px dashed #55cfdf66;border-radius:7px;background:#55cfdf08}.awareness-bypass>span{color:#61d8e7;font:700 10px monospace}.awareness-bypass strong{display:block;color:#b8d5df;font-size:11px}.awareness-bypass small{display:block;color:#69889d;font-size:9px}.abstraction-node-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:6px}.auto-endpoint-node{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid #a996ff55;border-radius:5px;background:#a996ff0a}.auto-endpoint-node>b{color:#b7a8ff;font:600 10px monospace}.physical-auto-layer{border-color:#6de1a84d}.physical-group{min-height:58px}.sensor-chip-grid,.hardware-chip-grid{display:flex;flex-wrap:wrap;gap:5px}.sensor-chip-grid article,.hardware-chip-grid article{display:flex;align-items:center;gap:6px;min-width:100px;padding:5px 7px;border:1px solid #55cedd3d;border-radius:5px;background:#55cedd09}.sensor-chip-grid article>i{width:6px;height:6px;border-radius:50%;background:var(--flow-data);box-shadow:0 0 7px var(--flow-data)}.sensor-chip-grid article.offline{border-color:#c16f6740;opacity:.65}.sensor-chip-grid article.offline>i{background:#c9776d;box-shadow:none}.hardware-chip-grid article{border-color:#6de1a83d;background:#6de1a808}.hardware-chip-grid article>span{display:grid;place-items:center;width:24px;height:23px;border:1px solid #6de1a85c;border-radius:4px;color:#75dcb0;font:600 9px monospace}.flow-column-label{position:absolute;top:50%;z-index:3;padding:7px 2px;writing-mode:vertical-rl;transform:translateY(-50%);background:#0b1b29;color:#678da2;font:600 9px monospace;letter-spacing:1.6px}.flow-column-label b{color:currentColor;font-size:12px}.data-label{left:13px;color:var(--flow-data)}.control-label{right:13px;color:var(--flow-control)}.vertical-flow{position:absolute;z-index:1;top:35px;bottom:35px;width:2px;opacity:.85}.data-vertical{left:34px;background:linear-gradient(transparent,var(--flow-data) 12%,var(--flow-data) 88%,transparent)}.control-vertical{right:34px;background:linear-gradient(transparent,var(--flow-control) 12%,var(--flow-control) 88%,transparent)}.vertical-flow i{position:absolute;left:-3px;width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}.data-vertical{color:var(--flow-data)}.control-vertical{color:var(--flow-control)}.data-vertical i{animation:application-data-up 4s linear infinite}.control-vertical i{animation:application-control-down 4s linear infinite}.vertical-flow i:nth-child(2){animation-delay:-1s}.vertical-flow i:nth-child(3){animation-delay:-2s}.vertical-flow i:nth-child(4){animation-delay:-3s}.run-paused .vertical-flow i,.run-idle .vertical-flow i{animation-play-state:paused;opacity:.38}.application-flow-summary{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:11px;padding-top:10px;border-top:1px solid #263f52;color:#8099ac;font-size:11px}.application-flow-summary b{color:#75dfce;font:700 14px monospace}.application-flow-summary>i{color:#3d5b70;font-style:normal}.application-flow-summary>strong{margin-left:auto;color:#70ccbe;font-weight:500}.empty-flow-side{padding:8px;color:#648196;font-size:10px}@keyframes application-data-up{from{bottom:0}to{bottom:100%}}@keyframes application-control-down{from{top:0}to{top:100%}}@keyframes node-active{to{filter:brightness(1.25)}}@media(max-width:1150px){.application-flow-panel{overflow-x:auto}.application-flow-heading{min-width:880px}.application-flow-map{min-width:880px}.application-flow-summary{min-width:880px}}@media(max-width:700px){.application-flow-panel{padding:18px 14px}}
+</style>

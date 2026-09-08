@@ -9,13 +9,17 @@ import FireFighting from '../views/FireFighting.vue'
 import AlarmCenter from '../views/AlarmCenter.vue'
 import DataScreen from '../views/DataScreen.vue'
 import Settings from '../views/Settings.vue'
-import AtomicServices from '../views/AtomicServices.vue'
+import MarineDemo from '../views/MarineDemo.vue'
 import ResourcePool from '../views/ResourcePool.vue'
 import DeviceGraph from '../views/DeviceGraph.vue'
+import HardwareDecoupling from '../views/HardwareDecoupling.vue'
 
 const router = createRouter({
   history: createWebHistory('/'),
   routes: [
+    { path: '/legacy-dashboard', name: 'legacy-dashboard', component: Dashboard },
+    { path: '/workflow', redirect: '/' },
+    { path: '/marine', redirect: '/' },
     {
       path: '/login',
       name: 'login',
@@ -24,7 +28,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'dashboard',
-      component: Dashboard
+      component: MarineDemo
     },
     {
       path: '/logs',
@@ -69,7 +73,12 @@ const router = createRouter({
     {
       path: '/atomic-services',
       name: 'atomic-services',
-      component: AtomicServices
+      component: MarineDemo
+    },
+    {
+      path: '/hardware-decoupling',
+      name: 'hardware-decoupling',
+      component: HardwareDecoupling
     },
     {
       path: '/resource-pool',
@@ -84,15 +93,14 @@ const router = createRouter({
   ]
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach((to) => {
   const isLoggedIn = localStorage.getItem('isLoggedIn')
-  if (to.name !== 'login' && !isLoggedIn) {
-    next({ name: 'login' })
+  if (to.name !== 'login' && to.name !== 'dashboard' && to.name !== 'atomic-services' && to.name !== 'hardware-decoupling' && !isLoggedIn) {
+    return { name: 'login', query: { redirect: to.fullPath } }
   } else if (to.name === 'login' && isLoggedIn) {
-    next({ name: 'dashboard' })
-  } else {
-    next()
+    return { name: 'dashboard' }
   }
+  return true
 })
 
 export default router

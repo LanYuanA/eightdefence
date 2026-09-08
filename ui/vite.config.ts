@@ -8,6 +8,9 @@ export default defineConfig({
     vue(),
     tailwindcss()
   ],
+  build: {
+    target: 'chrome83'
+  },
   server: {
     proxy: {
       '/api': {

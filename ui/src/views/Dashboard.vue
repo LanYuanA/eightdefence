@@ -1,113 +1,33 @@
 <template>
   <div class="dashboard-root">
     <ParticleBackground :particle-count="50" color="#3b82f6" :opacity="0.4" />
-    <AppNavbar title="软件定义消防系统" subtitle="Software Defined Fire Protection System" />
+    <AppNavbar title="船舶软件定义平台" subtitle="Software Defined Vessel Platform" />
 
     <main class="dashboard-main">
-      <!-- 软件定义架构概览 -->
-      <section class="architecture-section">
-        <div class="section-header">
-          <h2 class="section-title">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
-            软件定义架构
-          </h2>
-          <div class="header-actions">
-            <CyberButton variant="primary" size="sm" @click="showResourcePool = true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-              资源池
-            </CyberButton>
-          </div>
-        </div>
-
-        <!-- 五层架构展示 -->
-        <div class="architecture-layers">
-          <div class="layer application-layer">
-            <div class="layer-header">
-              <span class="layer-icon">📱</span>
-              <span class="layer-title">应用层</span>
-              <span class="layer-desc">安防/环境/消防</span>
-            </div>
-            <div class="layer-nodes">
-              <div v-for="app in applicationLayer" :key="app.id" class="arch-node app-node" :class="{ active: app.active }">
-                <span class="node-icon">{{ app.icon }}</span>
-                <span class="node-name">{{ app.name }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="layer atomic-upper-layer">
-            <div class="layer-header">
-              <span class="layer-icon">⚙️</span>
-              <span class="layer-title">原子服务上层</span>
-              <span class="layer-desc">组合服务</span>
-            </div>
-            <div class="layer-nodes">
-              <div v-for="service in atomicUpperLayer" :key="service.id" class="arch-node service-node" :class="{ active: service.active }">
-                <span class="node-icon">{{ service.icon }}</span>
-                <span class="node-name">{{ service.name }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="layer atomic-lower-layer">
-            <div class="layer-header">
-              <span class="layer-icon">🔧</span>
-              <span class="layer-title">原子服务下层</span>
-              <span class="layer-desc">基础服务</span>
-            </div>
-            <div class="layer-nodes">
-              <div v-for="service in atomicLowerLayer" :key="service.id" class="arch-node service-node" :class="{ active: service.active }">
-                <span class="node-icon">{{ service.icon }}</span>
-                <span class="node-name">{{ service.name }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="layer abstraction-layer">
-            <div class="layer-header">
-              <span class="layer-icon">🔌</span>
-              <span class="layer-title">设备抽象层</span>
-              <span class="layer-desc">统一接口</span>
-            </div>
-            <div class="layer-nodes">
-              <div v-for="abstraction in abstractionLayer" :key="abstraction.id" class="arch-node abstraction-node" :class="{ active: abstraction.active }">
-                <span class="node-icon">{{ abstraction.icon }}</span>
-                <span class="node-name">{{ abstraction.name }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="layer device-layer">
-            <div class="layer-header">
-              <span class="layer-icon">📡</span>
-              <span class="layer-title">设备层</span>
-              <span class="layer-desc">物理设备</span>
-            </div>
-            <div class="layer-nodes">
-              <div v-for="device in deviceLayer" :key="device.id" class="arch-node device-node" :class="{ active: device.online }">
-                <span class="node-icon">{{ device.icon }}</span>
-                <span class="node-name">{{ device.name }}</span>
-                <span class="node-value">{{ device.value }}{{ device.unit }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <!-- 数据流向图 - 软件定义架构 -->
       <section class="flow-section">
-        <BaseCard title="软件定义数据流向" subtitle="设备层 → 设备抽象 → 原子服务 → 应用" icon-color="blue">
+        <BaseCard title="软件定义动态数据流" subtitle="应用层 ↕ 原子服务层 ↕ 设备抽象层 ↕ 态势感知与执行器硬件层" icon-color="blue">
           <template #header>
-            <div class="flex items-center gap-3">
-              <div class="card-icon icon-blue">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <div class="flow-card-header">
+              <div class="flex items-center gap-3">
+                <div class="card-icon icon-blue">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </div>
+                <div><h3 class="card-title">软件定义动态数据流</h3><p class="card-subtitle">态势数据向上汇聚，控制指令向下执行；新应用自动进入应用层</p></div>
               </div>
-              <div><h3 class="card-title">软件定义数据流向</h3><p class="card-subtitle">设备层 → 设备抽象 → 原子服务 → 应用</p></div>
+              <div class="flow-header-actions">
+                <CyberButton variant="ghost" size="sm" @click="$router.push('/hardware-decoupling')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h11l-3-3m3 3-3 3M17 17H6l3 3m-3-3 3-3"/></svg>
+                  硬件替换演示
+                </CyberButton>
+                <CyberButton variant="primary" size="sm" @click="showResourcePool = true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                  应用资源池
+                </CyberButton>
+              </div>
             </div>
           </template>
-          <div class="flow-canvas">
-            <canvas ref="flowCanvasRef"></canvas>
-          </div>
+          <SoftwareDefinedFlow :online-count="sensorOnlineCount" :live="sensorFeedLive" :applications="flowApplications" />
         </BaseCard>
       </section>
 
@@ -287,7 +207,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import ParticleBackground from '../components/ParticleBackground.vue'
 import AppNavbar from '../components/AppNavbar.vue'
@@ -295,15 +215,17 @@ import DataCard from '../components/DataCard.vue'
 import BaseCard from '../components/BaseCard.vue'
 import CyberButton from '../components/CyberButton.vue'
 import DeviceCard from '../components/DeviceCard.vue'
+import SoftwareDefinedFlow from '../components/SoftwareDefinedFlow.vue'
 import { realtimeApi } from '../api/realtime'
 
 const showResourcePool = ref(false)
 const showAppDetail = ref(false)
 const selectedApp = ref<any>(null)
-const flowCanvasRef = ref<HTMLCanvasElement | null>(null)
 const appFlowCanvasRef = ref<HTMLCanvasElement | null>(null)
-let flowAnimationId: number | null = null
 let appFlowAnimationId: number | null = null
+const sensorOnlineCount = ref(0)
+const sensorFeedLive = ref(false)
+const marineApplications = ref<Array<{ id: string; name: string }>>([])
 
 // 资源池相关
 const selectedPoolDevices = ref<string[]>([])
@@ -325,59 +247,24 @@ const createdApps = reactive<CreatedApp[]>([])
 
 // 软件定义架构层级
 const applicationLayer = reactive([
-  { id: 'app-security', name: '安防系统', icon: '🛡️', active: true },
-  { id: 'app-environment', name: '环境监测', icon: '🌡️', active: true },
-  { id: 'app-fire', name: '消防系统', icon: '🔥', active: true },
-  { id: 'app-custom', name: '自定义应用', icon: '📱', active: false }
+  { id: 'app-sail', name: '开航辅助保障', icon: '🚢', active: true },
+  { id: 'app-recovery', name: '作业后恢复保障', icon: '⚓', active: true },
+  { id: 'app-inspection', name: '全船安全巡检', icon: '◉', active: true }
 ])
 
-const atomicUpperLayer = reactive([
-  { id: 'upper-monitor', name: '环境监测服务', icon: '📊', active: true },
-  { id: 'upper-security', name: '安防监控服务', icon: '🛡️', active: true },
-  { id: 'upper-fire', name: '消防预警服务', icon: '🔥', active: true },
-  { id: 'upper-linkage', name: '设备联动服务', icon: '🔗', active: true }
+const generatedApplicationLayer = computed(() => [
+  ...marineApplications.value.map(app => ({ ...app, generated: true })),
+  ...createdApps.map(app => ({ id: app.id, name: app.name, generated: true })),
 ])
-
-const atomicLowerLayer = reactive([
-  { id: 'lower-collect', name: '数据采集服务', icon: '📥', active: true },
-  { id: 'lower-process', name: '数据处理服务', icon: '⚙️', active: true },
-  { id: 'lower-store', name: '数据存储服务', icon: '💾', active: true },
-  { id: 'lower-alarm', name: '报警判断服务', icon: '🔔', active: true },
-  { id: 'lower-control', name: '设备控制服务', icon: '🎮', active: true }
-])
-
-// 设备抽象层：一对一解耦，多数据设备拆分为多个虚拟设备
-// 云测仪 SD123-E60V2 → 8个虚拟传感器
-const abstractionLayer = reactive([
-  { id: 'abs-temp', name: '虚拟温度', icon: '🌡️', active: true },
-  { id: 'abs-humi', name: '虚拟湿度', icon: '💧', active: true },
-  { id: 'abs-pm25', name: '虚拟PM2.5', icon: '💨', active: true },
-  { id: 'abs-co2', name: '虚拟CO2', icon: '☁️', active: true },
-  { id: 'abs-tvoc', name: '虚拟TVOC', icon: '🧪', active: true },
-  { id: 'abs-ch2o', name: '虚拟甲醛', icon: '⚗️', active: true },
-  { id: 'abs-pm10', name: '虚拟PM10', icon: '💨', active: true },
-  { id: 'abs-smoke', name: '虚拟烟雾', icon: '🔥', active: true },
-  { id: 'abs-water', name: '虚拟水浸', icon: '💧', active: true },
-  { id: 'abs-infrared', name: '虚拟红外', icon: '👤', active: true },
-  { id: 'abs-light', name: '虚拟光照', icon: '💡', active: true },
-  { id: 'abs-humidifier', name: '虚拟净化', icon: '🌀', active: true }
-])
-
-// 设备层：物理设备
-const deviceLayer = reactive([
-  { id: 'dev-cloud', name: '云测仪(多数据)', icon: '🌡️', online: true, value: 24.5, unit: '℃' },
-  { id: 'dev-smoke', name: '烟雾报警器', icon: '🔥', online: true, value: 0, unit: '' },
-  { id: 'dev-water', name: '水浸传感器', icon: '💧', online: true, value: 0, unit: 'cm' },
-  { id: 'dev-infrared', name: '红外探测器', icon: '👤', online: true, value: 0, unit: '' },
-  { id: 'dev-light', name: '弱光传感器', icon: '💡', online: true, value: 350, unit: 'lux' },
-  { id: 'dev-humidifier', name: '恒湿净化机', icon: '🌀', online: true, value: 0, unit: '' },
-  { id: 'dev-conditioner', name: '空调控制器', icon: '❄️', online: true, value: 24, unit: '℃' }
+const flowApplications = computed(() => [
+  ...applicationLayer.map(app => ({ id: app.id, name: app.name, generated: false })),
+  ...generatedApplicationLayer.value,
 ])
 
 // 概览卡片数据
 const overviewCards = reactive([
   { label: '设备总数', value: 36, unit: '台', icon: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/>', iconColor: 'blue' as const, status: 'normal' as const, trend: '在线', trendDirection: 'stable' as const, miniChartData: [32, 34, 35, 36, 35, 36, 36] },
-  { label: '原子服务', value: 9, unit: '个', icon: '<circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m-7-7h6m6 0h6"/>', iconColor: 'purple' as const, status: 'normal' as const, trend: '运行中', trendDirection: 'stable' as const, miniChartData: [9, 9, 9, 9, 9, 9, 9] },
+  { label: '原子服务', value: 21, unit: '个', icon: '<circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m-7-7h6m6 0h6"/>', iconColor: 'purple' as const, status: 'normal' as const, trend: '11项可运行', trendDirection: 'stable' as const, miniChartData: [14, 14, 16, 18, 18, 21, 21] },
   { label: '数据吞吐', value: 1284, unit: '条/s', icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>', iconColor: 'green' as const, status: 'normal' as const, trend: '稳定', trendDirection: 'stable' as const, miniChartData: [1200, 1250, 1280, 1260, 1290, 1270, 1284] },
   { label: '自定义应用', value: createdApps.length, unit: '个', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8m-4-4h8"/>', iconColor: 'cyan' as const, status: 'normal' as const, trend: '可扩展', trendDirection: 'stable' as const, miniChartData: [0, 0, 0, 0, 0, 0, createdApps.length] }
 ])
@@ -467,6 +354,8 @@ function createNewApp() {
   }
 
   createdApps.push(app)
+  localStorage.setItem('custom-apps', JSON.stringify(createdApps))
+  syncApplicationCount()
   ElMessage.success(`应用 "${app.name}" 创建成功`)
 
   // 重置表单
@@ -513,6 +402,8 @@ function deleteApp(app: CreatedApp) {
   const index = createdApps.findIndex(a => a.id === app.id)
   if (index !== -1) {
     createdApps.splice(index, 1)
+    localStorage.setItem('custom-apps', JSON.stringify(createdApps))
+    syncApplicationCount()
     ElMessage.success(`应用 "${app.name}" 已删除`)
   }
 }
@@ -520,202 +411,6 @@ function deleteApp(app: CreatedApp) {
 // 处理设备操作
 function handleDeviceAction(actionId: string) {
   ElMessage.info(`设备操作: ${actionId}`)
-}
-
-// 绘制软件定义架构数据流向图
-function drawFlowChart() {
-  if (!flowCanvasRef.value) return
-
-  const canvas = flowCanvasRef.value
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-
-  const container = canvas.parentElement
-  if (!container) return
-
-  canvas.width = Math.max(container.clientWidth, 1400)
-  canvas.height = 520
-
-  const ox = 220
-  const GAP = 95 // 层间距，均匀填满画布
-
-  const lowerSvcGroups = [
-    { label: '数据采集类', color: '#3b82f6', x: ox + 20, svcs: ['温度','湿度','PM2.5','PM10','CO₂','TVOC','甲醛','烟雾','水浸','光感','红外','雷达','空气等级'] },
-    { label: '设备控制类', color: '#22c55d', x: ox + 440, svcs: ['空调开关','风速','温控模式','温度设定','加湿','除湿','恒湿','净化开关','净化控制','排烟风机','喷淋','报警器','舱门'] },
-    { label: '报警判断类', color: '#ef4444', x: ox + 830, svcs: ['阈值判断','状态监测','火情确认','风险评估','多源融合'] },
-    { label: '管理支撑类', color: '#8b5cf6', x: ox + 830, svcs: ['日志管理','信息推送','数据备份','设备登记','在线监测'], yOff: 28 },
-  ]
-
-  function makeLowerNodes(group: any): any[] {
-    const nodes: any[] = []
-    const spacing = 56
-    group.svcs.forEach((name: string, i: number) => {
-      const row = Math.floor(i / 7)
-      const col = i % 7
-      nodes.push({ id: 'svc-' + group.label + '-' + name, x: group.x + col * spacing, label: name, yOff: group.yOff || 0, row, color: group.color })
-    })
-    return nodes
-  }
-
-  const allLowerNodes: any[] = []
-  lowerSvcGroups.forEach(g => { allLowerNodes.push(...makeLowerNodes(g)) })
-
-  // 均匀分布5层
-  const layers: any[] = [
-    { name: '应用层', y: 30, nodes: [
-      { id: 'app-env', x:200+ox, icon:'🌡️', label:'环境监测应用', color:'#3b82f6' },
-      { id: 'app-security', x:450+ox, icon:'🛡️', label:'安防系统应用', color:'#8b5cf6' },
-      { id: 'app-fire', x:680+ox, icon:'🔥', label:'火灾预警应用', color:'#ef4444' }
-    ]},
-    { name: '组合上层', y: 30 + GAP, nodes: [
-      { id: 'upper-collect', x:110+ox,icon:'📥',label:'数据采集服务',color:'#3b82f6'},
-      { id: 'upper-fireid', x:280+ox,icon:'🔥',label:'火灾识别服务',color:'#ef4444'},
-      { id: 'upper-store', x:450+ox,icon:'💾',label:'数据存储服务',color:'#f59e0b'},
-      { id: 'upper-alarm', x:600+ox,icon:'🔔',label:'报警服务',color:'#ef4444'},
-      { id: 'upper-control', x:750+ox,icon:'🎮',label:'设备控制服务',color:'#22c55d'}
-    ]},
-    { name: '原子服务下层', y: 30 + GAP * 2 - 5, nodes: allLowerNodes, isLower: true },
-    { name: '设备抽象层', y: 30 + GAP * 3 + 20, nodes: [
-      { id: 'abs-temp',x:15+ox,icon:'🌡️',label:'温度',color:'#3b82f6'},{ id: 'abs-humi',x:85+ox,icon:'💧',label:'湿度',color:'#06b6d4'},
-      { id: 'abs-pm25',x:155+ox,icon:'💨',label:'PM2.5',color:'#f59e0b'},{ id: 'abs-co2',x:225+ox,icon:'☁️',label:'CO₂',color:'#8b5cf6'},
-      { id: 'abs-tvoc',x:295+ox,icon:'🧪',label:'TVOC',color:'#ec4899'},{ id: 'abs-ch2o',x:365+ox,icon:'⚗️',label:'甲醛',color:'#14b8a6'},
-      { id: 'abs-pm10',x:435+ox,icon:'💨',label:'PM10',color:'#f59e0b'},
-      { id: 'abs-smoke',x:520+ox,icon:'🔥',label:'烟雾',color:'#ef4444'},{ id: 'abs-water',x:590+ox,icon:'💧',label:'水浸',color:'#06b6d4'},
-      { id: 'abs-ir',x:660+ox,icon:'👤',label:'红外',color:'#8b5cf6'},{ id: 'abs-light',x:730+ox,icon:'💡',label:'光照',color:'#f59e0b'},
-    ]},
-    { name: '设备层', y: 30 + GAP * 4 + 30, nodes: [
-      { id: 'sensor-cloud', x: 80+ox, icon:'☁️', label:'云测仪(SD123)', color:'#3b82f6' },
-      { id: 'sensor-smoke', x: 260+ox, icon:'🔥', label:'烟雾报警器', color:'#ef4444' },
-      { id: 'sensor-water', x: 440+ox, icon:'💧', label:'水浸传感器', color:'#06b6d4' },
-      { id: 'sensor-infrared', x: 620+ox, icon:'👤', label:'红外探测器', color:'#8b5cf6' },
-      { id: 'sensor-light', x: 780+ox, icon:'💡', label:'弱光传感器', color:'#f59e0b' },
-    ]},
-  ]
-
-  const lowerBaseY = layers[2].y + 5 // 原子服务下层的绘制基点
-
-  // 数据流: 大部分向上(设备→应用), 仅设备控制服务向下(应用→设备)
-  const connections: Array<{from:string;to:string;active:boolean;color?:string}> = [
-    // === 向上流: 设备层→抽象层 (传感器数据上报) ===
-    ...['abs-temp','abs-humi','abs-pm25','abs-co2','abs-tvoc','abs-ch2o','abs-pm10'].map(id=>({from:'sensor-cloud',to:id,active:true,color:'#3b82f6'})),
-    {from:'sensor-smoke',to:'abs-smoke',active:true,color:'#ef4444'},{from:'sensor-water',to:'abs-water',active:true,color:'#06b6d4'},
-    {from:'sensor-infrared',to:'abs-ir',active:true,color:'#8b5cf6'},{from:'sensor-light',to:'abs-light',active:true,color:'#f59e0b'},
-    // === 向上流: 抽象层→原子服务下层(数据采集类节点) ===
-    {from:'abs-temp',to:'svc-数据采集类-温度',active:true,color:'#3b82f6'},{from:'abs-humi',to:'svc-数据采集类-湿度',active:true,color:'#06b6d4'},
-    {from:'abs-pm25',to:'svc-数据采集类-PM2.5',active:true,color:'#f59e0b'},{from:'abs-co2',to:'svc-数据采集类-CO₂',active:true,color:'#8b5cf6'},
-    {from:'abs-tvoc',to:'svc-数据采集类-TVOC',active:true,color:'#ec4899'},{from:'abs-ch2o',to:'svc-数据采集类-甲醛',active:true,color:'#14b8a6'},
-    {from:'abs-pm10',to:'svc-数据采集类-PM10',active:true,color:'#f59e0b'},
-    {from:'abs-smoke',to:'svc-数据采集类-烟雾',active:true,color:'#ef4444'},{from:'abs-water',to:'svc-数据采集类-水浸',active:true,color:'#06b6d4'},
-    {from:'abs-ir',to:'svc-数据采集类-红外',active:true,color:'#8b5cf6'},{from:'abs-light',to:'svc-数据采集类-光感',active:true,color:'#f59e0b'},
-    // 报警相关抽象→报警判断类下层
-    {from:'abs-smoke',to:'svc-报警判断类-阈值判断',active:true,color:'#ef4444'},{from:'abs-water',to:'svc-报警判断类-状态监测',active:true,color:'#ef4444'},
-    // === 向上流: 下层→上层 (子服务汇聚到核心服务) ===
-    ...allLowerNodes.filter(n=>n.color==='#3b82f6').map(n=>({from:n.id,to:'upper-collect',active:true,color:'#3b82f6'})),
-    ...allLowerNodes.filter(n=>n.color==='#ef4444').map(n=>({from:n.id,to:'upper-alarm',active:true,color:'#ef4444'})),
-    ...allLowerNodes.filter(n=>n.color==='#8b5cf6').map(n=>({from:n.id,to:'upper-store',active:true,color:'#8b5cf6'})),
-    // === 向上流: 上层→应用 (数据呈现) ===
-    {from:'upper-collect',to:'app-env',active:true,color:'#3b82f6'},{from:'upper-collect',to:'app-security',active:true,color:'#8b5cf6'},{from:'upper-collect',to:'app-fire',active:true,color:'#ef4444'},
-    {from:'upper-fireid',to:'app-fire',active:true,color:'#ef4444'},{from:'upper-fireid',to:'app-security',active:true,color:'#8b5cf6'},
-    {from:'upper-alarm',to:'app-security',active:true,color:'#ef4444'},{from:'upper-alarm',to:'app-fire',active:true,color:'#ef4444'},
-    {from:'upper-store',to:'app-env',active:true,color:'#f59e0b'},{from:'upper-store',to:'app-security',active:true,color:'#f59e0b'},
-    // === 向下流: 仅设备控制服务(应用→设备) ===
-    {from:'app-env',to:'upper-control',active:true,color:'#22c55d'},{from:'app-security',to:'upper-control',active:true,color:'#22c55d'},{from:'app-fire',to:'upper-control',active:true,color:'#22c55d'},
-    ...allLowerNodes.filter(n=>n.color==='#22c55d').map(n=>({from:'upper-control',to:n.id,active:true,color:'#22c55d'})),
-    {from:'upper-control',to:'abs-temp',active:true,color:'#22c55d'},{from:'upper-control',to:'abs-humi',active:true,color:'#22c55d'},{from:'upper-control',to:'abs-smoke',active:true,color:'#22c55d'},
-    {from:'abs-temp',to:'sensor-cloud',active:true,color:'#22c55d'},{from:'abs-humi',to:'sensor-cloud',active:true,color:'#22c55d'},
-    // === 横向: 服务间联动 ===
-    {from:'upper-collect',to:'upper-store',active:true},{from:'upper-fireid',to:'upper-alarm',active:true},{from:'upper-alarm',to:'upper-control',active:true},
-  ]
-
-  let time = 0
-  function animate() {
-    if (!ctx) return
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    time += 0.02
-
-    layers.forEach((layer: any, index: number) => {
-      const colors = ['rgba(15,23,42,0.5)','rgba(59,130,246,0.05)','rgba(139,92,246,0.06)','rgba(139,92,246,0.04)','rgba(59,130,246,0.04)']
-      const h = layer.isLower ? 52 : 46
-      ctx.fillStyle = colors[index] || colors[0]
-      ctx.fillRect(0, layer.y - 10, canvas.width, h)
-      ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'left'
-      ctx.fillText(layer.name, 8, layer.y + 6)
-    })
-
-    lowerSvcGroups.forEach(g => {
-      ctx.font = 'bold 10px sans-serif'; ctx.fillStyle = g.color; ctx.textAlign = 'left'
-      ctx.fillText(g.label, g.x, lowerBaseY - 8)
-    })
-
-    // 下层节点 — 加大尺寸
-    allLowerNodes.forEach(node => {
-      const ny = lowerBaseY + 15 + node.row * 24 + (node.yOff || 0)
-      ctx.beginPath(); ctx.arc(node.x, ny, 10, 0, Math.PI * 2)
-      ctx.fillStyle = node.color + '50'
-      ctx.fill()
-      ctx.strokeStyle = node.color; ctx.lineWidth = 1.5
-      ctx.stroke()
-      // 内圈
-      ctx.beginPath(); ctx.arc(node.x, ny, 5, 0, Math.PI * 2)
-      ctx.fillStyle = node.color + '80'; ctx.fill()
-      ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = node.color
-      ctx.fillText(node.label, node.x + 13, ny + 4)
-    })
-
-    // 连线 — 更清晰的颜色
-    const drawnEdges = new Set<string>()
-    connections.forEach(conn => {
-      const fromLayer = layers.find((l: any) => l.nodes.some((n: any) => n.id === conn.from))
-      const toLayer = layers.find((l: any) => l.nodes.some((n: any) => n.id === conn.to))
-      if (!fromLayer || !toLayer) return
-      const fromNode = fromLayer.nodes.find((n: any) => n.id === conn.from)
-      const toNode = toLayer.nodes.find((n: any) => n.id === conn.to)
-      if (!fromNode || !toNode) return
-      const key = conn.from + '->' + conn.to
-      if (drawnEdges.has(key)) return; drawnEdges.add(key)
-
-      const col = conn.color || '#3b82f6'
-      const fy = fromLayer.isLower ? (lowerBaseY + 15 + (fromNode.row || 0) * 24 + (fromNode.yOff || 0)) : (fromLayer.y + 23)
-      const ty = toLayer.isLower ? (lowerBaseY + 15 + (toNode.row || 0) * 24 + (toNode.yOff || 0)) : (toLayer.y + 23)
-
-      if (!fromLayer.isLower || !toLayer.isLower) {
-        ctx.beginPath(); ctx.moveTo(fromNode.x, fy); ctx.lineTo(toNode.x, ty)
-        ctx.strokeStyle = conn.active ? col + '55' : '#33415520'
-        ctx.lineWidth = conn.active ? 1.2 : 0.4; ctx.stroke()
-
-        if (conn.active) {
-          const prog = ((time * 0.25 + fromNode.x * 0.008) % 1 + 1) % 1
-          const px = fromNode.x + (toNode.x - fromNode.x) * prog
-          const py = fy + (ty - fy) * prog
-          ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2)
-          ctx.fillStyle = col; ctx.globalAlpha = 0.8; ctx.fill()
-        }
-      }
-    })
-    ctx.globalAlpha = 1
-
-    layers.forEach((layer: any) => {
-      if (layer.isLower) return
-      layer.nodes.forEach((node: any) => {
-        const ny = layer.y + 23; const r = 17
-        // 发光环
-        const g = ctx.createRadialGradient(node.x, ny, r * 0.6, node.x, ny, r * 2)
-        g.addColorStop(0, node.color + '30'); g.addColorStop(1, 'transparent')
-        ctx.beginPath(); ctx.arc(node.x, ny, r * 2, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill()
-        // 主体
-        ctx.beginPath(); ctx.arc(node.x, ny, r, 0, Math.PI * 2)
-        ctx.fillStyle = node.color + '30'; ctx.strokeStyle = node.color; ctx.lineWidth = 2
-        ctx.fill(); ctx.stroke()
-        ctx.font = '15px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-        ctx.fillStyle = '#fff'; ctx.fillText(node.icon, node.x, ny)
-        ctx.font = '10px sans-serif'; ctx.fillStyle = node.color
-        ctx.fillText(node.label, node.x, ny + r + 12)
-      })
-    })
-
-    flowAnimationId = requestAnimationFrame(animate)
-  }
-  animate()
 }
 
 // 绘制应用数据流向图
@@ -958,8 +653,30 @@ function loadCustomApps() {
           createdApps.push(app)
         }
       })
+      syncApplicationCount()
     }
   } catch { /* ignore */ }
+}
+
+function loadMarineApplications() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('marine-demo.apps.v1') || '[]')
+    marineApplications.value = Array.isArray(saved)
+      ? saved.filter(app => app && typeof app.id === 'string' && typeof app.name === 'string').map(app => ({ id: app.id, name: app.name }))
+      : []
+    syncApplicationCount()
+  } catch {
+    marineApplications.value = []
+    syncApplicationCount()
+  }
+}
+
+function syncApplicationCount() {
+  const card = overviewCards[3]
+  if (!card) return
+  card.value = createdApps.length + marineApplications.value.length
+  card.trend = card.value ? '已进入应用层' : '可快速生成'
+  card.miniChartData[card.miniChartData.length - 1] = card.value
 }
 
 // 实时事件（从C++获取）
@@ -972,6 +689,8 @@ async function pollRealtimeData() {
     const res = await realtimeApi.getAllData() as any
     const d = res.data || res
     if (!d) return
+    sensorFeedLive.value = true
+    sensorOnlineCount.value = [d.temperature_online, d.humidity_online, d.pm25_online, d.pm10_online, d.tvoc_online, d.ch2o_online, d.co2_online, d.smoke_online, d.water_online, d.ir_online, d.ir_online, d.light_online].filter(Boolean).length
     const now = new Date().toLocaleTimeString('zh-CN', { hour12: false })
     const items = [
       { s:'温度', v: Math.round(d.temperature)/10, u:'℃', o: d.temperature_online, c:'#3b82f6', numeric:true },
@@ -1006,20 +725,21 @@ async function pollRealtimeData() {
       dev.value = (dev as any).cppBool ? raw : Math.round(raw / div * 10) / 10
       dev.unit = (dev as any).cppUnit || ''
     })
-  } catch { /* C++不可用 */ }
+  } catch { sensorFeedLive.value = false }
 }
 
 onMounted(() => {
-  drawFlowChart()
   loadCustomApps()
+  loadMarineApplications()
+  window.addEventListener('marine-apps-updated', loadMarineApplications)
   pollRealtimeData()
   realtimeTimer = setInterval(pollRealtimeData, 2000)
 })
 
 onUnmounted(() => {
-  if (flowAnimationId) cancelAnimationFrame(flowAnimationId)
   if (appFlowAnimationId) cancelAnimationFrame(appFlowAnimationId)
   if (realtimeTimer) clearInterval(realtimeTimer)
+  window.removeEventListener('marine-apps-updated', loadMarineApplications)
 })
 </script>
 
@@ -1042,29 +762,10 @@ onUnmounted(() => {
 .dashboard-root { min-height: 100vh; background: var(--bg-primary); position: relative; }
 .dashboard-main { position: relative; z-index: 1; padding: var(--spacing-xl); max-width: 1920px; margin: 0 auto; }
 
-.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--spacing-lg); }
-.section-title { display: flex; align-items: center; gap: var(--spacing-sm); font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0; }
-.section-title svg { color: var(--accent-primary); }
-.header-actions { display: flex; gap: var(--spacing-sm); }
-
-/* 软件定义架构 */
-.architecture-section { margin-bottom: var(--spacing-xl); }
-.architecture-layers { display: flex; flex-direction: column; gap: var(--spacing-md); }
-.layer { background: var(--bg-card); border: 1px solid var(--border-primary); border-radius: var(--radius-lg); padding: var(--spacing-md); }
-.layer-header { display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); }
-.layer-icon { font-size: 20px; }
-.layer-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
-.layer-desc { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
-.layer-nodes { display: flex; gap: var(--spacing-md); overflow-x: auto; padding: var(--spacing-xs) 0; }
-.arch-node { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: var(--spacing-sm) var(--spacing-md); background: rgba(0,0,0,0.2); border: 1px solid var(--border-primary); border-radius: var(--radius-md); min-width: 80px; transition: all var(--duration-fast); }
-.arch-node:hover { border-color: var(--accent-primary); background: rgba(59,130,246,0.1); }
-.arch-node.active { border-color: var(--accent-primary); }
-.node-icon { font-size: 24px; }
-.node-name { font-size: 11px; color: var(--text-secondary); text-align: center; white-space: nowrap; }
-.node-value { font-size: 12px; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono); }
-
 /* 数据流向图 */
 .flow-section { margin-bottom: var(--spacing-xl); }
+.flow-card-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-lg); width: 100%; }
+.flow-header-actions { display:flex; align-items:center; gap:var(--spacing-sm); }
 .flow-canvas { height: 620px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md); overflow: hidden; }
 .flow-canvas canvas { width: 100%; height: 100%; }
 

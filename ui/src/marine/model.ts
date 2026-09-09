@@ -14,8 +14,8 @@ export const services: MarineService[] = [
   { id: '02', name: '冷却循环', category: '执行控制', description: '建立并维持稳定冷却循环', color: '#75b6ff', available: true, kind: 'action', resource: '冷却执行器', metric: '循环流量', unit: 'm³/h', target: 48 },
   { id: '03', name: '供水增压', category: '执行控制', description: '按作业需求建立稳定供水', color: '#ae9bff', available: true, kind: 'action', resource: '水务执行器', metric: '供水压力', unit: 'MPa', target: 0.5 },
   { id: '04', name: '舱底排水', category: '执行控制', description: '完成指定区域的积水排放', color: '#f1be74', available: true, kind: 'action', resource: '水务执行器', metric: '剩余水位', unit: 'cm', target: 5 },
-  { id: '05', name: '压载调节', category: '扩展能力', description: '按目标调整压载分配', color: '#75b6ff', available: false, kind: 'action' },
-  { id: '06', name: '舱室温控', category: '扩展能力', description: '调节舱室环境温度', color: '#66dfce', available: false, kind: 'action' },
+  { id: '05', name: '检修安全报警', category: '执行控制', description: '按检修安全策略触发声光提示与报警联动', color: '#ef8d78', available: true, kind: 'action', resource: '安全报警执行器', metric: '报警状态', unit: '', target: 1 },
+  { id: '06', name: '压载调节', category: '扩展能力', description: '按目标调整压载分配', color: '#75b6ff', available: false, kind: 'action' },
   { id: '07', name: '消防供水', category: '扩展能力', description: '建立消防供水能力', color: '#f1be74', available: false, kind: 'action' },
   { id: '08', name: '应急通风', category: '扩展能力', description: '执行应急区域换气', color: '#66dfce', available: false, kind: 'action' },
   { id: '09', name: '舱门控制', category: '扩展能力', description: '执行指定舱门开闭', color: '#ae9bff', available: false, kind: 'action' },
@@ -47,15 +47,17 @@ export function createNode(serviceId: string): TaskNode {
   return { id: uid(), serviceId, area: '机舱', intensity: 70, duration: service?.kind === 'awareness' ? 3 : 6 }
 }
 export function createStep(ids: string[] = []): TaskStep { return { id: uid(), nodes: ids.map(createNode) } }
-export function createPreset(which: 'A' | 'B' | 'C'): MarineApp {
+export function createPreset(which: 'A' | 'B' | 'C' | 'D' | 'E'): MarineApp {
   if (which === 'A') return { id: uid(), name: '开航辅助保障', description: '先汇聚环境态势，再完成通风准备，并行建立冷却与供水，为开航提供辅助保障。', steps: [createStep(['A01', 'A02', 'A03']), createStep(['01']), createStep(['02', '03'])] }
   if (which === 'B') return { id: uid(), name: '作业后恢复保障', description: '读取舱底水浸态势，并行完成冷却与供水保障，随后执行舱底排水。', steps: [createStep(['A05']), createStep(['02', '03']), createStep(['04'])] }
-  return { id: uid(), name: '全船安全巡检', description: '并行复用全部态势感知能力，一次完成环境、消防、安防和舱底状态巡检。', steps: [createStep(['A01', 'A02', 'A03']), createStep(['A04', 'A05', 'A06', 'A07'])] }
+  if (which === 'C') return { id: uid(), name: '全船安全巡检', description: '并行复用全部态势感知能力，一次完成环境、消防、安防和舱底状态巡检。', steps: [createStep(['A01', 'A02', 'A03']), createStep(['A04', 'A05', 'A06', 'A07'])] }
+  if (which === 'D') return { id: uid(), name: '夜间机舱检修保障', description: '靠港夜间检修期间，为机舱作业提供人员、照度、火情、水浸、通风、报警和排水保障。', steps: [createStep(['A06', 'A07', 'A04', 'A05']), createStep(['01']), createStep(['05']), createStep(['04'])] }
+  return { id: uid(), name: '检修异常安全处置', description: '检修过程中发生烟雾或舱底积水时，执行报警、通风安全策略与排水处置。', steps: [createStep(['A04', 'A05', 'A06']), createStep(['05', '01']), createStep(['04'])] }
 }
 export function createLeadershipDemo() {
   return {
-    apps: [createPreset('A'), createPreset('B')] as [MarineApp, MarineApp],
-    reusedServiceIds: ['02', '03'],
+    apps: [createPreset('D'), createPreset('E')] as [MarineApp, MarineApp],
+    reusedServiceIds: ['01', '04', '05'],
     newServiceCount: 0,
   }
 }

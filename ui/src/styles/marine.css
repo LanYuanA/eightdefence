@@ -1223,6 +1223,25 @@
   color:#9bb4ca;
   font-size:15px
 }
+.step-service-picker {
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin:0 0 10px;
+  color:#7f9aad;
+  font-size:11px
+}
+.step-service-picker select {
+  min-width:0;
+  flex:1;
+  padding:6px 8px;
+  border:1px solid #37566d;
+  border-radius:4px;
+  background:#0a1926;
+  color:#c7d9e6;
+  font:inherit
+}
+.step-service-picker select:disabled { opacity:.55 }
 .parallel-caption {
   font-size:12px!important;
   color:#80b9e0!important

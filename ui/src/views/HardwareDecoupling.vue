@@ -73,9 +73,9 @@ onUnmounted(() => {
     <main class="hardware-main">
       <section class="hardware-title-row">
         <div>
-          <p class="hardware-eyebrow">HARDWARE DECOUPLING / 地址有差异 · 能力不改变</p>
-          <h1>换一台电机，应用无需改变<span>。</span></h1>
-          <p>{{ demo.lastMessage }}</p>
+          <p class="hardware-eyebrow">靠港夜间机舱检修 / HARDWARE REPLACEMENT</p>
+          <h1>检修通风设备替换<span>。</span></h1>
+          <p>机舱通风机 1 号异常或厂家更换时，切换至兼容备用驱动设备。</p>
         </div>
         <div class="change-metrics" aria-label="软硬解耦变更统计">
           <article><span>应用修改</span><strong>{{ demo.applicationChanges }}</strong><small>任务页面保持不变</small></article>
@@ -140,7 +140,7 @@ onUnmounted(() => {
             </div>
             <div class="motor-telemetry"><span class="speed-reading">实时转速 <b>{{ device.speed || '—' }}</b><small> rpm</small></span><span>故障码 <b>{{ device.faultCode }}</b></span></div>
             <div class="motor-badges"><span v-if="device.id === demo.logicalExecutor.boundDeviceId">当前绑定</span><span v-if="device.id === demo.candidateId">推荐替换</span><span v-else-if="device.compatible">能力兼容</span></div>
-            <button v-if="device.status === 'offline' && demo.phase === 'protected' && device.id !== demo.logicalExecutor.boundDeviceId" @click="connect(device.id)">＋ 模拟接入</button>
+            <button v-if="device.compatible && device.status === 'offline' && demo.phase === 'protected' && device.id !== demo.logicalExecutor.boundDeviceId" @click="connect(device.id)">＋ 模拟接入</button>
           </article>
         </div>
       </section>

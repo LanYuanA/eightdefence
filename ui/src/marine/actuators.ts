@@ -5,7 +5,7 @@ export type ActuatorStatus = 'offline' | 'standby' | 'running' | 'faulted'
 export interface ActuatorDevice {
   id: 'MOTOR-02' | 'MOTOR-0E' | 'MOTOR-0F'
   name: string
-  type: '短电机' | '长电机'
+  type: string
   address: '0x02' | '0x0E' | '0x0F'
   status: ActuatorStatus
   compatible: boolean
@@ -54,21 +54,21 @@ export function createActuatorDemo(): ActuatorDemoState {
   return {
     mode: 'simulation',
     phase: 'running',
-    application: { id: 'APP-VENT-01', name: '机舱通风保障' },
-    atomicService: { id: 'SERVICE-01', name: '舱室智能通风' },
-    logicalExecutor: { id: 'VENT-01', name: '通风执行器', boundDeviceId: 'MOTOR-02' },
+    application: { id: 'APP-MAINT-01', name: '夜间机舱检修保障' },
+    atomicService: { id: 'SERVICE-01', name: '检修通风控制' },
+    logicalExecutor: { id: 'VENT-01', name: '机舱通风机逻辑执行器', boundDeviceId: 'MOTOR-02' },
     devices: [
-      { id: 'MOTOR-02', name: '海风一号', type: '短电机', address: '0x02', status: 'running', compatible: true, faultCode: '0x0000', speed: 860 },
-      { id: 'MOTOR-0E', name: '海岳一号', type: '长电机', address: '0x0E', status: 'offline', compatible: true, faultCode: '—', speed: 0 },
-      { id: 'MOTOR-0F', name: '海岳二号', type: '长电机', address: '0x0F', status: 'offline', compatible: true, faultCode: '—', speed: 0 },
+      { id: 'MOTOR-02', name: '机舱通风机 1 号', type: '通风驱动设备', address: '0x02', status: 'running', compatible: true, faultCode: '0x0000', speed: 860 },
+      { id: 'MOTOR-0E', name: '舱底排水泵 2 号', type: '排水泵驱动设备', address: '0x0E', status: 'offline', compatible: false, faultCode: '—', speed: 0 },
+      { id: 'MOTOR-0F', name: '备用兼容驱动设备 3 号', type: '不同厂家兼容设备', address: '0x0F', status: 'offline', compatible: true, faultCode: '—', speed: 0 },
     ],
     candidateId: null,
     applicationChanges: 0,
     serviceChanges: 0,
     bindingUpdates: 0,
     recoveryMs: 0,
-    events: [{ id: 1, tone: 'success', title: '任务稳定运行', detail: 'VENT-01 当前绑定海风一号 · 0x02' }],
-    lastMessage: '应用正通过逻辑执行器稳定运行。',
+    events: [{ id: 1, tone: 'success', title: '检修通风稳定运行', detail: 'VENT-01 当前绑定机舱通风机 1 号 · 0x02' }],
+    lastMessage: '检修保障应用正通过逻辑执行器运行。',
   }
 }
 

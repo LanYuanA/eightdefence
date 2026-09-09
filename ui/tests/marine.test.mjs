@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createId, createLeadershipDemo, createPreset, createStep, createNode, validateApp, plannedDuration, parseSavedApps } from '../src/marine/model.ts'
+import { createId, createLeadershipDemo, createPreset, createStep, createNode, services, validateApp, plannedDuration, parseSavedApps } from '../src/marine/model.ts'
 import { MarineRunner, simulateService } from '../src/marine/runner.ts'
 import { demoSensorSnapshot, normalizeSensorSnapshot, sensorServiceSummary } from '../src/marine/sensors.ts'
 import { buildApplicationFlow } from '../src/marine/application-flow.ts'
@@ -66,14 +66,14 @@ test('validation rejects shared actuator conflicts, empty steps and unimplemente
   const app = createPreset('A'); app.steps = [createStep(['03', '04'])]
   assert.match(validateApp(app).join(), /共用水务执行器/)
   assert.throws(() => new MarineRunner().start(app), /共用/)
-  app.steps = [createStep(['05'])]; assert.match(validateApp(app).join(), /尚未实现/)
+  app.steps = [createStep(['06'])]; assert.match(validateApp(app).join(), /尚未实现/)
   app.steps = [createStep()]; assert.match(validateApp(app).join(), /没有服务/)
   app.steps = [createStep(['01'])]; app.steps[0].nodes[0].duration = NaN
   assert.match(validateApp(app).join(), /超出范围/)
 })
-test('all four simulators produce distinct results and respond to strength or duration progress', () => {
-  const outputs = ['01','02','03','04'].map(id => simulateService(createNode(id), 1))
-  assert.equal(new Set(outputs.map(result => result.metric)).size, 4)
+test('all five simulators produce distinct results and respond to strength or duration progress', () => {
+  const outputs = ['01','02','03','04','05'].map(id => simulateService(createNode(id), 1))
+  assert.equal(new Set(outputs.map(result => result.metric)).size, 5)
   for (const id of ['02','03','04']) {
     const node = createNode(id); node.intensity = 20; const low = simulateService(node, 1).value
     node.intensity = 100; const high = simulateService(node, 1).value
@@ -101,13 +101,13 @@ test('application IDs still work when the browser has no crypto.randomUUID', () 
   assert.match(id, /^marine-3f-[a-z0-9]{8}$/)
 })
 
-test('leadership demo creates two independent apps by reusing services 02 and 03', () => {
+test('leadership demo creates two independent document scenarios by reusing control services', () => {
   const demo = createLeadershipDemo()
   const actionIds = demo.apps.map(app => app.steps.flatMap(step => step.nodes)
-    .map(node => node.serviceId).filter(id => ['01', '02', '03', '04'].includes(id)))
+    .map(node => node.serviceId).filter(id => ['01', '02', '03', '04', '05'].includes(id)))
 
-  assert.deepEqual(actionIds, [['01', '02', '03'], ['02', '03', '04']])
-  assert.deepEqual(demo.reusedServiceIds, ['02', '03'])
+  assert.deepEqual(actionIds, [['01', '05', '04'], ['05', '01', '04']])
+  assert.deepEqual(demo.reusedServiceIds, ['01', '04', '05'])
   assert.notEqual(demo.apps[0].id, demo.apps[1].id)
   assert.equal(demo.newServiceCount, 0)
 })
@@ -119,13 +119,13 @@ test('application flow is derived from the services actually used by each app', 
   assert.deepEqual(flowA.sensors.map(item => item.label), ['温度', '湿度', 'PM2.5', 'PM10', 'TVOC', '甲醛', 'CO₂'])
   assert.deepEqual(flowA.actions.map(item => item.id), ['01', '02', '03'])
   assert.deepEqual(flowA.abstractions.map(item => item.id), ['VENT-01', 'COOL-01', 'WATER-01'])
-  assert.deepEqual(flowA.hardware.map(item => item.name), ['通风驱动电机', '冷却循环泵', '供水增压泵'])
+  assert.deepEqual(flowA.hardware.map(item => item.name), ['机舱通风机 1 号', '冷却循环泵', '供水增压泵'])
 
   const flowB = buildApplicationFlow(createPreset('B'))
   assert.deepEqual(flowB.awareness.map(item => item.id), ['A05'])
   assert.deepEqual(flowB.sensors.map(item => item.label), ['水浸'])
   assert.deepEqual(flowB.actions.map(item => item.id), ['02', '03', '04'])
-  assert.deepEqual(flowB.hardware.map(item => item.name), ['冷却循环泵', '供水增压泵', '舱底排水泵'])
+  assert.deepEqual(flowB.hardware.map(item => item.name), ['冷却循环泵', '供水增压泵', '舱底排水泵 2 号'])
 })
 
 test('all 12 existing sensor readings are grouped into seven atomic awareness services', () => {
@@ -181,17 +181,17 @@ test('software base runs multiple application instances independently', () => {
 test('operator-confirmed replacement changes only the physical binding', () => {
   const initial = createActuatorDemo()
   const protectedState = disconnectActive(initial)
-  const candidateState = connectActuator(protectedState, 'MOTOR-0E')
+  const candidateState = connectActuator(protectedState, 'MOTOR-0F')
 
   assert.equal(initial.logicalExecutor.boundDeviceId, 'MOTOR-02')
   assert.equal(protectedState.phase, 'protected')
   assert.equal(protectedState.devices.find(device => device.id === 'MOTOR-02')?.status, 'offline')
   assert.equal(candidateState.phase, 'awaiting-confirmation')
-  assert.equal(candidateState.candidateId, 'MOTOR-0E')
+  assert.equal(candidateState.candidateId, 'MOTOR-0F')
 
   const switching = confirmActuatorSwitch(candidateState)
   assert.equal(switching.phase, 'switching')
-  assert.equal(switching.logicalExecutor.boundDeviceId, 'MOTOR-0E')
+  assert.equal(switching.logicalExecutor.boundDeviceId, 'MOTOR-0F')
   assert.equal(switching.application.id, initial.application.id)
   assert.equal(switching.atomicService.id, initial.atomicService.id)
   assert.deepEqual(
@@ -201,7 +201,7 @@ test('operator-confirmed replacement changes only the physical binding', () => {
 
   const recovered = advanceActuatorDemo(switching, 1800)
   assert.equal(recovered.phase, 'recovered')
-  assert.equal(recovered.devices.find(device => device.id === 'MOTOR-0E')?.status, 'running')
+  assert.equal(recovered.devices.find(device => device.id === 'MOTOR-0F')?.status, 'running')
   assert.equal(recovered.recoveryMs, 1800)
 })
 
@@ -218,4 +218,29 @@ test('fault protection cannot switch until an eligible motor is connected', () =
   const candidate = connectActuator(rejected, 'MOTOR-0F')
   assert.equal(candidate.phase, 'awaiting-confirmation')
   assert.equal(candidate.candidateId, 'MOTOR-0F')
+})
+
+test('document scenarios combine the night-maintenance and abnormal-response services', () => {
+  const maintenance = createPreset('D')
+  const response = createPreset('E')
+
+  assert.equal(maintenance.name, '夜间机舱检修保障')
+  assert.deepEqual(
+    maintenance.steps.map(step => step.nodes.map(node => node.serviceId)),
+    [['A06', 'A07', 'A04', 'A05'], ['01'], ['05'], ['04']],
+  )
+  assert.equal(response.name, '检修异常安全处置')
+  assert.deepEqual(
+    response.steps.map(step => step.nodes.map(node => node.serviceId)),
+    [['A04', 'A05', 'A06'], ['05', '01'], ['04']],
+  )
+  assert.equal(services.find(service => service.id === '05')?.name, '检修安全报警')
+  assert.equal(services.find(service => service.id === '05')?.available, true)
+})
+
+test('hardware demo names physical devices by their shipboard responsibility', () => {
+  const devices = createActuatorDemo().devices
+  assert.deepEqual(devices.map(device => device.name), ['机舱通风机 1 号', '舱底排水泵 2 号', '备用兼容驱动设备 3 号'])
+  assert.equal(devices.find(device => device.id === 'MOTOR-0E')?.compatible, false)
+  assert.equal(devices.find(device => device.id === 'MOTOR-0F')?.compatible, true)
 })

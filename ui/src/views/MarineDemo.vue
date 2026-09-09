@@ -10,12 +10,13 @@ import type { SensorSnapshot } from '../marine/sensors'
 import { realtimeApi } from '../api/realtime'
 import ShipDiagram from '../components/marine/ShipDiagram.vue'
 import ApplicationFlow from '../components/marine/ApplicationFlow.vue'
+import ApplicationCommandCenter from '../components/marine/ApplicationCommandCenter.vue'
 import '../styles/marine.css'
 
 const route = useRoute()
 const tab = ref<'compose' | 'run' | 'catalog'>(route.path === '/atomic-services' ? 'catalog' : 'compose')
 watch(() => route.path, path => { tab.value = path === '/atomic-services' ? 'catalog' : 'compose' })
-const app = ref<MarineApp>(createPreset('A'))
+const app = ref<MarineApp>(createPreset('D'))
 const original = ref(JSON.stringify(app.value))
 const selectedId = ref(app.value.steps[0]!.nodes[0]!.id)
 const selectedStep = ref(app.value.steps[0]!.id)
@@ -74,8 +75,9 @@ const onlineSensorCount = computed(() => Object.values(sensorSnapshot.value.valu
 const completedCount = computed(() => runNodes.value.filter(node => node.status === 'completed').length)
 const progress = computed(() => runNodes.value.length ? Math.round(runNodes.value.reduce((sum, node) => sum + node.progress, 0) / runNodes.value.length * 100) : 0)
 const filteredServices = computed(() => services.filter(service => (service.name + service.description + service.id).includes(search.value) && (catalogFilter.value === '全部服务' || (catalogFilter.value === '可运行' ? service.available : !service.available))))
-const reused = computed(() => [...new Set(nodes.value.map(node => node.serviceId))].filter(id => id === '02' || id === '03'))
-const runReused = computed(() => [...new Set(runNodes.value.map(item => item.node.serviceId))].filter(id => id === '02' || id === '03'))
+const reused = computed(() => [...new Set(nodes.value.map(node => node.serviceId))].filter(id => ['01', '04', '05'].includes(id)))
+const runReused = computed(() => [...new Set(runNodes.value.map(item => item.node.serviceId))].filter(id => ['01', '04', '05'].includes(id)))
+const generationReuseNames = computed(() => generationPreview.value?.reusedServiceIds.map(id => `${id} ${serviceById(id).name}`).join('　＋　') || '')
 const statusLabels = { idle: '等待运行', running: '正在执行', paused: '已暂停', completed: '任务完成', cancelled: '已停止', failed: '执行异常' }
 const nodeLabels = { waiting: '等待执行', running: '运行中', completed: '已完成', cancelled: '已取消', failed: '异常' }
 const storageKey = 'marine-demo.apps.v1'
@@ -96,7 +98,7 @@ function requestReplace(next: MarineApp) {
 }
 function confirmReplace() { confirmation.value?.close(); pendingAction?.(); pendingAction = undefined }
 function newApp() { journeyStage.value = 1; requestReplace({ id: uid(), name: '未命名应用', description: '请填写任务目标，并从左侧添加需要的服务。', steps: [createStep()] }) }
-function selectPreset(which: 'A' | 'B' | 'C') { journeyStage.value = 2; requestReplace(createPreset(which)) }
+function selectPreset(which: 'A' | 'B' | 'C' | 'D' | 'E') { journeyStage.value = 2; requestReplace(createPreset(which)) }
 function chooseNode(node: TaskNode, stepId: string) { selectedId.value = node.id; selectedStep.value = stepId }
 function addService(serviceId: string, targetId = selectedStep.value) {
   if (editingBusy.value) return
@@ -105,6 +107,11 @@ function addService(serviceId: string, targetId = selectedStep.value) {
   if (!step) { step = createStep(); app.value.steps.push(step) }
   const node = createNode(serviceId); step.nodes.push(node); chooseNode(node, step.id)
   journeyStage.value = 2
+}
+function addServiceFromSelect(event: Event, targetId: string) {
+  const select = event.target as HTMLSelectElement
+  if (select.value) addService(select.value, targetId)
+  select.value = ''
 }
 function addStep() { if (!editingBusy.value) { const step = createStep(); app.value.steps.push(step); selectedStep.value = step.id; selectedId.value = '' } }
 function removeNode(id: string) {
@@ -294,26 +301,25 @@ onUnmounted(() => { clearInterval(timer); clearInterval(sensorTimer); clearTimeo
 
     <main class="marine-main">
       <template v-if="tab === 'compose'">
-        <section class="page-heading compose-heading"><div><p class="eyebrow">MISSION COMPOSER / 任务驱动 · 服务复用</p><h1>按需组合，定义船舶能力<span>.</span></h1><p>一次封装原子服务，按任务快速组合为多个独立应用。</p></div><div class="button-group"><button class="leadership-button" :disabled="leadershipBusy" @click="runLeadershipDemo"><span class="leadership-play">▶</span> {{ leadershipBusy ? '正在生成两个应用…' : '一键演示' }}</button><button :disabled="editingBusy" @click="savedDialog?.showModal()">我的应用 <span class="count">{{ savedApps.length }}</span></button><button :disabled="editingBusy" @click="newApp">＋ 新建应用</button></div></section>
+        <section class="page-heading compose-heading"><div><p class="eyebrow">MISSION COMPOSER</p><h1>任务编排<span>.</span></h1></div><div class="button-group"><button class="leadership-button" :disabled="leadershipBusy" @click="runLeadershipDemo"><span class="leadership-play">▶</span> {{ leadershipBusy ? '正在生成应用…' : '一键演示' }}</button><button :disabled="editingBusy" @click="savedDialog?.showModal()">我的应用 <span class="count">{{ savedApps.length }}</span></button><button :disabled="editingBusy" @click="newApp">＋ 新建应用</button></div></section>
         <section class="software-story-bar" aria-label="软件定义演示路径">
           <div class="journey-track">
-            <div v-for="(item,index) in ['选择任务','组合服务','生成应用','并行运行']" :key="item" class="journey-step" :class="{active:journeyStage === index + 1,done:journeyStage > index + 1}"><span>{{ journeyStage > index + 1 ? '✓' : index + 1 }}</span><div><small>STEP {{ String(index + 1).padStart(2,'0') }}</small><strong>{{ item }}</strong></div><i v-if="index < 3">→</i></div>
+            <div v-for="(item,index) in ['任务选择','服务编排','应用生成','应用运行']" :key="item" class="journey-step" :class="{active:journeyStage === index + 1,done:journeyStage > index + 1}"><span>{{ journeyStage > index + 1 ? '✓' : index + 1 }}</span><div><small>STEP {{ String(index + 1).padStart(2,'0') }}</small><strong>{{ item }}</strong></div><i v-if="index < 3">→</i></div>
           </div>
-          <div class="soft-value-metrics"><div><strong>0</strong><span>新增开发</span></div><div><strong>2</strong><span>跨应用复用</span></div><div><strong>{{ savedApps.length }}</strong><span>已生成应用</span></div><div><strong>{{ activeRuntimeCount }}</strong><span>正在运行</span></div></div>
+          <div class="soft-value-metrics"><div><strong>{{ savedApps.length }}</strong><span>应用</span></div><div><strong>{{ activeRuntimeCount }}</strong><span>运行中</span></div></div>
         </section>
         <section class="order-strip reuse-orders" aria-label="示例任务订单与服务复用对比">
-          <div class="reuse-orders-title"><p class="eyebrow">TASK ORDERS / 任务订单</p><strong>相同服务，不同组合</strong><span>点击任一订单载入编排</span></div>
-          <button class="reuse-order-card" :disabled="editingBusy" @click="selectPreset('A')"><b>A</b><span class="order-name">开航辅助保障</span><span class="order-service service-01">01 通风</span><i>＋</i><span class="order-service shared-service">02 冷却</span><i>＋</i><span class="order-service shared-service">03 供水</span></button>
-          <div class="reuse-bridge"><span>02</span><span>03</span><strong>跨应用复用</strong></div>
-          <button class="reuse-order-card" :disabled="editingBusy" @click="selectPreset('B')"><b>B</b><span class="order-name">作业后恢复保障</span><span class="order-service shared-service">02 冷却</span><i>＋</i><span class="order-service shared-service">03 供水</span><i>＋</i><span class="order-service service-04">04 排水</span></button>
-          <button class="compact-order" :disabled="editingBusy" @click="selectPreset('C')"><b>C</b><span>全船安全巡检</span><small>7 项态势能力</small></button>
+          <div class="reuse-orders-title"><p class="eyebrow">PRESET SCENARIOS</p><strong>预设场景</strong></div>
+          <button class="reuse-order-card" :disabled="editingBusy" @click="selectPreset('D')"><b>01</b><span class="order-name">夜间机舱检修保障</span><span class="order-service service-01">人员 / 照度</span><i>＋</i><span class="order-service shared-service">通风 / 报警</span><i>＋</i><span class="order-service service-04">排水</span></button>
+          <div class="reuse-bridge"><span>01</span><span>05</span><strong>复用</strong></div>
+          <button class="reuse-order-card" :disabled="editingBusy" @click="selectPreset('E')"><b>02</b><span class="order-name">检修异常安全处置</span><span class="order-service service-01">烟雾 / 水浸</span><i>＋</i><span class="order-service shared-service">报警 / 通风</span><i>＋</i><span class="order-service service-04">排水</span></button>
         </section>
         <div v-if="editingBusy" class="info-banner">应用正在{{ editingSession?.state.status === 'paused' ? '暂停' : '运行' }}，编排已锁定。<button @click="tab = 'run'">查看运行 →</button></div>
         <div class="composer-layout">
-          <aside class="panel library"><div class="panel-heading"><h2>原子服务库</h2><span>21 项能力</span></div><p class="muted">拖入步骤，或点击 ＋ 添加</p>
+          <aside class="panel library"><div class="panel-heading"><h2>原子服务库</h2><span>{{ services.length }} 项</span></div>
             <button class="library-label library-toggle" :aria-expanded="awarenessExpanded" @click="awarenessExpanded = !awarenessExpanded"><span><i class="sensor-dot" :class="{live:sensorApiConnected}"/> 态势感知服务</span><span>07 {{ awarenessExpanded ? '−' : '+' }}</span></button>
             <div v-if="awarenessExpanded"><article v-for="service in awarenessServices" :key="service.id" class="service-tile sensing-tile" :style="{'--service-color':service.color}" :draggable="!editingBusy" @dragstart="drag($event, 'service', service.id)"><span class="service-number">{{ service.id }}</span><div><h3>{{ service.name }}</h3><p>{{ service.description }}</p></div><button :disabled="editingBusy" class="tile-add" :aria-label="`添加${service.name}到选中步骤`" @click="addService(service.id)">＋</button></article></div>
-            <button class="library-label library-toggle" :aria-expanded="actionExpanded" @click="actionExpanded = !actionExpanded"><span><i class="action-dot"/> 执行控制服务</span><span>04 {{ actionExpanded ? '−' : '+' }}</span></button>
+            <button class="library-label library-toggle" :aria-expanded="actionExpanded" @click="actionExpanded = !actionExpanded"><span><i class="action-dot"/> 执行控制服务</span><span>{{ String(actionServices.length).padStart(2,'0') }} {{ actionExpanded ? '−' : '+' }}</span></button>
             <div v-if="actionExpanded"><article v-for="service in actionServices" :key="service.id" class="service-tile" :style="{'--service-color':service.color}" :draggable="!editingBusy" @dragstart="drag($event, 'service', service.id)"><span class="service-number">{{ service.id }}</span><div><h3>{{ service.name }}</h3><p>{{ service.description }}</p></div><button :disabled="editingBusy" class="tile-add" :aria-label="`添加${service.name}到选中步骤`" @click="addService(service.id)">＋</button></article></div>
             <button class="expand-library" :aria-expanded="libraryExpanded" @click="libraryExpanded = !libraryExpanded">扩展服务 <span>10 项 · {{ libraryExpanded ? '收起 −' : '展开 ＋' }}</span></button>
             <div v-if="libraryExpanded" class="future-library"><div v-for="service in services.filter(item => !item.available)" :key="service.id"><span>{{ service.id }} {{ service.name }}</span><span>待实现</span></div></div>
@@ -324,30 +330,31 @@ onUnmounted(() => { clearInterval(timer); clearInterval(sensorTimer); clearTimeo
             <div class="flow-steps">
               <article v-for="(step,index) in app.steps" :key="step.id" class="step" :class="{ 'selected-step':selectedStep === step.id, parallel:step.nodes.length > 1 }" :draggable="!editingBusy" @dragstart.self="drag($event, 'step', step.id)" @dragover.prevent @drop.prevent.stop="drop($event, step.id)">
                 <div class="step-header"><button class="step-select" @click="selectedStep = step.id; selectedId = ''"><span class="step-index">{{ String(index + 1).padStart(2,'0') }}</span>{{ step.nodes.length > 1 ? '并行组' : '顺序步骤' }}</button><div class="step-actions"><button :disabled="editingBusy || index === 0" @click="moveStep(step.id,-1)" aria-label="步骤前移">←</button><button :disabled="editingBusy || index === app.steps.length-1" @click="moveStep(step.id,1)" aria-label="步骤后移">→</button><button :disabled="editingBusy" @click="removeStep(step.id)" aria-label="删除步骤">×</button></div></div>
-                <p v-if="step.nodes.length > 1" class="parallel-caption">同时开始 · 全部完成后继续</p>
+                <div class="step-service-picker"><label>添加原子服务</label><select :disabled="editingBusy" @change="addServiceFromSelect($event, step.id)"><option value="">从服务库选择…</option><option v-for="service in services" :key="service.id" :value="service.id" :disabled="!service.available">{{ service.id }} · {{ service.name }}{{ service.available ? '' : '（待实现）' }}</option></select></div>
+                <p v-if="step.nodes.length > 1" class="parallel-caption">并行执行</p>
                 <div v-for="node in step.nodes" :key="node.id" class="flow-node" :class="{selected:selectedId === node.id}" :style="{'--service-color':serviceById(node.serviceId).color}" :draggable="!editingBusy" @dragstart.stop="drag($event,'node',node.id)">
                   <button class="node-main" @click="chooseNode(node,step.id)"><div class="node-top"><span class="service-number">{{ node.serviceId }}</span><span v-if="serviceById(node.serviceId).kind === 'awareness'" class="reuse-badge">态势输入</span><span v-else-if="['02','03'].includes(node.serviceId)" class="reuse-badge">可跨应用复用</span><span class="drag-handle">⠿</span></div><h3>{{ serviceById(node.serviceId).name }}</h3><p>{{ node.area }} · {{ serviceById(node.serviceId).kind === 'awareness' ? '数据采样' : `强度 ${node.intensity}%` }}</p><div class="node-footer"><span>◷ {{ node.duration }} 秒</span><span>参数配置 ↗</span></div></button>
                   <button class="node-remove" :disabled="editingBusy" :aria-label="`移除${serviceById(node.serviceId).name}`" @click="removeNode(node.id)">×</button>
                 </div>
-                <button class="parallel-drop" :disabled="editingBusy" @click="selectedStep = step.id; selectedId = ''; notify('已选中此步骤，点击左侧服务的 ＋ 即可添加。')">＋ {{ step.nodes.length ? '拖入服务，组成并行组' : '拖入或从左侧添加服务' }}</button>
+                <button class="parallel-drop" :disabled="editingBusy" @click="selectedStep = step.id; selectedId = ''">＋ 添加服务</button>
                 <span v-if="index < app.steps.length-1" class="step-connector" aria-hidden="true">→</span>
               </article>
               <button class="new-step-drop" :disabled="editingBusy" @dragover.prevent @drop.prevent.stop="drop($event)" @click="addStep"><span>＋</span>新步骤<small>拖入服务，顺序执行</small></button>
             </div>
             <div v-if="errors.length" class="validation-list" role="status"><p v-for="error in errors" :key="error">{{ error }}</p></div>
-            <div class="canvas-bottom"><span>◇ 业务服务独立封装，应用只定义组合关系</span><div class="button-group"><button :disabled="editingBusy || !!errors.length" @click="saveApp">生成并保存应用</button><button class="primary" :disabled="editingBusy || !!errors.length" @click="startRun">▶ 运行应用</button></div></div>
+            <div class="canvas-bottom"><span>任务步骤</span><div class="button-group"><button :disabled="editingBusy || !!errors.length" @click="saveApp">生成并保存应用</button><button class="primary" :disabled="editingBusy || !!errors.length" @click="startRun">▶ 运行应用</button></div></div>
           </section>
           <aside class="panel inspector"><p class="eyebrow">MISSION ORDER</p><h2>{{ selected ? '服务参数' : '任务需求' }}</h2>
             <template v-if="selected"><div class="inspector-service" :style="{'--service-color':serviceById(selected.serviceId).color}"><span class="service-number">{{ selected.serviceId }}</span><h3>{{ serviceById(selected.serviceId).name }}</h3></div><p>{{ serviceById(selected.serviceId).description }}</p><div v-if="serviceById(selected.serviceId).kind === 'awareness'" class="sensor-source-card"><span :class="{live:sensorApiConnected}"/><div><strong>{{ sensorApiConnected ? '实时数据已接入' : '当前使用演示数据' }}</strong><p>{{ sensorApiConnected ? `${onlineSensorCount} / 12 路数据在线` : '启动网关后自动切换为真实数据' }}</p></div></div><label class="field">任务区域<select v-model="selected.area" :disabled="editingBusy"><option v-for="area in areas" :key="area">{{ area }}</option></select></label><label v-if="serviceById(selected.serviceId).kind === 'action'" class="field">运行强度 <strong>{{ selected.intensity }}%</strong><input type="range" min="10" max="100" step="5" v-model.number="selected.intensity" :disabled="editingBusy" /></label><label class="field">{{ serviceById(selected.serviceId).kind === 'awareness' ? '采样窗口' : '持续时间' }}（秒）<input type="number" min="2" max="30" v-model.number="selected.duration" :disabled="editingBusy" /></label><label class="field">移动到步骤<select :value="selectedStep" :disabled="editingBusy" @change="moveNode(selected.id, ($event.target as HTMLSelectElement).value)"><option v-for="(step,index) in app.steps" :key="step.id" :value="step.id">步骤 {{ index+1 }}{{ step.nodes.length > 1 ? ' · 并行组' : '' }}</option><option value="">新建顺序步骤</option></select></label><button class="text-button" @click="selectedId = ''">← 查看任务需求</button></template>
             <template v-else><label class="field">应用名称<input v-model="app.name" maxlength="40" :disabled="editingBusy" /></label><label class="field">任务目标<textarea v-model="app.description" rows="4" maxlength="240" :disabled="editingBusy" /></label><div class="order-summary"><span>执行方式</span><strong>顺序 / 并行</strong><span>预计运行</span><strong>{{ duration }} 秒</strong><span>运行环境</span><strong>软件模拟</strong></div></template>
-            <div class="reuse-note">示例 A / B 共用服务<strong v-for="id in reused" :key="id">{{ id }} {{ serviceById(id).name }}</strong><p v-if="!reused.length">添加 02 或 03，体验跨应用复用。</p><p>同一套能力，适配不同任务。</p></div>
+            <div class="reuse-note">当前场景服务<strong v-for="id in reused" :key="id">{{ id }} {{ serviceById(id).name }}</strong></div>
           </aside>
         </div>
         <section class="architecture-strip" aria-label="控制执行顺序"><div><span>01</span><strong>任务需求</strong><p>选择并生成任务应用</p></div><i>→</i><div><span>02</span><strong>应用层</strong><p>下发应用执行计划</p></div><i>→</i><div><span>03</span><strong>原子服务层</strong><p>步骤间顺序 · 步骤内并行</p></div><i>→</i><div><span>04</span><strong>设备抽象层</strong><p>转换为统一设备指令</p></div><i>→</i><div><span>05</span><strong>物理资源层</strong><p>态势感知与执行器硬件</p></div></section>
       </template>
 
       <template v-else-if="tab === 'run'">
-        <section class="page-heading"><div><p class="eyebrow">SOFTWARE BASE / 多应用承载 · 独立运行</p><h1>{{ activeSession?.app.name || '软件基座' }}<span>.</span></h1><p>{{ activeSession?.app.description || '每生成一个应用，软件基座就增加一个独立应用页面。' }}</p></div><div class="button-group"><button @click="tab = 'compose'">＋ 生成新应用</button><template v-if="busy"><button @click="pauseResume">{{ run.status === 'paused' ? '▶ 继续' : 'Ⅱ 暂停' }}</button><button class="danger-button" @click="stopRun">■ 停止当前应用</button></template><button v-else class="primary" :disabled="!activeSession" @click="activeSession && startApplication(activeSession.app)">▶ {{ run.app ? '重新运行' : '启动当前应用' }}</button></div></section>
+        <section class="page-heading"><div><p class="eyebrow">SOFTWARE BASE</p><h1>{{ activeSession?.app.name || '应用运行' }}<span>.</span></h1></div><div class="button-group"><button @click="tab = 'compose'">＋ 生成新应用</button><template v-if="busy"><button @click="pauseResume">{{ run.status === 'paused' ? '▶ 继续' : 'Ⅱ 暂停' }}</button><button class="danger-button" @click="stopRun">■ 停止当前应用</button></template><button v-else class="primary" :disabled="!activeSession" @click="activeSession && startApplication(activeSession.app)">▶ {{ run.app ? '重新运行' : '启动当前应用' }}</button></div></section>
         <section class="application-base panel">
           <div class="application-base-heading"><div><p class="eyebrow">APPLICATION PAGES / 应用页面</p><h2>一个基座，承载多个独立应用</h2></div><div class="base-runtime-summary"><strong>{{ applicationPages.length }}</strong><span>个应用</span><i/><strong>{{ activeRuntimeCount }}</strong><span>个正在运行</span></div></div>
           <div v-if="applicationPages.length" class="application-page-tabs">
@@ -359,6 +366,7 @@ onUnmounted(() => { clearInterval(timer); clearInterval(sensorTimer); clearTimeo
           </div>
           <div v-else class="application-base-empty"><span>＋</span><div><strong>还没有生成应用</strong><p>返回任务编排，组合服务并点击“生成并保存应用”。</p></div><button class="primary" @click="tab = 'compose'">前往任务编排</button></div>
         </section>
+        <ApplicationCommandCenter v-if="activeSession" :app="activeSession.app" :nodes="runNodes" :snapshot="sensorSnapshot" :status="run.status" />
         <ApplicationFlow v-if="activeSession" :app="activeSession.app" :nodes="runNodes" :snapshot="sensorSnapshot" :status="run.status" />
         <div class="runtime-stats"><div><span>任务状态</span><strong :class="run.status">{{ statusLabels[run.status] }}</strong></div><div><span>整体进度</span><strong>{{ progress }}<small>%</small></strong></div><div><span>服务完成</span><strong>{{ completedCount }}<small>/ {{ runNodes.length }}</small></strong></div><div><span>执行用时</span><strong>{{ run.elapsed.toFixed(1) }}<small>秒</small></strong></div><div class="runtime-mode"><span class="mode-pill">混合运行</span><p>感知读取数据 · 执行软件模拟</p></div></div>
         <div class="runtime-layout"><section class="panel ship-panel"><div class="panel-heading"><h2>船舶服务运行态势</h2><span>{{ busy ? `步骤 ${run.stepIndex+1} / ${run.app?.steps.length}` : '任务能力视图' }}</span></div><ShipDiagram :nodes="runNodes" :paused="run.status !== 'running'"/><div class="runtime-services"><article v-for="service in actionServices" :key="service.id" :style="{'--service-color':service.color}" :class="{active:runNodes.some(node => node.node.serviceId === service.id && node.status === 'running')}"><span>{{ service.id }} / {{ service.name }}</span><strong>{{ runNodes.some(node => node.node.serviceId === service.id && node.status === 'running') ? (run.status === 'paused' ? '已暂停' : '执行中') : runNodes.some(node => node.node.serviceId === service.id && node.status === 'completed') ? '已完成' : runNodes.some(node => node.node.serviceId === service.id && node.status === 'failed') ? '异常' : runNodes.some(node => node.node.serviceId === service.id && node.status === 'cancelled') ? '已取消' : '待命' }}</strong></article></div></section>
@@ -369,7 +377,7 @@ onUnmounted(() => { clearInterval(timer); clearInterval(sensorTimer); clearTimeo
       </template>
 
       <template v-else>
-        <section class="page-heading"><div><p class="eyebrow">CAPABILITY CATALOG / 一次封装 · 多处复用</p><h1>船舶能力，服务化交付<span>.</span></h1><p>21 项船舶业务能力：7 项态势感知接入现有数据，4 项执行能力支持软件模拟。</p></div><button class="primary" @click="tab = 'compose'">前往任务编排 →</button></section>
+        <section class="page-heading"><div><p class="eyebrow">CAPABILITY CATALOG</p><h1>原子服务库<span>.</span></h1></div><button class="primary" @click="tab = 'compose'">前往任务编排 →</button></section>
         <div class="catalog-toolbar"><div class="filter-tabs"><button v-for="filter in ['全部服务','可运行','待实现']" :key="filter" :class="{active:catalogFilter === filter}" @click="catalogFilter = filter">{{ filter }}</button></div><input v-model="search" aria-label="搜索服务" placeholder="搜索名称、编号或能力…" /></div>
         <div class="catalog-grid"><article v-for="service in filteredServices" :key="service.id" class="panel catalog-card" :style="{'--service-color':service.color}"><header><span class="service-number">{{ service.id }}</span><span :class="service.available ? 'available-tag' : 'pending-tag'">{{ service.available ? (service.kind === 'awareness' ? (sensorApiConnected ? '可运行 · 实时数据' : '可运行 · 演示数据') : '可运行 · 软件模拟') : '待实现' }}</span></header><span class="catalog-category">{{ service.category }}</span><h2>{{ service.name }}</h2><p>{{ service.description }}</p><footer><span>{{ service.available ? (service.kind === 'awareness' ? '传感器数据 → 态势结果' : '任务参数 → 执行结果') : '扩展能力规划' }}</span><button v-if="service.available" :disabled="busy" :aria-label="`将${service.name}加入编排`" @click="addService(service.id); tab = 'compose'">加入编排 ↗</button><span v-else>—</span></footer></article></div><p v-if="!filteredServices.length" class="empty-state">没有匹配的服务，请尝试其他关键词。</p>
       </template>
@@ -379,8 +387,7 @@ onUnmounted(() => { clearInterval(timer); clearInterval(sensorTimer); clearTimeo
       <div v-if="generationPreview" class="generation-overlay" role="status" aria-live="assertive">
         <section class="generation-stage">
           <p class="eyebrow">SOFTWARE DEFINED / 服务编排生成应用</p>
-          <h2>{{ generationPreview.mode === 'leadership' ? '同一套原子服务，生成两个独立应用' : '服务组合正在生成独立应用' }}</h2>
-          <p class="generation-subtitle">应用只保存任务流程和参数，底层服务能力无需复制开发。</p>
+          <h2>{{ generationPreview.mode === 'leadership' ? '正在生成两个应用' : '正在生成应用' }}</h2>
           <div class="generation-apps">
             <article v-for="(previewApp,index) in generationPreview.apps" :key="previewApp.id" class="generation-app-card">
               <div class="generation-app-icon">APP<span>{{ String(index + 1).padStart(2,'0') }}</span></div>
@@ -388,7 +395,7 @@ onUnmounted(() => { clearInterval(timer); clearInterval(sensorTimer); clearTimeo
               <i class="generation-pulse"/>
             </article>
           </div>
-          <div v-if="generationPreview.mode === 'leadership'" class="generation-reuse-line"><span/><strong>02 冷却循环　＋　03 供水增压</strong><span/><em>两个应用直接复用</em></div>
+          <div v-if="generationPreview.mode === 'leadership'" class="generation-reuse-line"><span/><strong>{{ generationReuseNames }}</strong><span/></div>
           <div class="generation-metrics"><div><strong>0</strong><span>新增服务开发</span></div><div><strong>{{ generationPreview.reusedServiceIds.length }}</strong><span>共享原子服务</span></div><div><strong>{{ generationPreview.apps.length }}</strong><span>新应用页面</span></div><div><strong>{{ generationPreview.mode === 'leadership' ? generationPreview.apps.length : activeRuntimeCount }}</strong><span>可并行运行</span></div></div>
           <p class="generation-status"><i/> {{ generationPreview.mode === 'leadership' ? '应用已装载到统一软件基座，即将进入并行运行视图' : '应用页面已加入软件基座' }}</p>
         </section>

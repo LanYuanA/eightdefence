@@ -31,10 +31,11 @@ export interface ApplicationFlow {
 }
 
 const actionBindings: Record<string, { abstraction: [string, string]; hardware: [string, string] }> = {
-  '01': { abstraction: ['VENT-01', '通风逻辑执行器'], hardware: ['HW-VENT', '通风驱动电机'] },
+  '01': { abstraction: ['VENT-01', '机舱通风逻辑执行器'], hardware: ['HW-VENT', '机舱通风机 1 号'] },
   '02': { abstraction: ['COOL-01', '冷却逻辑执行器'], hardware: ['HW-COOL', '冷却循环泵'] },
   '03': { abstraction: ['WATER-01', '供水逻辑执行器'], hardware: ['HW-WATER', '供水增压泵'] },
-  '04': { abstraction: ['DRAIN-01', '排水逻辑执行器'], hardware: ['HW-DRAIN', '舱底排水泵'] },
+  '04': { abstraction: ['DRAIN-01', '舱底排水逻辑执行器'], hardware: ['HW-DRAIN', '舱底排水泵 2 号'] },
+  '05': { abstraction: ['ALARM-01', '检修安全报警逻辑执行器'], hardware: ['HW-ALARM', '检修安全报警设备'] },
 }
 
 export function buildApplicationFlow(app: MarineApp): ApplicationFlow {

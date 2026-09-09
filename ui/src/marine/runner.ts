@@ -19,6 +19,7 @@ const simulations: Record<string, Simulation> = {
   '02': (node, progress) => ({ metric: '循环流量', value: Number((48 * node.intensity / 100 * Math.min(1, progress * 2)).toFixed(1)), unit: 'm³/h', detail: `${node.area}冷却循环已${progress < .5 ? '启动' : '稳定'}`, source: '软件模拟' }),
   '03': (node, progress) => ({ metric: '供水压力', value: Number((.5 * node.intensity / 100 * Math.min(1, progress * 2)).toFixed(2)), unit: 'MPa', detail: `${node.area}供水${progress < .5 ? '增压中' : '压力稳定'}`, source: '软件模拟' }),
   '04': (node, progress) => ({ metric: '剩余水位', value: Number(Math.max(5, 60 - 55 * progress * node.intensity / 100).toFixed(1)), unit: 'cm', detail: `${node.area}已完成本轮定时排水`, source: '软件模拟' }),
+  '05': (node, progress) => ({ metric: '报警状态', value: progress >= 1 ? '已就绪' : '联动检查中', unit: '', detail: `${node.area}检修安全报警联动${progress >= 1 ? '已就绪' : '检查中'}`, source: '软件模拟' }),
 }
 export function simulateService(node: TaskNode, progress: number, sensors: SensorSnapshot = demoSensorSnapshot()): ServiceResult {
   if (serviceById(node.serviceId)?.kind === 'awareness') return sensorServiceSummary(node.serviceId, sensors)

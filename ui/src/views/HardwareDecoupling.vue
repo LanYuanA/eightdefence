@@ -114,9 +114,9 @@ onUnmounted(() => {
           <div class="binding-orbit" :class="{ switching: demo.phase === 'switching' }">
             <div class="orbit-ring ring-one"/><div class="orbit-ring ring-two"/>
             <div class="binding-center">
-              <span>DEVICE BINDING</span>
-              <strong>{{ demo.logicalExecutor.id }}</strong>
-              <small>当前映射</small>
+              <span>设备抽象层</span>
+              <strong>机舱通风</strong>
+              <small>当前连接设备</small>
               <b>{{ activeDevice?.address }}</b>
             </div>
             <span class="orbit-node node-a">能力匹配</span><span class="orbit-node node-b">协议适配</span><span class="orbit-node node-c">状态复检</span>

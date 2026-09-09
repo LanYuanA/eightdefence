@@ -186,7 +186,7 @@
   display:grid;
   grid-template-columns:300px minmax(0,1fr) 280px;
   gap:18px;
-  align-items:stretch
+  align-items:start
 }
 .panel {
   background:linear-gradient(130deg,#14263866,transparent 70%),var(--sea-panel);
@@ -207,6 +207,35 @@
 }
 .library,.inspector {
   padding:22px
+}
+.library {
+  /* 服务项较多时仅滚动左侧服务库，编排画布保持在当前视野。 */
+  position:sticky;
+  top:18px;
+  max-height:calc(100vh - 36px);
+  overflow-y:scroll;
+  overflow-x:hidden;
+  scrollbar-gutter:stable;
+  scrollbar-width:thin;
+  scrollbar-color:#58c8d7 #0c1c2d
+}
+.library::-webkit-scrollbar {
+  width:12px
+}
+.library::-webkit-scrollbar-track {
+  margin:12px 4px;
+  border-radius:10px;
+  background:#0c1c2d;
+  border:1px solid #29465b
+}
+.library::-webkit-scrollbar-thumb {
+  min-height:52px;
+  border:3px solid #0c1c2d;
+  border-radius:10px;
+  background:linear-gradient(180deg,#76e0df,#3e9fc6)
+}
+.library::-webkit-scrollbar-thumb:hover {
+  background:linear-gradient(180deg,#a0f0e9,#55b9dc)
 }
 .library>.muted {
   font-size:14px;

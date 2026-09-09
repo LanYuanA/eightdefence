@@ -128,7 +128,7 @@ onUnmounted(() => {
         </div>
 
         <div class="physical-pool">
-          <header class="stage-heading"><span>L1 · 执行器硬件层</span><small>同一 RS485 总线 · 不同地址</small></header>
+          <header class="stage-heading"><span>L1 · 设备抽象电机</span><small>同一 RS485 总线 · 不同地址</small></header>
           <article v-for="device in demo.devices" :key="device.id" class="motor-card" :class="[device.status, { bound: device.id === demo.logicalExecutor.boundDeviceId, candidate: device.id === demo.candidateId }]">
             <div class="motor-visual">
               <span class="motor-axis"/><span class="motor-body"><i/><i/><i/></span><span class="motor-tail"/>

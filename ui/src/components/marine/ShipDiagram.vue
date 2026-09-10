@@ -5,6 +5,14 @@ const props = defineProps<{ nodes: NodeRun[]; paused: boolean }>()
 const actionServices = services.filter(service => service.kind === 'action' && service.available)
 function active(id: string) { return props.nodes.some(node => node.node.serviceId === id && node.status === 'running') }
 function completed(id: string) { return props.nodes.some(node => node.node.serviceId === id && node.status === 'completed') }
+const servicePositions: Record<string, { x: number; y: number; labelY: number; labelWidth: number }> = {
+  '01': { x: 260, y: 105, labelY: 33, labelWidth: 140 },
+  '02': { x: 430, y: 236, labelY: 58, labelWidth: 140 },
+  '03': { x: 595, y: 236, labelY: 58, labelWidth: 140 },
+  '04': { x: 760, y: 236, labelY: 58, labelWidth: 140 },
+  '05': { x: 860, y: 187, labelY: 108, labelWidth: 150 },
+}
+function position(id: string) { return servicePositions[id] || servicePositions['01'] }
 </script>
 <template>
   <div class="ship-diagram" :class="{ paused }">
@@ -23,12 +31,12 @@ function completed(id: string) { return props.nodes.some(node => node.node.servi
       <path d="M214 119H304M364 210V159H482V210M502 210V159H620V210M640 210V159H758V210M778 210V172H850V210" fill="#172f43" stroke="#5b8097"/>
       <path d="M390 163V207M417 163V207M444 163V207M528 163V207M555 163V207M582 163V207M666 163V207M693 163V207M720 163V207" stroke="#355c77"/>
       <path d="M120 209V196H181M343 198H864M859 199V174M849 183H869" fill="none" stroke="#83a6b9"/>
-      <g v-for="(service, index) in actionServices" :key="service.id" :style="{color:service.color}" :class="{ 'ship-active':active(service.id), 'ship-completed':completed(service.id) }">
-        <path :d="`M${260 + index * 175} ${index === 0 ? 105 : 236} V${index % 2 ? 90 : 65}`" class="ship-link" stroke="currentColor" fill="none" stroke-dasharray="4 5"/>
-        <circle :cx="260 + index * 175" :cy="index === 0 ? 105 : 236" r="15" class="ship-halo" fill="currentColor" opacity=".12"/>
-        <circle :cx="260 + index * 175" :cy="index === 0 ? 105 : 236" r="5" fill="currentColor"/>
-        <rect :x="200 + index * 175" :y="index % 2 ? 58 : 33" width="120" height="31" rx="5" fill="#0d2031" stroke="currentColor" opacity=".9"/>
-        <text :x="260 + index * 175" :y="index % 2 ? 79 : 54" text-anchor="middle" fill="currentColor" font-size="15">{{ service.id }} {{ service.name }}</text>
+      <g v-for="service in actionServices" :key="service.id" :style="{color:service.color}" :class="{ 'ship-active':active(service.id), 'ship-completed':completed(service.id) }">
+        <path :d="`M${position(service.id).x} ${position(service.id).y} V${position(service.id).labelY + 31}`" class="ship-link" stroke="currentColor" fill="none" stroke-dasharray="4 5"/>
+        <circle :cx="position(service.id).x" :cy="position(service.id).y" r="15" class="ship-halo" fill="currentColor" opacity=".12"/>
+        <circle :cx="position(service.id).x" :cy="position(service.id).y" r="5" fill="currentColor"/>
+        <rect :x="position(service.id).x - position(service.id).labelWidth / 2" :y="position(service.id).labelY" :width="position(service.id).labelWidth" height="31" rx="5" fill="#0d2031" stroke="currentColor" opacity=".9"/>
+        <text :x="position(service.id).x" :y="position(service.id).labelY + 21" text-anchor="middle" fill="currentColor" font-size="14">{{ service.id }} {{ service.name }}</text>
       </g>
       <text x="780" y="249" fill="#8daec2" font-size="12" letter-spacing="4">SD VESSEL</text>
     </svg>

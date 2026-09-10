@@ -1106,13 +1106,19 @@
   grid-template-columns:1.25fr 1fr .8fr;
   gap:9px
 }
-.marine .threshold-fields .field { min-width:0 }
+.marine .threshold-fields .field {
+  display:block!important;
+  width:auto!important;
+  min-width:0;
+  margin:0!important
+}
 .marine .threshold-fields .field>strong {
   display:block;
   min-height:39px;
   padding:10px 0;
   color:#74d8ca;
-  font-size:14px
+  font-size:14px;
+  float:none
 }
 .result-source {
   display:block;

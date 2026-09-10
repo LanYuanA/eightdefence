@@ -8,7 +8,7 @@
   background:radial-gradient(ellipse at 65% 0%,#15334b77,transparent 52%),var(--sea-bg);
   min-height:100vh;
   font-family:Inter,'Noto Sans SC','Microsoft YaHei',sans-serif;
-  font-size:16px;
+  font-size:18px;
   line-height:1.6
 }
 .marine button,.marine input,.marine select,.marine textarea {
@@ -48,13 +48,13 @@
   font-weight:600
 }
 .marine h2 {
-  font-size:21px
+  font-size:25px
 }
 .marine h3 {
-  font-size:18px
+  font-size:21px
 }
 .marine .eyebrow {
-  font-size:12px;
+  font-size:14px;
   font-weight:600;
   letter-spacing:2px;
   color:var(--sea-accent)
@@ -75,13 +75,13 @@
   flex:1
 }
 .marine-brand strong {
-  font-size:21px;
+  font-size:24px;
   letter-spacing:2px
 }
 .marine-brand small {
   display:block;
   color:#8aa5bb;
-  font-size:12px;
+  font-size:14px;
   letter-spacing:3.6px
 }
 .brand-mark {
@@ -108,7 +108,7 @@
   border:1px solid transparent;
   border-radius:5px;
   text-decoration:none;
-  font-size:14px
+  font-size:17px
 }
 .marine-header nav .scene-link{color:#f0c579;border-color:#f0c57936;background:#f0c5790a}.marine-header nav .scene-link:hover{color:#ffd996;background:#f0c57914}.marine-header nav .scene-link span{font-size:12px;margin-left:3px}
 .marine-header nav button.active {
@@ -1749,6 +1749,21 @@
   display:grid;
   grid-template-columns:minmax(0,1fr) 360px;
   gap:20px
+}
+.composer-ship-panel {
+  margin:22px 0;
+  padding:24px 28px;
+  background:radial-gradient(circle at 76% 12%,#2a738422,transparent 34%),#102131
+}
+.composer-ship-panel .panel-heading>span {
+  color:#9db9ca;
+  font-size:15px
+}
+.composer-ship-panel .ship-caption,.composer-ship-panel .ship-legend {
+  font-size:15px
+}
+.timeline {
+  margin-top:22px
 }
 .ship-panel {
   padding:22px 26px

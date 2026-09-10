@@ -24,6 +24,13 @@ bool readInteger(const JsonValue::Object& object, const std::string& key, int& o
     if (iterator == object.end() || !iterator->second.isNumber() || std::floor(iterator->second.asNumber()) != iterator->second.asNumber()) { error = "缺少整数字段: " + key; return false; }
     output = static_cast<int>(iterator->second.asNumber()); return true;
 }
+int defaultThreshold(const std::string& serviceId) {
+    if (serviceId == "A01") return 30;
+    if (serviceId == "A02") return 35;
+    if (serviceId == "A03") return 800;
+    if (serviceId == "A07") return 300;
+    return 1;
+}
 }
 
 bool isAvailableService(const std::string& serviceId) { return kServices.find(serviceId) != kServices.end(); }
@@ -42,7 +49,7 @@ std::vector<std::string> validateApplication(const Application& app) {
         for (const auto& node : step.nodes) {
             if (!isAvailableService(node.serviceId)) { errors.push_back("步骤 " + std::to_string(stepIndex + 1) + " 包含尚未实现的服务。"); continue; }
             if (!nodeIds.insert(node.id).second) errors.push_back("存在重复的服务实例。");
-            if (kAreas.find(node.area) == kAreas.end() || node.intensity < 10 || node.intensity > 100 || node.duration < 2 || node.duration > 30) errors.push_back(node.serviceId + " 的参数不完整或超出范围。");
+            if (kAreas.find(node.area) == kAreas.end() || node.intensity < 10 || node.intensity > 100 || node.duration < 2 || node.duration > 30 || (isAwarenessService(node.serviceId) && (node.threshold < 0 || (node.thresholdOperator != "gte" && node.thresholdOperator != "lte")))) errors.push_back(node.serviceId + " 的参数不完整或超出范围。");
             const std::string resource = serviceResource(node.serviceId);
             if (!resource.empty() && !resources.insert(resource).second) errors.push_back("步骤 " + std::to_string(stepIndex + 1) + " 的服务共用" + resource + "，请拆成顺序步骤。");
         }
@@ -55,7 +62,7 @@ JsonValue applicationToJson(const Application& app) {
     JsonValue::Array steps;
     for (const auto& step : app.steps) {
         JsonValue::Array nodes;
-        for (const auto& node : step.nodes) nodes.emplace_back(JsonValue::Object{{"id", node.id}, {"serviceId", node.serviceId}, {"area", node.area}, {"intensity", node.intensity}, {"duration", node.duration}});
+        for (const auto& node : step.nodes) nodes.emplace_back(JsonValue::Object{{"id", node.id}, {"serviceId", node.serviceId}, {"area", node.area}, {"intensity", node.intensity}, {"duration", node.duration}, {"threshold", node.threshold}, {"thresholdOperator", node.thresholdOperator}});
         steps.emplace_back(JsonValue::Object{{"id", step.id}, {"nodes", std::move(nodes)}});
     }
     object.emplace("steps", std::move(steps));
@@ -81,6 +88,17 @@ bool applicationFromJson(const JsonValue& value, Application& app, std::string& 
             TaskNode node;
             const auto& nodeObject = rawNode.asObject();
             if (!readString(nodeObject, "id", node.id, error) || !readString(nodeObject, "serviceId", node.serviceId, error) || !readString(nodeObject, "area", node.area, error) || !readInteger(nodeObject, "intensity", node.intensity, error) || !readInteger(nodeObject, "duration", node.duration, error)) return false;
+            node.threshold = defaultThreshold(node.serviceId);
+            const auto threshold = nodeObject.find("threshold");
+            if (threshold != nodeObject.end()) {
+                if (!threshold->second.isNumber() || std::floor(threshold->second.asNumber()) != threshold->second.asNumber()) { error = "阈值必须是整数。"; return false; }
+                node.threshold = static_cast<int>(threshold->second.asNumber());
+            }
+            const auto thresholdOperator = nodeObject.find("thresholdOperator");
+            if (thresholdOperator != nodeObject.end()) {
+                if (!thresholdOperator->second.isString()) { error = "阈值关系必须是字符串。"; return false; }
+                node.thresholdOperator = thresholdOperator->second.asString();
+            } else if (node.serviceId == "A07") node.thresholdOperator = "lte";
             step.nodes.push_back(std::move(node));
         }
         parsed.steps.push_back(std::move(step));

@@ -3,13 +3,13 @@ export interface MarineService {
   available: boolean; kind: 'awareness' | 'action'; resource?: string; metric?: string; unit?: string; target?: number
 }
 export const services: MarineService[] = [
-  { id: 'A01', name: '环境温湿感知', category: '态势感知', description: '汇聚温度与湿度，形成舱室环境状态', color: '#4ed7c8', available: true, kind: 'awareness' },
-  { id: 'A02', name: '颗粒物感知', category: '态势感知', description: '汇聚 PM2.5 与 PM10，形成空气颗粒物状态', color: '#58c4e8', available: true, kind: 'awareness' },
-  { id: 'A03', name: '气体环境感知', category: '态势感知', description: '汇聚 TVOC、甲醛与 CO₂ 数据', color: '#7f9cff', available: true, kind: 'awareness' },
-  { id: 'A04', name: '烟雾火情感知', category: '态势感知', description: '读取烟雾状态，输出火情关注结果', color: '#ef8d78', available: true, kind: 'awareness' },
-  { id: 'A05', name: '舱底水浸感知', category: '态势感知', description: '读取水浸状态，输出舱底积水风险', color: '#62b7ff', available: true, kind: 'awareness' },
-  { id: 'A06', name: '舱室活动感知', category: '态势感知', description: '融合红外与雷达，判断人员活动状态', color: '#ac98ff', available: true, kind: 'awareness' },
-  { id: 'A07', name: '舱室光照感知', category: '态势感知', description: '读取光照强度，输出区域照明状态', color: '#e8c66f', available: true, kind: 'awareness' },
+  { id: 'A01', name: '环境温湿感知', category: '态势感知', description: '汇聚温度与湿度，形成舱室环境状态', color: '#4ed7c8', available: true, kind: 'awareness', metric: '温度', unit: '℃', target: 30 },
+  { id: 'A02', name: '颗粒物感知', category: '态势感知', description: '汇聚 PM2.5 与 PM10，形成空气颗粒物状态', color: '#58c4e8', available: true, kind: 'awareness', metric: 'PM2.5', unit: 'μg/m³', target: 35 },
+  { id: 'A03', name: '气体环境感知', category: '态势感知', description: '汇聚 TVOC、甲醛与 CO₂ 数据', color: '#7f9cff', available: true, kind: 'awareness', metric: 'CO₂', unit: 'ppm', target: 800 },
+  { id: 'A04', name: '烟雾火情感知', category: '态势感知', description: '读取烟雾状态，输出火情关注结果', color: '#ef8d78', available: true, kind: 'awareness', metric: '烟雾状态', unit: '', target: 1 },
+  { id: 'A05', name: '舱底水浸感知', category: '态势感知', description: '读取水浸状态，输出舱底积水风险', color: '#62b7ff', available: true, kind: 'awareness', metric: '水浸状态', unit: '', target: 1 },
+  { id: 'A06', name: '舱室活动感知', category: '态势感知', description: '融合红外与雷达，判断人员活动状态', color: '#ac98ff', available: true, kind: 'awareness', metric: '活动状态', unit: '', target: 1 },
+  { id: 'A07', name: '舱室光照感知', category: '态势感知', description: '读取光照强度，输出区域照明状态', color: '#e8c66f', available: true, kind: 'awareness', metric: '光照', unit: 'lx', target: 300 },
   { id: '01', name: '舱室通风', category: '执行控制', description: '按目标强度完成指定区域换气', color: '#66dfce', available: true, kind: 'action', resource: '通风执行器', metric: '换气进度', unit: '%', target: 100 },
   { id: '02', name: '冷却循环', category: '执行控制', description: '建立并维持稳定冷却循环', color: '#75b6ff', available: true, kind: 'action', resource: '冷却执行器', metric: '循环流量', unit: 'm³/h', target: 48 },
   { id: '03', name: '供水增压', category: '执行控制', description: '按作业需求建立稳定供水', color: '#ae9bff', available: true, kind: 'action', resource: '水务执行器', metric: '供水压力', unit: 'MPa', target: 0.5 },
@@ -27,7 +27,8 @@ export const services: MarineService[] = [
 ]
 export const serviceById = (id: string) => services.find(service => service.id === id)!
 export const areas = ['机舱', '生活舱', '作业舱', '全船']
-export interface TaskNode { id: string; serviceId: string; area: string; intensity: number; duration: number }
+export type ThresholdOperator = 'gte' | 'lte'
+export interface TaskNode { id: string; serviceId: string; area: string; intensity: number; duration: number; threshold: number; thresholdOperator: ThresholdOperator }
 export interface TaskStep { id: string; nodes: TaskNode[] }
 export interface MarineApp { id: string; name: string; description: string; steps: TaskStep[] }
 export function createId(randomUUID?: () => string, random = Math.random, now = Date.now) {
@@ -44,7 +45,7 @@ export function uid() {
 }
 export function createNode(serviceId: string): TaskNode {
   const service = serviceById(serviceId)
-  return { id: uid(), serviceId, area: '机舱', intensity: 70, duration: service?.kind === 'awareness' ? 3 : 6 }
+  return { id: uid(), serviceId, area: '机舱', intensity: 70, duration: service?.kind === 'awareness' ? 3 : 6, threshold: service?.target ?? 0, thresholdOperator: serviceId === 'A07' ? 'lte' : 'gte' }
 }
 export function createStep(ids: string[] = []): TaskStep { return { id: uid(), nodes: ids.map(createNode) } }
 export function createPreset(which: 'A' | 'B' | 'C' | 'D' | 'E'): MarineApp {
@@ -74,7 +75,7 @@ export function validateApp(app: MarineApp): string[] {
       if (!service?.available) { errors.push(`步骤 ${index + 1} 包含尚未实现的服务。`); return }
       if (nodeIds.has(node.id)) errors.push('存在重复的服务实例。')
       nodeIds.add(node.id)
-      if (!areas.includes(node.area) || !Number.isFinite(node.intensity) || node.intensity < 10 || node.intensity > 100 || !Number.isFinite(node.duration) || node.duration < 2 || node.duration > 30) errors.push(`${service.name} 的参数不完整或超出范围。`)
+      if (!areas.includes(node.area) || !Number.isFinite(node.intensity) || node.intensity < 10 || node.intensity > 100 || !Number.isFinite(node.duration) || node.duration < 2 || node.duration > 30 || (service.kind === 'awareness' && (!Number.isFinite(node.threshold) || node.threshold < 0 || !['gte', 'lte'].includes(node.thresholdOperator)))) errors.push(`${service.name} 的参数不完整或超出范围。`)
       if (service.resource && resources.has(service.resource)) errors.push(`步骤 ${index + 1} 的服务共用${service.resource}，请拆成顺序步骤。`)
       if (service.resource) resources.add(service.resource)
     })
@@ -86,7 +87,15 @@ export function parseSavedApps(raw: string | null): MarineApp[] {
   if (!raw) return []
   const data = JSON.parse(raw)
   if (!Array.isArray(data)) throw new Error('应用记录格式不正确')
-  return data.filter((app): app is MarineApp => {
+  return data.map((app) => {
+    if (!app || typeof app !== 'object' || !Array.isArray((app as MarineApp).steps)) return app
+    ;(app as MarineApp).steps.forEach(step => step.nodes?.forEach(node => {
+      const service = serviceById(node.serviceId)
+      if (!Number.isFinite(node.threshold)) node.threshold = service?.target ?? 0
+      if (node.thresholdOperator !== 'gte' && node.thresholdOperator !== 'lte') node.thresholdOperator = node.serviceId === 'A07' ? 'lte' : 'gte'
+    }))
+    return app
+  }).filter((app): app is MarineApp => {
     try {
       return typeof app.id === 'string' && typeof app.name === 'string' && typeof app.description === 'string' && Array.isArray(app.steps) && app.steps.every((step: TaskStep) => typeof step.id === 'string' && Array.isArray(step.nodes) && step.nodes.every(node => typeof node.id === 'string')) && validateApp(app).length === 0
     } catch { return false }

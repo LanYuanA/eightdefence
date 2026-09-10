@@ -59,7 +59,9 @@ void application_validation_rejects_same_resource_in_parallel_step() {
 }
 
 void application_json_round_trip_preserves_parallel_nodes() {
-    const auto input = makeApplication({{"A01"}, {"02", "03"}});
+    auto input = makeApplication({{"A01"}, {"02", "03"}});
+    input.steps.at(0).nodes.at(0).threshold = 26;
+    input.steps.at(0).nodes.at(0).thresholdOperator = "gte";
     marine::JsonValue value;
     std::string error;
     REQUIRE(marine::parseJson(marine::toJson(marine::applicationToJson(input)), value, error));
@@ -68,6 +70,8 @@ void application_json_round_trip_preserves_parallel_nodes() {
     REQUIRE(output.steps.size() == 2);
     REQUIRE(output.steps.at(1).nodes.size() == 2);
     REQUIRE(output.steps.at(1).nodes.at(1).serviceId == "03");
+    REQUIRE(output.steps.at(0).nodes.at(0).threshold == 26);
+    REQUIRE(output.steps.at(0).nodes.at(0).thresholdOperator == "gte");
 }
 
 void json_parser_rejects_trailing_content() {

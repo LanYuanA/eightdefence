@@ -71,6 +71,14 @@ test('validation rejects shared actuator conflicts, empty steps and unimplemente
   app.steps = [createStep(['01'])]; app.steps[0].nodes[0].duration = NaN
   assert.match(validateApp(app).join(), /超出范围/)
 })
+test('awareness services keep an editable, validated threshold condition', () => {
+  const node = createNode('A03')
+  assert.equal(node.threshold, 800)
+  assert.equal(node.thresholdOperator, 'gte')
+  const app = createPreset('A'); app.steps = [createStep(['A03'])]
+  app.steps[0].nodes[0].threshold = -1
+  assert.match(validateApp(app).join(), /超出范围/)
+})
 test('all five simulators produce distinct results and respond to strength or duration progress', () => {
   const outputs = ['01','02','03','04','05'].map(id => simulateService(createNode(id), 1))
   assert.equal(new Set(outputs.map(result => result.metric)).size, 5)

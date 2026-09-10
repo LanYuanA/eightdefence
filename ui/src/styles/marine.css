@@ -1086,6 +1086,34 @@
   font-size:12px;
   margin-top:2px
 }
+.marine .threshold-title {
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:12px;
+  margin:19px 0 7px;
+  color:#d5e5f1;
+  font-size:15px;
+  font-weight:600
+}
+.marine .threshold-title span {
+  color:#8aaabe;
+  font-size:12px;
+  font-weight:400
+}
+.marine .threshold-fields {
+  display:grid;
+  grid-template-columns:1.25fr 1fr .8fr;
+  gap:9px
+}
+.marine .threshold-fields .field { min-width:0 }
+.marine .threshold-fields .field>strong {
+  display:block;
+  min-height:39px;
+  padding:10px 0;
+  color:#74d8ca;
+  font-size:14px
+}
 .result-source {
   display:block;
   color:#7693aa;
@@ -1343,6 +1371,21 @@
   right:-21px;
   top:50%;
   color:#6b9cb6
+}
+.marine .step-connector {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  font-size:25px;
+  line-height:.8
+}
+.marine .step-connector small {
+  color:#93bdd0;
+  font-size:11px;
+  font-weight:600;
+  line-height:1;
+  white-space:nowrap
 }
 .marine .new-step-drop {
   flex:0 0 125px;

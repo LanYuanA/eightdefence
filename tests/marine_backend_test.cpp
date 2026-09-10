@@ -4,6 +4,7 @@
 #include "application/marine/marine_safety.hpp"
 #include "application/marine/marine_executor.hpp"
 #include "application/marine/marine_runtime.hpp"
+#include "application/marine/marine_api.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -163,6 +164,44 @@ void cancelling_one_run_does_not_cancel_another_run() {
     REQUIRE(runtime.getRun(first.id)->status == marine::RunStatus::Cancelled);
     REQUIRE(runtime.getRun(second.id)->status == marine::RunStatus::Running);
 }
+
+marine::HttpRequest request(const std::string& method, const std::string& path, const std::string& body = "") {
+    marine::HttpRequest value;
+    value.method = method;
+    value.path = path;
+    value.fullPath = path;
+    value.body = body;
+    return value;
+}
+
+void api_creates_lists_and_starts_persisted_application() {
+    TempDir data;
+    marine::MarineRepository repository(data.path());
+    REQUIRE(repository.load().empty());
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }));
+    marine::MarineSafety safety(data.path() + "/events.jsonl");
+    marine::MarineApi api(repository, runtime, safety);
+    const auto app = makeApplication({{"A01"}, {"01"}});
+    const auto create = api.handle(request("POST", "/api/v1/marine/apps", marine::toJson(marine::applicationToJson(app))));
+    REQUIRE(create.statusCode == 201);
+    const auto start = api.handle(request("POST", "/api/v1/marine/runs", "{\"appId\":\"APP-01\"}"));
+    REQUIRE(start.statusCode == 201);
+    const auto listed = api.handle(request("GET", "/api/v1/marine/runs"));
+    REQUIRE(listed.statusCode == 200);
+    REQUIRE(listed.body.find("APP-01") != std::string::npos);
+}
+
+void api_returns_conflict_for_stale_binding_version() {
+    TempDir data;
+    marine::MarineRepository repository(data.path());
+    REQUIRE(repository.load().empty());
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }));
+    marine::MarineSafety safety(data.path() + "/events.jsonl");
+    marine::MarineApi api(repository, runtime, safety);
+    const auto response = api.handle(request("PUT", "/api/v1/marine/executors/VENT-01/binding", "{\"deviceId\":\"MOTOR-0F\",\"expectedVersion\":0,\"operator\":\"演示员\"}"));
+    REQUIRE(response.statusCode == 409);
+    REQUIRE(response.body.find("binding_version_conflict") != std::string::npos);
+}
 }
 
 int main() {
@@ -177,6 +216,8 @@ int main() {
     offline_sensor_is_reported_as_demo_data();
     runtime_waits_for_all_parallel_nodes_before_next_step();
     cancelling_one_run_does_not_cancel_another_run();
+    api_creates_lists_and_starts_persisted_application();
+    api_returns_conflict_for_stale_binding_version();
     if (failures != 0) {
         std::cerr << failures << " 项测试失败\n";
         return EXIT_FAILURE;

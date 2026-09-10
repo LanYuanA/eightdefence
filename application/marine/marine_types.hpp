@@ -41,6 +41,7 @@ JsonValue applicationToJson(const Application& app);
 bool applicationFromJson(const JsonValue& value, Application& app, std::string& error);
 std::string runStatusToString(RunStatus status);
 bool runStatusFromString(const std::string& value, RunStatus& status);
+std::string nodeStatusToString(NodeStatus status);
 
 } // namespace marine
 

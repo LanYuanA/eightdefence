@@ -50,6 +50,7 @@ extern "C" {
 #include "application/apps/security/app_security.hpp"
 #include "application/apps/environment/app_environment.hpp"
 #include "application/apps/fire_fighting/app_fire_fighting.hpp"
+#include "application/marine/marine_api.hpp"
 #include "service/atomic/svc_sound_light_alarm.hpp"
 #include "service/atomic/svc_drainage.hpp"
 #include "service/atomic/svc_temp_humidity_control.hpp"
@@ -146,6 +147,7 @@ static void print_usage(const char *prog) {
     printf("  -t <seconds>   压力测试持续时间 (秒, 0=不测试, 默认: 0)\n");
     printf("  -c <count>     压力测试并发线程数 (默认: 4)\n");
     printf("  -h             显示此帮助\n");
+    printf("  --marine-demo  启动船舶网关演示模式（不打开串口）\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -155,6 +157,7 @@ int main(int argc, char *argv[]) {
     int worker_threads = 4;
     int stress_duration = 0;
     int stress_concurrency = 4;
+    bool marine_demo = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-d") == 0 && i + 1 < argc) {
@@ -170,6 +173,8 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-h") == 0) {
             print_usage(argv[0]);
             return 0;
+        } else if (strcmp(argv[i], "--marine-demo") == 0) {
+            marine_demo = true;
         }
     }
 
@@ -253,10 +258,41 @@ int main(int argc, char *argv[]) {
     appMgr.startAll();
     LOG_INFO("应用管理器已启动, 注册了 %zu 个应用", appMgr.getAllApps().size());
 
+    /* 船舶软件定义网关：应用、运行状态和设备绑定由后端统一持有。 */
+    marine::MarineRepository marineRepository("./data/marine");
+    const std::string marineLoadError = marineRepository.load();
+    if (!marineLoadError.empty()) {
+        LOG_ERROR("船舶网关数据加载失败: %s", marineLoadError.c_str());
+        return 1;
+    }
+    marine::MarineExecutor marineExecutor([] {
+        marine::SensorSnapshot snapshot;
+        snapshot.values = {{"temperature", static_cast<double>(dev_temperature.getValue())}, {"humidity", static_cast<double>(dev_humidity.getValue())}, {"pm25", static_cast<double>(dev_pm25.getValue())}, {"pm10", static_cast<double>(dev_pm10.getValue())}, {"tvoc", static_cast<double>(dev_tvoc.getValue())}, {"ch2o", static_cast<double>(dev_ch2o.getValue())}, {"co2", static_cast<double>(dev_co2.getValue())}, {"smoke", static_cast<double>(dev_smoke.getAlarmState())}, {"water", static_cast<double>(dev_water.getWaterState())}, {"ir", static_cast<double>(dev_infrared.getInfraredState())}, {"lux", static_cast<double>(dev_light.getIlluminance())}};
+        snapshot.online = {{"temperature", dev_temperature.isOnline()}, {"humidity", dev_humidity.isOnline()}, {"pm25", dev_pm25.isOnline()}, {"pm10", dev_pm10.isOnline()}, {"tvoc", dev_tvoc.isOnline()}, {"ch2o", dev_ch2o.isOnline()}, {"co2", dev_co2.isOnline()}, {"smoke", dev_smoke.isOnline()}, {"water", dev_water.isOnline()}, {"ir", dev_infrared.isOnline()}, {"lux", dev_light.isOnline()}};
+        bool anyOnline = false;
+        for (const auto& item : snapshot.online) anyOnline = anyOnline || item.second;
+        snapshot.source = anyOnline ? "device" : "";
+        return snapshot;
+    });
+    marine::MarineSafety marineSafety("./data/marine/events.jsonl");
+    marine::MarineRuntime marineRuntime(marineRepository, std::move(marineExecutor));
+    marineRuntime.start();
+    marine::MarineApi marineApi(marineRepository, marineRuntime, marineSafety);
+
     /* 启动 Web 服务器 */
     pthread_t web_tid;
-    pthread_create(&web_tid, NULL, start_web_server, NULL);
+    pthread_create(&web_tid, NULL, start_web_server, &marineApi);
     LOG_INFO("Web 服务器已启动");
+
+    if (marine_demo) {
+        LOG_INFO("船舶网关演示模式已启动：不连接串口，执行服务仅返回模拟结果。");
+        while (g_web_running) usleep(100000);
+        marineRuntime.stop();
+        pthread_join(web_tid, NULL);
+        appMgr.stopAll();
+        Logger::instance().shutdown();
+        return 0;
+    }
 
     /* ============================================================
      * 创建线程安全的串口总线
@@ -477,6 +513,7 @@ int main(int argc, char *argv[]) {
      * 清理退出
      * ============================================================ */
     LOG_INFO("正在停止 Web 服务器...");
+    marineRuntime.stop();
     pthread_join(web_tid, NULL);
 
     LOG_INFO("正在停止所有应用...");

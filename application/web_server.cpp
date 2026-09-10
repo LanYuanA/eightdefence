@@ -2,6 +2,7 @@
 #include "core/global_devices.hpp"
 #include "core/device_config.h"
 #include "application/app_manager.hpp"
+#include "application/marine/marine_api.hpp"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +17,7 @@
 #include <dirent.h>
 #include <algorithm>
 #include <sys/stat.h>
+#include <sstream>
 
 #define PORT 8080
 
@@ -95,6 +97,41 @@ void parse_request_path(const std::string& req, std::string& path, std::string& 
         path = fullPath;
         query = "";
     }
+}
+
+bool parse_http_request(const std::string& raw, HttpRequest& request) {
+    const size_t lineEnd = raw.find("\r\n");
+    const size_t headerEnd = raw.find("\r\n\r\n");
+    if (lineEnd == std::string::npos || headerEnd == std::string::npos) return false;
+    std::istringstream firstLine(raw.substr(0, lineEnd));
+    std::string target, version;
+    if (!(firstLine >> request.method >> target >> version) || target.empty()) return false;
+    request.fullPath = target;
+    const size_t query = target.find('?');
+    request.path = query == std::string::npos ? target : target.substr(0, query);
+    request.queryString = query == std::string::npos ? "" : target.substr(query + 1);
+    size_t cursor = lineEnd + 2;
+    while (cursor < headerEnd) {
+        const size_t end = raw.find("\r\n", cursor);
+        if (end == std::string::npos || end > headerEnd) return false;
+        const std::string line = raw.substr(cursor, end - cursor);
+        const size_t separator = line.find(':');
+        if (separator == std::string::npos) return false;
+        request.headers[line.substr(0, separator)] = line.substr(separator + 1);
+        cursor = end + 2;
+    }
+    request.body = raw.substr(headerEnd + 4);
+    return true;
+}
+
+size_t content_length(const std::string& raw) {
+    const size_t headerEnd = raw.find("\r\n\r\n");
+    if (headerEnd == std::string::npos) return 0;
+    const std::string key = "Content-Length:";
+    const size_t start = raw.find(key);
+    if (start == std::string::npos || start > headerEnd) return 0;
+    try { return static_cast<size_t>(std::stoul(raw.substr(start + key.size()))); }
+    catch (...) { return 0; }
 }
 
 void serve_file(int client_socket, const std::string& filepath) {
@@ -180,7 +217,7 @@ static bool try_app_route(int client_socket, const std::string& path, const std:
 }
 
 void* start_web_server(void *arg) {
-    (void)arg;
+    marine::MarineApi* marineApi = static_cast<marine::MarineApi*>(arg);
     int server_fd, new_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
@@ -224,23 +261,42 @@ void* start_web_server(void *arg) {
             continue;
         }
 
-        memset(buffer, 0, sizeof(buffer));
-        int read_len = read(new_socket, buffer, sizeof(buffer) - 1);
-        if (read_len <= 0) {
+        std::string req;
+        size_t expectedLength = 0;
+        size_t headerEnd = std::string::npos;
+        while (req.size() < 65536) {
+            const ssize_t read_len = read(new_socket, buffer, sizeof(buffer));
+            if (read_len <= 0) break;
+            req.append(buffer, static_cast<size_t>(read_len));
+            headerEnd = req.find("\r\n\r\n");
+            if (headerEnd != std::string::npos) {
+                expectedLength = headerEnd + 4 + content_length(req);
+                if (req.size() >= expectedLength) break;
+            }
+        }
+        if (req.empty() || headerEnd == std::string::npos || req.size() < expectedLength) {
             close(new_socket);
             continue;
         }
-
-        std::string req(buffer);
         std::string reqPath, reqQuery;
         parse_request_path(req, reqPath, reqQuery);
+        HttpRequest httpRequest;
+        if (!parse_http_request(req, httpRequest)) {
+            const char* err = "{\"error\":{\"code\":\"bad_request\",\"message\":\"HTTP 请求格式错误。\"}}";
+            send_response(new_socket, "400 Bad Request", "application/json; charset=utf-8", err, strlen(err));
+            close(new_socket);
+            continue;
+        }
 
         /* ============================================================
          * 路由分发 (优先级从高到低)
          * ============================================================ */
 
         // --- 核心系统 API ---
-        if (req.find("GET /api/data") == 0) {
+        if (marineApi != nullptr && reqPath.rfind("/api/v1/", 0) == 0) {
+            send_http_response(new_socket, marineApi->handle(httpRequest));
+
+        } else if (req.find("GET /api/data") == 0) {
             char json[4096];
             snprintf(json, sizeof(json),
                 "{"

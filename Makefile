@@ -4,7 +4,7 @@ CFLAGS = -Wall -I. -I./devices -I./core -I./application -I./service
 CXXFLAGS = -Wall -std=c++17 -I. -I./devices -I./core -I./application -I./service
 LDFLAGS = -lpthread
 
-MARINE_TEST_SRCS = application/marine/json_value.cpp application/marine/marine_types.cpp application/marine/marine_repository.cpp application/marine/marine_safety.cpp application/marine/marine_executor.cpp application/marine/marine_runtime.cpp tests/marine_backend_test.cpp
+MARINE_TEST_SRCS = application/marine/json_value.cpp application/marine/marine_types.cpp application/marine/marine_repository.cpp application/marine/marine_safety.cpp application/marine/marine_executor.cpp application/marine/marine_runtime.cpp application/marine/marine_api.cpp tests/marine_backend_test.cpp
 
 TARGET = app_gateway
 
@@ -27,6 +27,10 @@ CXX_SRCS = service/modbus_service.cpp service/parse_service.cpp \
            devices/dev_alarm_device.cpp \
            devices/dev_stepper_motor.cpp \
            application/web_server.cpp application/app_base.cpp \
+           application/marine/json_value.cpp application/marine/marine_types.cpp \
+           application/marine/marine_repository.cpp application/marine/marine_safety.cpp \
+           application/marine/marine_executor.cpp application/marine/marine_runtime.cpp \
+           application/marine/marine_api.cpp \
            application/apps/security/app_security.cpp \
            application/apps/environment/app_environment.cpp \
            application/apps/fire_fighting/app_fire_fighting.cpp \

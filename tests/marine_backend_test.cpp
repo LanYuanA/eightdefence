@@ -1,6 +1,8 @@
 #include "application/marine/json_value.hpp"
 #include "application/marine/marine_types.hpp"
 #include "application/marine/marine_repository.hpp"
+#include "application/marine/marine_safety.hpp"
+#include "application/marine/marine_executor.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -105,6 +107,28 @@ void repository_marks_unfinished_runs_interrupted_on_load() {
     REQUIRE(reopened.load().empty());
     REQUIRE(reopened.listRunSummaries().at(0).status == marine::RunStatus::Interrupted);
 }
+
+void safety_unlock_expires_after_ten_minutes() {
+    TempDir data;
+    marine::MarineSafety safety(data.path() + "/events.jsonl");
+    safety.unlock("演示员", 1000);
+    REQUIRE(safety.status(600999).unlocked);
+    REQUIRE(!safety.status(601000).unlocked);
+}
+
+void executor_returns_simulated_result_without_command_callback() {
+    marine::MarineExecutor executor([] { return marine::SensorSnapshot::demo(); });
+    marine::TaskNode node{"NODE-02", "02", "机舱", 70, 6};
+    const auto result = executor.execute(node, 0.5, executor.snapshot());
+    REQUIRE(result.source == "simulated");
+    REQUIRE(result.metric == "循环流量");
+    REQUIRE(result.value == "33.6");
+}
+
+void offline_sensor_is_reported_as_demo_data() {
+    marine::MarineExecutor executor([] { return marine::SensorSnapshot{}; });
+    REQUIRE(executor.snapshot().source == "demo");
+}
 }
 
 int main() {
@@ -114,6 +138,9 @@ int main() {
     repository_persists_application_across_reopen();
     binding_update_rejects_stale_version_without_mutation();
     repository_marks_unfinished_runs_interrupted_on_load();
+    safety_unlock_expires_after_ten_minutes();
+    executor_returns_simulated_result_without_command_callback();
+    offline_sensor_is_reported_as_demo_data();
     if (failures != 0) {
         std::cerr << failures << " 项测试失败\n";
         return EXIT_FAILURE;

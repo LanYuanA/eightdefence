@@ -4,6 +4,8 @@ CFLAGS = -Wall -I. -I./devices -I./core -I./application -I./service
 CXXFLAGS = -Wall -std=c++17 -I. -I./devices -I./core -I./application -I./service
 LDFLAGS = -lpthread
 
+MARINE_TEST_SRCS = application/marine/json_value.cpp application/marine/marine_types.cpp tests/marine_backend_test.cpp
+
 TARGET = app_gateway
 
 # C 源文件 (保留不变的底层模块)
@@ -38,6 +40,11 @@ OBJS = $(C_OBJS) $(CXX_OBJS)
 # 前端编译: npm run build + 拷贝到 public + 更新 dashboard.html
 # 强制每次都检查编译（Vite使用哈希文件名，Make无法追踪依赖变化）
 .PHONY: frontend
+.PHONY: test-backend
+test-backend:
+	$(CXX) $(CXXFLAGS) $(MARINE_TEST_SRCS) -o marine_backend_test
+	./marine_backend_test
+
 frontend:
 	cd ui && npm run build
 	mkdir -p public

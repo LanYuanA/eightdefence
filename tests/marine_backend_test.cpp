@@ -3,6 +3,7 @@
 #include "application/marine/marine_repository.hpp"
 #include "application/marine/marine_safety.hpp"
 #include "application/marine/marine_executor.hpp"
+#include "application/marine/marine_runtime.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -129,6 +130,39 @@ void offline_sensor_is_reported_as_demo_data() {
     marine::MarineExecutor executor([] { return marine::SensorSnapshot{}; });
     REQUIRE(executor.snapshot().source == "demo");
 }
+
+void runtime_waits_for_all_parallel_nodes_before_next_step() {
+    TempDir data;
+    marine::MarineRepository repository(data.path());
+    REQUIRE(repository.load().empty());
+    auto app = makeApplication({{"02", "03"}, {"04"}});
+    app.id = "APP-PARALLEL";
+    REQUIRE(repository.saveApp(app).empty());
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }));
+    const auto run = runtime.createRun(app.id);
+    REQUIRE(run.status == marine::RunStatus::Running);
+    runtime.advanceForTest(6000);
+    const auto current = runtime.getRun(run.id);
+    REQUIRE(current.has_value());
+    REQUIRE(current->stepIndex == 1);
+    REQUIRE(current->nodes.at("NODE-2-1").status == marine::NodeStatus::Running);
+}
+
+void cancelling_one_run_does_not_cancel_another_run() {
+    TempDir data;
+    marine::MarineRepository repository(data.path());
+    REQUIRE(repository.load().empty());
+    auto firstApp = makeApplication({{"01"}}); firstApp.id = "APP-FIRST";
+    auto secondApp = makeApplication({{"02"}}); secondApp.id = "APP-SECOND";
+    REQUIRE(repository.saveApp(firstApp).empty());
+    REQUIRE(repository.saveApp(secondApp).empty());
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }));
+    const auto first = runtime.createRun(firstApp.id);
+    const auto second = runtime.createRun(secondApp.id);
+    REQUIRE(runtime.cancelRun(first.id).empty());
+    REQUIRE(runtime.getRun(first.id)->status == marine::RunStatus::Cancelled);
+    REQUIRE(runtime.getRun(second.id)->status == marine::RunStatus::Running);
+}
 }
 
 int main() {
@@ -141,6 +175,8 @@ int main() {
     safety_unlock_expires_after_ten_minutes();
     executor_returns_simulated_result_without_command_callback();
     offline_sensor_is_reported_as_demo_data();
+    runtime_waits_for_all_parallel_nodes_before_next_step();
+    cancelling_one_run_does_not_cancel_another_run();
     if (failures != 0) {
         std::cerr << failures << " 项测试失败\n";
         return EXIT_FAILURE;

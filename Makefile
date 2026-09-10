@@ -4,7 +4,7 @@ CFLAGS = -Wall -I. -I./devices -I./core -I./application -I./service
 CXXFLAGS = -Wall -std=c++17 -I. -I./devices -I./core -I./application -I./service
 LDFLAGS = -lpthread
 
-MARINE_TEST_SRCS = application/marine/json_value.cpp application/marine/marine_types.cpp application/marine/marine_repository.cpp application/marine/marine_safety.cpp application/marine/marine_executor.cpp tests/marine_backend_test.cpp
+MARINE_TEST_SRCS = application/marine/json_value.cpp application/marine/marine_types.cpp application/marine/marine_repository.cpp application/marine/marine_safety.cpp application/marine/marine_executor.cpp application/marine/marine_runtime.cpp tests/marine_backend_test.cpp
 
 TARGET = app_gateway
 
@@ -42,7 +42,7 @@ OBJS = $(C_OBJS) $(CXX_OBJS)
 .PHONY: frontend
 .PHONY: test-backend
 test-backend:
-	$(CXX) $(CXXFLAGS) $(MARINE_TEST_SRCS) -o marine_backend_test
+	$(CXX) $(CXXFLAGS) $(MARINE_TEST_SRCS) -o marine_backend_test $(LDFLAGS)
 	./marine_backend_test
 
 frontend:

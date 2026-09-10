@@ -8,6 +8,7 @@ import type { RunState } from '../marine/runner'
 import { demoSensorSnapshot, normalizeSensorSnapshot } from '../marine/sensors'
 import type { SensorSnapshot } from '../marine/sensors'
 import { realtimeApi } from '../api/realtime'
+import { marineApi } from '../marine/api'
 import ShipDiagram from '../components/marine/ShipDiagram.vue'
 import ApplicationFlow from '../components/marine/ApplicationFlow.vue'
 import ApplicationCommandCenter from '../components/marine/ApplicationCommandCenter.vue'
@@ -51,7 +52,10 @@ const editingSession = computed(() => runtimeSessions.value.find(session => sess
 const run = computed(() => runtimeSessions.value.find(session => session.id === activeRuntimeId.value)?.state ?? idleRun)
 let timer: ReturnType<typeof setInterval> | undefined
 let sensorTimer: ReturnType<typeof setInterval> | undefined
+let gatewayTimer: ReturnType<typeof setInterval> | undefined
 const fullscreen = ref(false)
+const gatewayConnected = ref(false)
+const gatewayRunIds = new Map<string, string>()
 const sensorSnapshot = ref<SensorSnapshot>(demoSensorSnapshot())
 const sensorApiConnected = ref(false)
 const busy = computed(() => ['running', 'paused'].includes(run.value.status))
@@ -167,6 +171,7 @@ function saveApp() {
   const list = savedApps.value.filter(item => item.id !== snapshot.id); list.unshift(snapshot)
   try { localStorage.setItem(storageKey, JSON.stringify(list)); savedApps.value = list; original.value = JSON.stringify(app.value); const session = ensureRuntime(snapshot); if (!activeRuntimeId.value) activeRuntimeId.value = session.id; window.dispatchEvent(new CustomEvent('marine-apps-updated')); journeyStage.value = 3; showGeneration([snapshot], 'single', []); notify('应用已生成：软件基座新增了一个独立应用页面。') }
   catch { notify('本机存储不可用或空间不足，应用尚未保存。', true) }
+  if (gatewayConnected.value) marineApi.createApp(snapshot).catch(() => notify('网关保存失败，已保留本机应用。', true))
 }
 function loadApp(saved: MarineApp) { savedDialog.value?.close(); requestReplace(saved) }
 function cloneApp(target: MarineApp): MarineApp { return JSON.parse(JSON.stringify(target)) }
@@ -188,13 +193,40 @@ function selectApplicationPage(target: MarineApp) {
   activeRuntimeId.value = session.id
   tab.value = 'run'
 }
-function startApplication(target: MarineApp) {
+function gatewayRunToState(remote: any, target: MarineApp): RunState {
+  const nodes: RunState['nodes'] = {}
+  for (const node of target.steps.flatMap(step => step.nodes)) {
+    const source = remote.nodes?.[node.id] || {}
+    nodes[node.id] = { node, status: ['waiting', 'running', 'completed', 'cancelled', 'failed'].includes(source.status) ? source.status : 'waiting', elapsed: Number(source.elapsed || 0), progress: Number(source.progress || 0), result: source.result || { metric: '', value: '', unit: '', detail: '', source: '' } }
+  }
+  return { status: ['idle', 'running', 'paused', 'completed', 'cancelled', 'failed'].includes(remote.status) ? remote.status : 'failed', app: target, stepIndex: Number(remote.stepIndex || 0), elapsed: Number(remote.elapsed || 0), nodes, events: Array.isArray(remote.events) ? remote.events : [] }
+}
+async function syncGatewayRuns() {
+  if (!gatewayConnected.value) return
+  try {
+    const runs = await marineApi.listRuns()
+    for (const remote of runs) {
+      const target = savedApps.value.find(item => item.id === remote.appId) || (app.value.id === remote.appId ? app.value : undefined)
+      if (!target) continue
+      const session = ensureRuntime(target)
+      session.state = gatewayRunToState(remote, target)
+      gatewayRunIds.set(target.id, remote.id)
+    }
+    runtimeSessions.value = [...runtimeSessions.value]
+  } catch { gatewayConnected.value = false; notify('网关连接中断，后续操作将使用本地演示。', true) }
+}
+async function startApplication(target: MarineApp) {
   try {
     const session = ensureRuntime(target)
-    session.runner.start(target, sensorSnapshot.value)
+    if (gatewayConnected.value) {
+      await marineApi.createApp(target)
+      const remote = await marineApi.startRun(target.id)
+      gatewayRunIds.set(target.id, remote.id)
+      session.state = gatewayRunToState(remote, target)
+    } else session.runner.start(target, sensorSnapshot.value)
     session.app = cloneApp(target)
     session.lastTick = performance.now()
-    syncRun(session)
+    if (!gatewayConnected.value) syncRun(session)
     activeRuntimeId.value = session.id
     tab.value = 'run'
     journeyStage.value = 4
@@ -208,7 +240,7 @@ function showGeneration(apps: MarineApp[], mode: 'single' | 'leadership', reused
     if (mode === 'leadership') { leadershipBusy.value = false; tab.value = 'run' }
   }, mode === 'leadership' ? 2800 : 1900)
 }
-function runLeadershipDemo() {
+async function runLeadershipDemo() {
   if (leadershipBusy.value) return
   leadershipBusy.value = true
   try {
@@ -221,13 +253,18 @@ function runLeadershipDemo() {
       if (demoNames.has(session.app.name)) session.runner.cancel()
     })
     runtimeSessions.value = runtimeSessions.value.filter(session => !demoNames.has(session.app.name))
-    demo.apps.forEach(target => {
+    for (const target of demo.apps) {
       const session = ensureRuntime(target)
-      session.runner.start(target, sensorSnapshot.value)
+      if (gatewayConnected.value) {
+        await marineApi.createApp(target)
+        const remote = await marineApi.startRun(target.id)
+        gatewayRunIds.set(target.id, remote.id)
+        session.state = gatewayRunToState(remote, target)
+      } else session.runner.start(target, sensorSnapshot.value)
       session.app = cloneApp(target)
       session.lastTick = performance.now()
-      syncRun(session)
-    })
+      if (!gatewayConnected.value) syncRun(session)
+    }
     activeRuntimeId.value = demo.apps[0].id
     app.value = cloneApp(demo.apps[0])
     original.value = JSON.stringify(app.value)
@@ -240,15 +277,19 @@ function runLeadershipDemo() {
   }
 }
 function startRun() {
-  startApplication(app.value)
+  void startApplication(app.value)
 }
-function pauseResume() {
+async function pauseResume() {
   const session = activeSession.value
   if (!session) return
-  if (session.state.status === 'paused') { session.runner.resume(); session.lastTick = performance.now() } else session.runner.pause()
-  syncRun(session)
+  if (gatewayConnected.value) {
+    const runId = gatewayRunIds.get(session.app.id)
+    if (!runId) return
+    const remote = session.state.status === 'paused' ? await marineApi.resumeRun(runId) : await marineApi.pauseRun(runId)
+    session.state = gatewayRunToState(remote, session.app); runtimeSessions.value = [...runtimeSessions.value]
+  } else { if (session.state.status === 'paused') { session.runner.resume(); session.lastTick = performance.now() } else session.runner.pause(); syncRun(session) }
 }
-function stopRun() { const session = activeSession.value; if (session) { session.runner.cancel(); syncRun(session) } }
+async function stopRun() { const session = activeSession.value; if (!session) return; if (gatewayConnected.value) { const runId = gatewayRunIds.get(session.app.id); if (!runId) return; const remote = await marineApi.cancelRun(runId); session.state = gatewayRunToState(remote, session.app); runtimeSessions.value = [...runtimeSessions.value] } else { session.runner.cancel(); syncRun(session) } }
 function injectFailure() {
   const session = activeSession.value
   const active = runNodes.value.find(node => node.status === 'running')
@@ -277,7 +318,18 @@ onMounted(() => {
     if (raw && JSON.parse(raw).length !== savedApps.value.length) notify('部分旧应用记录无效，已跳过。', true)
   }
   catch { notify('未能读取本机应用记录，仍可正常编排和演示。', true) }
+  void marineApi.health().then(async health => {
+    gatewayConnected.value = Boolean(health)
+    if (!gatewayConnected.value) return
+    try {
+      const apps = await marineApi.listApps()
+      const valid = parseSavedApps(JSON.stringify(apps))
+      if (valid.length) { savedApps.value = valid; localStorage.setItem(storageKey, JSON.stringify(valid)) }
+      await syncGatewayRuns()
+    } catch { gatewayConnected.value = false }
+  })
   timer = setInterval(() => {
+    if (gatewayConnected.value) return
     const now = performance.now()
     runtimeSessions.value.forEach(session => {
       if (session.runner.state.status === 'running') { session.runner.tick((now - session.lastTick) / 1000); syncRun(session) }
@@ -286,9 +338,10 @@ onMounted(() => {
   }, 100)
   pollSensors()
   sensorTimer = setInterval(pollSensors, 2000)
+  gatewayTimer = setInterval(() => { void syncGatewayRuns() }, 500)
   document.addEventListener('fullscreenchange', syncFullscreen); window.addEventListener('beforeunload', unload)
 })
-onUnmounted(() => { clearInterval(timer); clearInterval(sensorTimer); clearTimeout(toastTimer); clearTimeout(generationTimer); runtimeSessions.value.forEach(session => session.runner.cancel()); document.removeEventListener('fullscreenchange', syncFullscreen); window.removeEventListener('beforeunload', unload) })
+onUnmounted(() => { clearInterval(timer); clearInterval(sensorTimer); clearInterval(gatewayTimer); clearTimeout(toastTimer); clearTimeout(generationTimer); runtimeSessions.value.forEach(session => session.runner.cancel()); document.removeEventListener('fullscreenchange', syncFullscreen); window.removeEventListener('beforeunload', unload) })
 </script>
 
 <template>

@@ -9,10 +9,13 @@ import {
   injectActuatorFault,
 } from '../marine/actuators'
 import type { ActuatorDevice, ActuatorPhase } from '../marine/actuators'
+import { marineApi } from '../marine/api'
 import '../styles/hardware-decoupling.css'
 
 const demo = ref(createActuatorDemo())
 const fullscreen = ref(false)
+const gatewayConnected = ref(false)
+const bindingVersion = ref(1)
 let timer: ReturnType<typeof setInterval> | undefined
 
 const activeDevice = computed(() => demo.value.devices.find(device => device.id === demo.value.logicalExecutor.boundDeviceId))
@@ -31,7 +34,27 @@ const statusLabels = { offline: '离线', standby: '在线待机', running: '在
 function disconnect() { demo.value = disconnectActive(demo.value) }
 function fault() { demo.value = injectActuatorFault(demo.value) }
 function connect(deviceId: ActuatorDevice['id']) { demo.value = connectActuator(demo.value, deviceId) }
-function confirmSwitch() { demo.value = confirmActuatorSwitch(demo.value) }
+async function syncGatewayBinding() {
+  try {
+    const bindings = await marineApi.listExecutors()
+    const binding = bindings.find((item: any) => item.logicalExecutorId === 'VENT-01')
+    if (!binding || !demo.value.devices.some(device => device.id === binding.deviceId)) return
+    gatewayConnected.value = true
+    bindingVersion.value = Number(binding.version || 1)
+    demo.value = { ...demo.value, logicalExecutor: { ...demo.value.logicalExecutor, boundDeviceId: binding.deviceId } }
+  } catch { gatewayConnected.value = false }
+}
+async function confirmSwitch() {
+  const next = confirmActuatorSwitch(demo.value)
+  if (!gatewayConnected.value || next.bindingUpdates === demo.value.bindingUpdates) { demo.value = next; return }
+  try {
+    const binding = await marineApi.updateBinding('VENT-01', { deviceId: next.logicalExecutor.boundDeviceId, expectedVersion: bindingVersion.value, operator: '演示员' })
+    bindingVersion.value = Number(binding.version || bindingVersion.value + 1)
+    demo.value = next
+  } catch {
+    demo.value = { ...demo.value, lastMessage: '网关未接受本次设备绑定更新，请保持当前连接后重试。' }
+  }
+}
 function reset() { demo.value = createActuatorDemo() }
 function syncFullscreen() { fullscreen.value = Boolean(document.fullscreenElement) }
 async function toggleFullscreen() {
@@ -40,6 +63,7 @@ async function toggleFullscreen() {
 }
 
 onMounted(() => {
+  void marineApi.health().then(health => { if (health) void syncGatewayBinding() })
   timer = setInterval(() => { demo.value = advanceActuatorDemo(demo.value, 100) }, 100)
   document.addEventListener('fullscreenchange', syncFullscreen)
 })
@@ -65,7 +89,7 @@ onUnmounted(() => {
         <RouterLink to="/legacy-dashboard">系统总图</RouterLink>
       </nav>
       <div class="hardware-header-actions">
-        <span class="hardware-mode"><i/> 演示模式</span>
+        <span class="hardware-mode"><i/> {{ gatewayConnected ? '网关接入' : '演示模式' }}</span>
         <button @click="toggleFullscreen">⛶ {{ fullscreen ? '退出全屏' : '全屏演示' }}</button>
       </div>
     </header>

@@ -1,7 +1,9 @@
 #include "application/marine/json_value.hpp"
 #include "application/marine/marine_types.hpp"
+#include "application/marine/marine_repository.hpp"
 
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 
 namespace {
@@ -32,6 +34,20 @@ marine::Application makeApplication(const std::vector<std::vector<std::string>>&
     return app;
 }
 
+class TempDir {
+public:
+    TempDir() : path_(std::filesystem::temp_directory_path() / ("marine-backend-test-" + std::to_string(++next_))) {
+        std::filesystem::remove_all(path_);
+        std::filesystem::create_directories(path_);
+    }
+    ~TempDir() { std::filesystem::remove_all(path_); }
+    std::string path() const { return path_.string(); }
+private:
+    std::filesystem::path path_;
+    static int next_;
+};
+int TempDir::next_ = 0;
+
 void application_validation_rejects_same_resource_in_parallel_step() {
     const auto errors = marine::validateApplication(makeApplication({{"03", "04"}}));
     REQUIRE(!errors.empty());
@@ -55,12 +71,49 @@ void json_parser_rejects_trailing_content() {
     std::string error;
     REQUIRE(!marine::parseJson("{\"id\":\"APP-01\"} extra", value, error));
 }
+
+void repository_persists_application_across_reopen() {
+    TempDir data;
+    marine::MarineRepository first(data.path());
+    REQUIRE(first.load().empty());
+    const auto app = makeApplication({{"A01"}, {"01"}});
+    REQUIRE(first.saveApp(app).empty());
+    marine::MarineRepository reopened(data.path());
+    REQUIRE(reopened.load().empty());
+    REQUIRE(reopened.listApps().size() == 1);
+    REQUIRE(reopened.listApps().at(0).id == "APP-01");
+}
+
+void binding_update_rejects_stale_version_without_mutation() {
+    TempDir data;
+    marine::MarineRepository repository(data.path());
+    REQUIRE(repository.load().empty());
+    const auto before = repository.listBindings().at(0);
+    auto candidate = before;
+    candidate.deviceId = "MOTOR-0E";
+    candidate.address = "0x0E";
+    REQUIRE(repository.updateBinding(candidate, before.version - 1, "演示员") == "binding_version_conflict");
+    REQUIRE(repository.listBindings().at(0).deviceId == before.deviceId);
+}
+
+void repository_marks_unfinished_runs_interrupted_on_load() {
+    TempDir data;
+    marine::MarineRepository first(data.path());
+    REQUIRE(first.load().empty());
+    REQUIRE(first.saveRunSummaries({{"RUN-01", "APP-01", marine::RunStatus::Running, 0}}).empty());
+    marine::MarineRepository reopened(data.path());
+    REQUIRE(reopened.load().empty());
+    REQUIRE(reopened.listRunSummaries().at(0).status == marine::RunStatus::Interrupted);
+}
 }
 
 int main() {
     application_validation_rejects_same_resource_in_parallel_step();
     application_json_round_trip_preserves_parallel_nodes();
     json_parser_rejects_trailing_content();
+    repository_persists_application_across_reopen();
+    binding_update_rejects_stale_version_without_mutation();
+    repository_marks_unfinished_runs_interrupted_on_load();
     if (failures != 0) {
         std::cerr << failures << " 项测试失败\n";
         return EXIT_FAILURE;

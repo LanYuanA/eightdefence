@@ -4,7 +4,7 @@ CFLAGS = -Wall -I. -I./devices -I./core -I./application -I./service
 CXXFLAGS = -Wall -std=c++17 -I. -I./devices -I./core -I./application -I./service
 LDFLAGS = -lpthread
 
-MARINE_TEST_SRCS = application/marine/json_value.cpp application/marine/marine_types.cpp tests/marine_backend_test.cpp
+MARINE_TEST_SRCS = application/marine/json_value.cpp application/marine/marine_types.cpp application/marine/marine_repository.cpp tests/marine_backend_test.cpp
 
 TARGET = app_gateway
 

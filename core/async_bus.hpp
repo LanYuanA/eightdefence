@@ -44,6 +44,8 @@ struct AsyncRequest {
     uint8_t     data[256];      // Modbus RTU 帧数据
     size_t      len = 0;        // 帧长度
     bool        isWrite = false;// 是否为写操作 (写优先)
+    int         priority = 0;   // 0=普通读取，1=普通写入，2=高优先级，3=急停
+    uint64_t    sequence = 0;   // 同优先级保持提交顺序
     int         timeoutMs = 1000;   // 响应超时
     int         maxRetries = 0;     // 最大重试次数
     std::string description;        // 描述 (用于日志)
@@ -60,9 +62,11 @@ struct AsyncRequest {
     // 便捷方法: 构建写线圈帧
     void buildWriteCoil(uint8_t devAddr, uint16_t coilAddr, bool value);
 
-    // 优先级比较 (写操作优先)
+    // 数值越大越优先；同优先级按提交顺序处理。
     bool operator<(const AsyncRequest &other) const {
-        return isWrite < other.isWrite;  // true=写, 写排前面
+        const int ownPriority = priority == 0 && isWrite ? 1 : priority;
+        const int otherPriority = other.priority == 0 && other.isWrite ? 1 : other.priority;
+        return ownPriority == otherPriority ? sequence > other.sequence : ownPriority < otherPriority;
     }
 };
 
@@ -145,6 +149,7 @@ private:
     std::condition_variable         queueCv_;
 
     std::atomic<bool>               running_{false};
+    std::atomic<uint64_t>           nextSequence_{0};
     std::thread                     ioThread_;
     AsyncBusStats                   stats_;
 };

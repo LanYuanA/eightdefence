@@ -87,9 +87,11 @@ void AsyncBus::submit(const AsyncRequest &req) {
     stats_.totalSubmitted++;
     if (req.isWrite) stats_.totalWriteOps++;
 
+    AsyncRequest queued = req;
+    queued.sequence = ++nextSequence_;
     {
         std::lock_guard<std::mutex> lock(queueMtx_);
-        queue_.push(req);
+        queue_.push(std::move(queued));
         size_t qs = queue_.size();
         uint64_t hwm = stats_.queueHighWaterMark.load();
         while (qs > hwm) {

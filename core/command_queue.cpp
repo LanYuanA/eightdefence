@@ -88,6 +88,7 @@ uint64_t CommandQueue::submit(const Command &cmd) {
     // 构建 Modbus 帧
     AsyncRequest req;
     req.isWrite = true;
+    req.priority = static_cast<int>(c.priority);
     req.timeoutMs = c.timeoutMs;
     req.description = c.description;
 

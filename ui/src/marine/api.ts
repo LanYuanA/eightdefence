@@ -18,6 +18,11 @@ export interface MarineApiClient {
   safety(): Promise<any>
   unlock(operator: string): Promise<any>
   lock(operator: string): Promise<any>
+  listMotors(): Promise<any[]>
+  updateMotor(runId: string, nodeId: string, parameters: unknown): Promise<any>
+  stopMotor(runId: string, nodeId: string): Promise<any>
+  emergencyStop(operator: string): Promise<any>
+  emergencyReset(operator: string): Promise<any>
 }
 
 export function createMarineApi(fetcher: FetchLike = fetch as unknown as FetchLike): MarineApiClient {
@@ -60,6 +65,11 @@ export function createMarineApi(fetcher: FetchLike = fetch as unknown as FetchLi
     safety: () => request('/safety'),
     unlock: operator => request('/safety/unlock', 'POST', { operator }),
     lock: operator => request('/safety/lock', 'POST', { operator }),
+    listMotors: () => request('/marine/motors') as Promise<any[]>,
+    updateMotor: (runId, nodeId, parameters) => request(`/marine/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/motor`, 'PATCH', parameters),
+    stopMotor: (runId, nodeId) => request(`/marine/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/stop`, 'POST', {}),
+    emergencyStop: operator => request('/marine/emergency-stop', 'POST', { operator }),
+    emergencyReset: operator => request('/marine/emergency-reset', 'POST', { operator }),
   }
 }
 

@@ -58,6 +58,17 @@ export function buildApplicationFlow(app: MarineApp): ApplicationFlow {
 
   const abstractions = combineEndpoints(actions, 'abstraction')
   const hardware = combineEndpoints(actions, 'hardware')
+  const motorNames: Record<string, { name: string; hardware: string }> = {
+    'EXHAUST-FAN-01': { name: '机舱排烟风机逻辑执行器', hardware: 'IDS57-R · 地址 0x02' },
+    'FIRE-PUMP-01': { name: '消防水泵逻辑执行器', hardware: 'IDS42-R · 地址 0x0E' },
+    'DRAIN-PUMP-01': { name: '舱底排水泵逻辑执行器', hardware: 'IDS42-R · 地址 0x0F' },
+  }
+  app.steps.flatMap(step => step.nodes).filter(node => node.serviceId === 'M01' && node.motor).forEach(node => {
+    const definition = motorNames[node.motor!.executorId]; if (!definition) return
+    if (!abstractions.some(item => item.id === node.motor!.executorId)) abstractions.push({ id: node.motor!.executorId, name: definition.name, serviceIds: ['M01'] })
+    const hardwareId = `HW-${node.motor!.executorId}`
+    if (!hardware.some(item => item.id === hardwareId)) hardware.push({ id: hardwareId, name: definition.hardware, serviceIds: ['M01'] })
+  })
 
   return {
     application: { id: app.id, name: app.name },

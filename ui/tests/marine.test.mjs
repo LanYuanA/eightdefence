@@ -93,6 +93,13 @@ test('motor service defaults, persists direction and rejects unsafe parameters',
   restored.steps[0].nodes[0].motor.speedRpm = 501
   assert.match(validateApp(restored).join(), /电机参数/)
 })
+test('motor service adds its logical executor and physical adapter to application flow', () => {
+  const app = { id: 'motor-flow', name: '排烟控制', description: '', steps: [createStep(['M01'])] }
+  const flow = buildApplicationFlow(app)
+  assert.deepEqual(flow.actions.map(item => item.id), ['M01'])
+  assert.deepEqual(flow.abstractions.map(item => item.id), ['EXHAUST-FAN-01'])
+  assert.match(flow.hardware[0].name, /IDS57-R.*0x02/)
+})
 test('all five simulators produce distinct results and respond to strength or duration progress', () => {
   const outputs = ['01','02','03','04','05'].map(id => simulateService(createNode(id), 1))
   assert.equal(new Set(outputs.map(result => result.metric)).size, 5)

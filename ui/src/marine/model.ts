@@ -80,8 +80,9 @@ export function validateApp(app: MarineApp): string[] {
       nodeIds.add(node.id)
       if (!areas.includes(node.area) || !Number.isFinite(node.intensity) || node.intensity < 10 || node.intensity > 100 || !Number.isFinite(node.duration) || node.duration < 2 || node.duration > 30 || (service.kind === 'awareness' && (!Number.isFinite(node.threshold) || node.threshold < 0 || !['gte', 'lte'].includes(node.thresholdOperator)))) errors.push(`${service.name} 的参数不完整或超出范围。`)
       if (node.serviceId === 'M01' && (!node.motor || !['EXHAUST-FAN-01', 'FIRE-PUMP-01', 'DRAIN-PUMP-01'].includes(node.motor.executorId) || !Number.isFinite(node.motor.speedRpm) || node.motor.speedRpm < 1 || node.motor.speedRpm > 500 || !['forward', 'reverse'].includes(node.motor.direction) || !Number.isFinite(node.motor.acceleration) || node.motor.acceleration < 1 || node.motor.acceleration > 100 || !Number.isFinite(node.motor.deceleration) || node.motor.deceleration < 1 || node.motor.deceleration > 100)) errors.push('电机参数不完整或超出范围。')
-      if (service.resource && resources.has(service.resource)) errors.push(`步骤 ${index + 1} 的服务共用${service.resource}，请拆成顺序步骤。`)
-      if (service.resource) resources.add(service.resource)
+      const resource = node.serviceId === 'M01' ? node.motor?.executorId : service.resource
+      if (resource && resources.has(resource)) errors.push(`步骤 ${index + 1} 的服务共用${resource}，请拆成顺序步骤。`)
+      if (resource) resources.add(resource)
     })
   })
   return [...new Set(errors)]

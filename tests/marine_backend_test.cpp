@@ -74,6 +74,35 @@ void application_json_round_trip_preserves_parallel_nodes() {
     REQUIRE(output.steps.at(0).nodes.at(0).thresholdOperator == "gte");
 }
 
+void motor_parameters_round_trip_and_validate_boundaries() {
+    auto input = makeApplication({{"M01"}});
+    auto& motor = input.steps.at(0).nodes.at(0).motor;
+    motor.executorId = "EXHAUST-FAN-01";
+    motor.speedRpm = 200;
+    motor.direction = marine::MotorDirection::Reverse;
+    motor.acceleration = 10;
+    motor.deceleration = 10;
+    marine::JsonValue value;
+    std::string error;
+    REQUIRE(marine::parseJson(marine::toJson(marine::applicationToJson(input)), value, error));
+    marine::Application output;
+    REQUIRE(marine::applicationFromJson(value, output, error));
+    const auto& restored = output.steps.at(0).nodes.at(0).motor;
+    REQUIRE(restored.executorId == "EXHAUST-FAN-01");
+    REQUIRE(restored.speedRpm == 200);
+    REQUIRE(restored.direction == marine::MotorDirection::Reverse);
+    REQUIRE(restored.acceleration == 10);
+    REQUIRE(restored.deceleration == 10);
+
+    input.steps.at(0).nodes.at(0).motor.speedRpm = 0;
+    REQUIRE(!marine::validateApplication(input).empty());
+    input.steps.at(0).nodes.at(0).motor.speedRpm = 501;
+    REQUIRE(!marine::validateApplication(input).empty());
+    input.steps.at(0).nodes.at(0).motor.speedRpm = 200;
+    input.steps.at(0).nodes.at(0).motor.executorId = "UNKNOWN";
+    REQUIRE(!marine::validateApplication(input).empty());
+}
+
 void json_parser_rejects_trailing_content() {
     marine::JsonValue value;
     std::string error;
@@ -211,6 +240,7 @@ void api_returns_conflict_for_stale_binding_version() {
 int main() {
     application_validation_rejects_same_resource_in_parallel_step();
     application_json_round_trip_preserves_parallel_nodes();
+    motor_parameters_round_trip_and_validate_boundaries();
     json_parser_rejects_trailing_content();
     repository_persists_application_across_reopen();
     binding_update_rejects_stale_version_without_mutation();

@@ -15,6 +15,7 @@ export const services: MarineService[] = [
   { id: '03', name: '供水增压', category: '执行控制', description: '按作业需求建立稳定供水', color: '#ae9bff', available: true, kind: 'action', resource: '水务执行器', metric: '供水压力', unit: 'MPa', target: 0.5 },
   { id: '04', name: '舱底排水', category: '执行控制', description: '完成指定区域的积水排放', color: '#f1be74', available: true, kind: 'action', resource: '水务执行器', metric: '剩余水位', unit: 'cm', target: 5 },
   { id: '05', name: '检修安全报警', category: '执行控制', description: '按检修安全策略触发声光提示与报警联动', color: '#ef8d78', available: true, kind: 'action', resource: '安全报警执行器', metric: '报警状态', unit: '', target: 1 },
+  { id: 'M01', name: '电机调速控制', category: '执行控制', description: '通过统一逻辑接口控制电机转速与方向', color: '#4ed7c8', available: true, kind: 'action', resource: '电机执行器', metric: '实际转速', unit: 'rpm', target: 200 },
   { id: '06', name: '压载调节', category: '扩展能力', description: '按目标调整压载分配', color: '#75b6ff', available: false, kind: 'action' },
   { id: '07', name: '消防供水', category: '扩展能力', description: '建立消防供水能力', color: '#f1be74', available: false, kind: 'action' },
   { id: '08', name: '应急通风', category: '扩展能力', description: '执行应急区域换气', color: '#66dfce', available: false, kind: 'action' },
@@ -28,7 +29,9 @@ export const services: MarineService[] = [
 export const serviceById = (id: string) => services.find(service => service.id === id)!
 export const areas = ['机舱', '生活舱', '作业舱', '全船']
 export type ThresholdOperator = 'gte' | 'lte'
-export interface TaskNode { id: string; serviceId: string; area: string; intensity: number; duration: number; threshold: number; thresholdOperator: ThresholdOperator }
+export type MotorDirection = 'forward' | 'reverse'
+export interface MotorParameters { executorId: string; speedRpm: number; direction: MotorDirection; acceleration: number; deceleration: number }
+export interface TaskNode { id: string; serviceId: string; area: string; intensity: number; duration: number; threshold: number; thresholdOperator: ThresholdOperator; motor?: MotorParameters }
 export interface TaskStep { id: string; nodes: TaskNode[] }
 export interface MarineApp { id: string; name: string; description: string; steps: TaskStep[] }
 export function createId(randomUUID?: () => string, random = Math.random, now = Date.now) {
@@ -45,7 +48,7 @@ export function uid() {
 }
 export function createNode(serviceId: string): TaskNode {
   const service = serviceById(serviceId)
-  return { id: uid(), serviceId, area: '机舱', intensity: 70, duration: service?.kind === 'awareness' ? 3 : 6, threshold: service?.target ?? 0, thresholdOperator: serviceId === 'A07' ? 'lte' : 'gte' }
+  return { id: uid(), serviceId, area: '机舱', intensity: 70, duration: service?.kind === 'awareness' ? 3 : 6, threshold: service?.target ?? 0, thresholdOperator: serviceId === 'A07' ? 'lte' : 'gte', ...(serviceId === 'M01' ? { motor: { executorId: 'EXHAUST-FAN-01', speedRpm: 200, direction: 'forward' as const, acceleration: 10, deceleration: 10 } } : {}) }
 }
 export function createStep(ids: string[] = []): TaskStep { return { id: uid(), nodes: ids.map(createNode) } }
 export function createPreset(which: 'A' | 'B' | 'C' | 'D' | 'E'): MarineApp {
@@ -76,6 +79,7 @@ export function validateApp(app: MarineApp): string[] {
       if (nodeIds.has(node.id)) errors.push('存在重复的服务实例。')
       nodeIds.add(node.id)
       if (!areas.includes(node.area) || !Number.isFinite(node.intensity) || node.intensity < 10 || node.intensity > 100 || !Number.isFinite(node.duration) || node.duration < 2 || node.duration > 30 || (service.kind === 'awareness' && (!Number.isFinite(node.threshold) || node.threshold < 0 || !['gte', 'lte'].includes(node.thresholdOperator)))) errors.push(`${service.name} 的参数不完整或超出范围。`)
+      if (node.serviceId === 'M01' && (!node.motor || !['EXHAUST-FAN-01', 'FIRE-PUMP-01', 'DRAIN-PUMP-01'].includes(node.motor.executorId) || !Number.isFinite(node.motor.speedRpm) || node.motor.speedRpm < 1 || node.motor.speedRpm > 500 || !['forward', 'reverse'].includes(node.motor.direction) || !Number.isFinite(node.motor.acceleration) || node.motor.acceleration < 1 || node.motor.acceleration > 100 || !Number.isFinite(node.motor.deceleration) || node.motor.deceleration < 1 || node.motor.deceleration > 100)) errors.push('电机参数不完整或超出范围。')
       if (service.resource && resources.has(service.resource)) errors.push(`步骤 ${index + 1} 的服务共用${service.resource}，请拆成顺序步骤。`)
       if (service.resource) resources.add(service.resource)
     })
@@ -93,6 +97,7 @@ export function parseSavedApps(raw: string | null): MarineApp[] {
       const service = serviceById(node.serviceId)
       if (!Number.isFinite(node.threshold)) node.threshold = service?.target ?? 0
       if (node.thresholdOperator !== 'gte' && node.thresholdOperator !== 'lte') node.thresholdOperator = node.serviceId === 'A07' ? 'lte' : 'gte'
+      if (node.serviceId === 'M01' && !node.motor) node.motor = { executorId: 'EXHAUST-FAN-01', speedRpm: 200, direction: 'forward', acceleration: 10, deceleration: 10 }
     }))
     return app
   }).filter((app): app is MarineApp => {

@@ -79,6 +79,20 @@ test('awareness services keep an editable, validated threshold condition', () =>
   app.steps[0].nodes[0].threshold = -1
   assert.match(validateApp(app).join(), /超出范围/)
 })
+test('motor service defaults, persists direction and rejects unsafe parameters', () => {
+  const node = createNode('M01')
+  assert.equal(node.motor.executorId, 'EXHAUST-FAN-01')
+  assert.equal(node.motor.speedRpm, 200)
+  assert.equal(node.motor.direction, 'forward')
+
+  node.motor.direction = 'reverse'
+  const app = { id: 'motor-app', name: '电机应用', description: '', steps: [{ id: 'step', nodes: [node] }] }
+  const [restored] = parseSavedApps(JSON.stringify([app]))
+  assert.equal(restored.steps[0].nodes[0].motor.direction, 'reverse')
+
+  restored.steps[0].nodes[0].motor.speedRpm = 501
+  assert.match(validateApp(restored).join(), /电机参数/)
+})
 test('all five simulators produce distinct results and respond to strength or duration progress', () => {
   const outputs = ['01','02','03','04','05'].map(id => simulateService(createNode(id), 1))
   assert.equal(new Set(outputs.map(result => result.metric)).size, 5)

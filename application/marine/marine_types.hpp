@@ -8,7 +8,15 @@
 
 namespace marine {
 
-struct TaskNode { std::string id; std::string serviceId; std::string area; int intensity = 70; int duration = 6; int threshold = 0; std::string thresholdOperator = "gte"; };
+enum class MotorDirection { Forward, Reverse };
+struct MotorParameters {
+    std::string executorId = "EXHAUST-FAN-01";
+    int speedRpm = 200;
+    MotorDirection direction = MotorDirection::Forward;
+    int acceleration = 10;
+    int deceleration = 10;
+};
+struct TaskNode { std::string id; std::string serviceId; std::string area; int intensity = 70; int duration = 6; int threshold = 0; std::string thresholdOperator = "gte"; MotorParameters motor; };
 struct TaskStep { std::string id; std::vector<TaskNode> nodes; };
 struct Application { std::string id; std::string name; std::string description; std::vector<TaskStep> steps; };
 

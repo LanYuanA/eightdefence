@@ -10,6 +10,7 @@
 #include <optional>
 #include <thread>
 #include <memory>
+#include <functional>
 
 namespace marine {
 class MotorAtomicService;
@@ -20,7 +21,8 @@ struct MarineRun { std::string id; std::string appId; Application app; RunStatus
 
 class MarineRuntime {
 public:
-    MarineRuntime(MarineRepository& repository, MarineExecutor executor, std::shared_ptr<MotorAtomicService> motors = nullptr);
+    using MotorAuthorizer = std::function<bool(const MotorParameters&)>;
+    MarineRuntime(MarineRepository& repository, MarineExecutor executor, std::shared_ptr<MotorAtomicService> motors = nullptr, MotorAuthorizer motorAuthorizer = {});
     ~MarineRuntime();
     void start();
     void stop();
@@ -30,6 +32,7 @@ public:
     std::string cancelRun(const std::string& runId);
     std::string updateMotor(const std::string& runId, const std::string& nodeId, const MotorParameters& parameters);
     std::string stopMotor(const std::string& runId, const std::string& nodeId);
+    bool emergencyStopMotors();
     std::vector<MarineRun> listRuns() const;
     std::optional<MarineRun> getRun(const std::string& runId) const;
     void advanceForTest(uint64_t milliseconds);
@@ -38,6 +41,7 @@ private:
     MarineRepository& repository_;
     MarineExecutor executor_;
     std::shared_ptr<MotorAtomicService> motors_;
+    MotorAuthorizer motorAuthorizer_;
     mutable std::mutex mutex_;
     std::map<std::string, MarineRun> runs_;
     std::atomic<bool> running_{false};

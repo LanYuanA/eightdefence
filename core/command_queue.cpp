@@ -115,8 +115,8 @@ uint64_t CommandQueue::submit(const Command &cmd) {
     auto startTime = std::make_shared<std::chrono::steady_clock::time_point>(
         std::chrono::steady_clock::now());
 
-    const auto expectedAddr = c.devAddr; const auto expectedType = c.type; const auto expectedCount = c.count; const auto expectedReg = c.regAddr; const bool multi = !c.values.empty();
-    req.callback = [self, cmdId, cmdCb, startTime, expectedAddr, expectedType, expectedCount, expectedReg, multi](const uint8_t *resp, size_t resp_len, int rc) {
+    const auto expectedAddr = c.devAddr; const auto expectedType = c.type; const auto expectedCount = c.count; const auto expectedReg = c.regAddr; const auto expectedValue = c.value; const bool multi = !c.values.empty();
+    req.callback = [self, cmdId, cmdCb, startTime, expectedAddr, expectedType, expectedCount, expectedReg, expectedValue, multi](const uint8_t *resp, size_t resp_len, int rc) {
         auto endTime = std::chrono::steady_clock::now();
         double ms = std::chrono::duration<double, std::milli>(endTime - *startTime).count();
 
@@ -127,6 +127,9 @@ uint64_t CommandQueue::submit(const Command &cmd) {
         if (rc == 0 && crc16_modbus(resp, resp_len - 2) != static_cast<uint16_t>(resp[resp_len - 2] | (resp[resp_len - 1] << 8))) rc = -63;
         if (rc == 0 && expectedType == CommandType::READ_REG && (resp_len < static_cast<size_t>(5 + expectedCount * 2) || resp[2] != expectedCount * 2)) rc = -62;
         if (rc == 0 && expectedType != CommandType::READ_REG && (resp[2] != static_cast<uint8_t>(expectedReg >> 8) || resp[3] != static_cast<uint8_t>(expectedReg))) rc = -64;
+        if (rc == 0 && expectedType != CommandType::READ_REG && resp_len < 8) rc = -65;
+        if (rc == 0 && multi && (resp[4] != static_cast<uint8_t>(expectedCount >> 8) || resp[5] != static_cast<uint8_t>(expectedCount))) rc = -66;
+        if (rc == 0 && !multi && expectedType != CommandType::READ_REG && (resp[4] != static_cast<uint8_t>(expectedValue >> 8) || resp[5] != static_cast<uint8_t>(expectedValue))) rc = -67;
         if (rc == 0) {
             result.status = CommandStatus::SUCCESS;
             result.errorCode = 0;

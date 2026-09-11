@@ -6,7 +6,7 @@
 #include <sstream>
 
 namespace marine {
-MarineRuntime::MarineRuntime(MarineRepository& repository, MarineExecutor executor, std::shared_ptr<MotorAtomicService> motors) : repository_(repository), executor_(std::move(executor)), motors_(std::move(motors)) {}
+MarineRuntime::MarineRuntime(MarineRepository& repository, MarineExecutor executor, std::shared_ptr<MotorAtomicService> motors, MotorAuthorizer motorAuthorizer) : repository_(repository), executor_(std::move(executor)), motors_(std::move(motors)), motorAuthorizer_(std::move(motorAuthorizer)) {}
 MarineRuntime::~MarineRuntime() { stop(); }
 void MarineRuntime::start() { if (running_.exchange(true)) return; worker_ = std::thread(&MarineRuntime::workerLoop, this); }
 void MarineRuntime::stop() { if (!running_.exchange(false)) return; if (worker_.joinable()) worker_.join(); std::lock_guard<std::mutex> lock(mutex_); for (auto& item : runs_) stopMotors(item.second); }
@@ -25,7 +25,38 @@ std::string MarineRuntime::pauseRun(const std::string& runId) { std::lock_guard<
 std::string MarineRuntime::resumeRun(const std::string& runId) { std::lock_guard<std::mutex> lock(mutex_); const auto iterator = runs_.find(runId); if (iterator == runs_.end()) return "not_found"; if (iterator->second.status != RunStatus::Paused) return "invalid_state"; iterator->second.status = RunStatus::Running; startStep(iterator->second); addEvent(iterator->second, "任务继续执行"); persistLocked(); return ""; }
 std::string MarineRuntime::cancelRun(const std::string& runId) { std::lock_guard<std::mutex> lock(mutex_); const auto iterator = runs_.find(runId); if (iterator == runs_.end()) return "not_found"; if (iterator->second.status != RunStatus::Running && iterator->second.status != RunStatus::Paused) return "invalid_state"; stopMotors(iterator->second); iterator->second.status = RunStatus::Cancelled; for (auto& entry : iterator->second.nodes) if (entry.second.status == NodeStatus::Waiting || entry.second.status == NodeStatus::Running) entry.second.status = NodeStatus::Cancelled; addEvent(iterator->second, "任务已停止 · 未完成服务已取消"); persistLocked(); return ""; }
 std::string MarineRuntime::updateMotor(const std::string& runId, const std::string& nodeId, const MotorParameters& parameters) { std::lock_guard<std::mutex> lock(mutex_); auto run = runs_.find(runId); if (run == runs_.end()) return "not_found"; auto node = run->second.nodes.find(nodeId); if (node == run->second.nodes.end() || node->second.node.serviceId != "M01") return "node_not_found"; if (node->second.status != NodeStatus::Running || !motors_) return "invalid_state"; if (parameters.executorId != node->second.node.motor.executorId) return "executor_change_not_allowed"; const auto error = motors_->update(runId, parameters); if (!error.empty()) return error; node->second.node.motor = parameters; return ""; }
-std::string MarineRuntime::stopMotor(const std::string& runId, const std::string& nodeId) { std::lock_guard<std::mutex> lock(mutex_); auto run = runs_.find(runId); if (run == runs_.end()) return "not_found"; auto node = run->second.nodes.find(nodeId); if (node == run->second.nodes.end() || node->second.node.serviceId != "M01") return "node_not_found"; return motors_ ? motors_->stop(runId, node->second.node.motor.executorId) : "invalid_state"; }
+std::string MarineRuntime::stopMotor(const std::string& runId, const std::string& nodeId) {
+    std::lock_guard<std::mutex> lock(mutex_); auto run = runs_.find(runId); if (run == runs_.end()) return "not_found"; auto node = run->second.nodes.find(nodeId);
+    if (node == run->second.nodes.end() || node->second.node.serviceId != "M01") return "node_not_found";
+    if (node->second.status != NodeStatus::Running || !motors_) return "invalid_state";
+    const auto outcome = motors_->stop(runId, node->second.node.motor.executorId); if (!outcome.empty()) return outcome;
+    node->second.status = NodeStatus::Cancelled; node->second.result = {"电机状态", "已停止", "", "操作员停止了电机，当前任务随之停止", motors_->simulation() ? "simulation" : "device"};
+    run->second.status = RunStatus::Cancelled; stopMotors(run->second);
+    for (auto& item : run->second.nodes) if (item.second.status == NodeStatus::Running || item.second.status == NodeStatus::Waiting) item.second.status = NodeStatus::Cancelled;
+    addEvent(run->second, "电机已手动停止 · 当前任务已取消", "error"); persistLocked(); return "";
+}
+bool MarineRuntime::emergencyStopMotors() {
+    const bool physicallyStopped = motors_ && motors_->emergencyStop();
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto& entry : runs_) {
+        auto& run = entry.second;
+        if (run.status != RunStatus::Running && run.status != RunStatus::Paused) continue;
+        bool affected = false;
+        for (auto& node : run.nodes) {
+            if (node.second.node.serviceId == "M01" && (node.second.status == NodeStatus::Running || node.second.status == NodeStatus::Waiting)) {
+                node.second.status = NodeStatus::Failed;
+                node.second.result = {"电机状态", "急停", "", "执行器急停已触发", motors_ && motors_->simulation() ? "simulation" : "device"};
+                affected = true;
+            }
+        }
+        if (!affected) continue;
+        run.status = RunStatus::Failed;
+        for (auto& node : run.nodes) if (node.second.status == NodeStatus::Running || node.second.status == NodeStatus::Waiting) node.second.status = NodeStatus::Cancelled;
+        addEvent(run, "执行器急停 · 当前任务已停止", "error");
+    }
+    persistLocked();
+    return physicallyStopped;
+}
 std::vector<MarineRun> MarineRuntime::listRuns() const { std::lock_guard<std::mutex> lock(mutex_); std::vector<MarineRun> values; for (const auto& entry : runs_) values.push_back(entry.second); return values; }
 std::optional<MarineRun> MarineRuntime::getRun(const std::string& runId) const { std::lock_guard<std::mutex> lock(mutex_); const auto iterator = runs_.find(runId); return iterator == runs_.end() ? std::nullopt : std::optional<MarineRun>(iterator->second); }
 void MarineRuntime::advanceForTest(uint64_t milliseconds) { std::lock_guard<std::mutex> lock(mutex_); advanceLocked(milliseconds); }
@@ -40,6 +71,11 @@ void MarineRuntime::startStep(MarineRun& run) {
         if (current.status == NodeStatus::Completed || current.status == NodeStatus::Cancelled || current.status == NodeStatus::Failed) continue;
         current.status = NodeStatus::Running;
         if (node.serviceId == "M01" && motors_) {
+            if (motorAuthorizer_ && !motorAuthorizer_(current.node.motor)) {
+                current.status = NodeStatus::Failed; run.status = RunStatus::Failed;
+                current.result = {"电机状态", "控制被拒绝", "", "安全闸门或设备绑定未授权真实控制", motors_->simulation() ? "simulation" : "device"};
+                addEvent(run, "电机控制被安全闸门拒绝", "error"); break;
+            }
             const auto error = motors_->start(run.id, current.node.motor);
             if (!error.empty()) {
                 current.status = NodeStatus::Failed;
@@ -76,7 +112,8 @@ void MarineRuntime::advanceLocked(uint64_t milliseconds) {
             for (const auto& node : step.nodes) { auto& nodeRun = run.nodes.at(node.id); if (nodeRun.status == NodeStatus::Running) { active.push_back(&nodeRun); const uint64_t total = static_cast<uint64_t>(node.duration) * 1000; delta = std::min(delta, total - nodeRun.elapsedMs); } }
             if (active.empty()) { run.status = RunStatus::Failed; addEvent(run, "活动步骤没有可执行服务。", "error"); changed = true; break; }
             const SensorSnapshot sensors = executor_.snapshot();
-            for (auto* nodeRun : active) { const uint64_t total = static_cast<uint64_t>(nodeRun->node.duration) * 1000; nodeRun->elapsedMs = std::min(total, nodeRun->elapsedMs + delta); nodeRun->progress = static_cast<double>(nodeRun->elapsedMs) / total; if (nodeRun->node.serviceId == "M01" && motors_) { const auto t = motors_->telemetry(nodeRun->node.motor.executorId); nodeRun->result = {"实际转速", std::to_string(t.actualRpm), "rpm", t.name + " · " + (t.direction == "reverse" ? "反转" : "正转"), t.source}; } else nodeRun->result = executor_.execute(nodeRun->node, nodeRun->progress, sensors); if (nodeRun->elapsedMs == total) { if (nodeRun->node.serviceId == "M01" && motors_) motors_->stop(run.id, nodeRun->node.motor.executorId); nodeRun->status = NodeStatus::Completed; addEvent(run, nodeRun->node.serviceId + " 完成", "success"); } }
+            for (auto* nodeRun : active) { const uint64_t total = static_cast<uint64_t>(nodeRun->node.duration) * 1000; nodeRun->elapsedMs = std::min(total, nodeRun->elapsedMs + delta); nodeRun->progress = static_cast<double>(nodeRun->elapsedMs) / total; if (nodeRun->node.serviceId == "M01" && motors_) { const auto t = motors_->telemetry(nodeRun->node.motor.executorId); nodeRun->result = {"实际转速", std::to_string(t.actualRpm), "rpm", t.name + " · " + (t.direction == "reverse" ? "反转" : "正转"), t.source}; if (!motors_->simulation() && !t.online) { nodeRun->status = NodeStatus::Failed; run.status = RunStatus::Failed; nodeRun->result.detail = "电机通信异常，任务已停止"; addEvent(run, "电机通信异常 · 当前任务已停止", "error"); break; } } else nodeRun->result = executor_.execute(nodeRun->node, nodeRun->progress, sensors); if (nodeRun->elapsedMs == total) { if (nodeRun->node.serviceId == "M01" && motors_) motors_->stop(run.id, nodeRun->node.motor.executorId); nodeRun->status = NodeStatus::Completed; addEvent(run, nodeRun->node.serviceId + " 完成", "success"); } }
+            if (run.status == RunStatus::Failed) { stopMotors(run); for (auto& node : run.nodes) if (node.second.status == NodeStatus::Running || node.second.status == NodeStatus::Waiting) node.second.status = NodeStatus::Cancelled; changed = true; break; }
             run.elapsedMs += delta; remaining -= delta; changed = true;
             bool stepComplete = true; for (const auto& node : step.nodes) if (run.nodes.at(node.id).status != NodeStatus::Completed) { stepComplete = false; break; }
             if (stepComplete) { if (static_cast<size_t>(run.stepIndex + 1) >= run.app.steps.size()) { run.status = RunStatus::Completed; addEvent(run, "所有步骤已完成 · 任务结果已生成", "success"); } else { ++run.stepIndex; startStep(run); } }

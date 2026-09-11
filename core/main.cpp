@@ -22,6 +22,7 @@
 #include <sys/select.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <algorithm>
 
 extern "C" {
 #include "modbus_core.h"
@@ -277,16 +278,20 @@ int main(int argc, char *argv[]) {
     });
     marine::MarineSafety marineSafety("./data/marine/events.jsonl");
     auto motorService = std::make_shared<marine::MotorAtomicService>(true);
-    marine::MarineRuntime marineRuntime(marineRepository, std::move(marineExecutor), motorService);
-    marineRuntime.start();
+    marine::MarineRuntime marineRuntime(marineRepository, std::move(marineExecutor), motorService,
+        [&marineRepository, &marineSafety](const marine::MotorParameters& parameters) {
+            const auto& bindings = marineRepository.listBindings();
+            const auto binding = std::find_if(bindings.begin(), bindings.end(), [&](const marine::Binding& current) { return current.logicalExecutorId == parameters.executorId; });
+            return binding != bindings.end() && marineSafety.mayControl(*binding, static_cast<uint64_t>(time(nullptr)) * 1000);
+        });
     marine::MarineApi marineApi(marineRepository, marineRuntime, marineSafety, motorService);
 
-    /* 启动 Web 服务器 */
     pthread_t web_tid;
-    pthread_create(&web_tid, NULL, start_web_server, &marineApi);
-    LOG_INFO("Web 服务器已启动");
 
     if (marine_demo) {
+        marineRuntime.start();
+        pthread_create(&web_tid, NULL, start_web_server, &marineApi);
+        LOG_INFO("Web 服务器已启动");
         LOG_INFO("船舶网关演示模式已启动：不连接串口，执行服务仅返回模拟结果。");
         while (g_web_running) usleep(100000);
         marineRuntime.stop();
@@ -335,7 +340,21 @@ int main(int argc, char *argv[]) {
             if (result.status != CommandStatus::SUCCESS) return false;
             values = result.registers;
             return values.size() == count;
+        },
+        [&cmdQueue](const std::vector<uint8_t>& addresses) {
+            std::vector<uint64_t> commandIds;
+            commandIds.reserve(addresses.size());
+            for (const auto address : addresses) commandIds.push_back(cmdQueue.writeRegister(address, 0x6040, 6, CommandPriority::URGENT));
+            std::vector<bool> outcomes;
+            outcomes.reserve(commandIds.size());
+            for (const auto id : commandIds) outcomes.push_back(id != 0 && cmdQueue.waitResult(id, 3000).status == CommandStatus::SUCCESS);
+            return outcomes;
         });
+
+    /* 真实串口和电机服务就绪后再开放 API，避免启动窗口误报为模拟执行。 */
+    marineRuntime.start();
+    pthread_create(&web_tid, NULL, start_web_server, &marineApi);
+    LOG_INFO("Web 服务器已启动");
 
     LOG_INFO("异步总线已就绪");
 

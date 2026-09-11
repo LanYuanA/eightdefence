@@ -11,6 +11,9 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <atomic>
+#include <future>
+#include <thread>
 
 namespace {
 int failures = 0;
@@ -187,6 +190,49 @@ void motor_service_locks_resources_and_latches_emergency_stop() {
     REQUIRE(motors.start("RUN-3", parameters).empty());
 }
 
+void motor_service_reads_signed_32_bit_speed_and_reports_failed_emergency_stop() {
+    marine::MotorAtomicService motors(true);
+    motors.attachIo(
+        [](uint8_t, uint16_t, const std::vector<uint16_t>&) { return true; },
+        [](uint8_t, uint16_t reg, uint16_t count, std::vector<uint16_t>& values) {
+            if (reg == 0x606C && count == 2) values = {0xFFFF, 0xFF38};
+            else if (reg == 0x6041 && count == 1) values = {0x0027};
+            else return false;
+            return true;
+        });
+    const auto telemetry = motors.telemetry("EXHAUST-FAN-01");
+    REQUIRE(telemetry.online);
+    REQUIRE(telemetry.actualRpm == -200);
+
+    marine::MotorAtomicService failing(true);
+    failing.attachIo(
+        [](uint8_t, uint16_t, const std::vector<uint16_t>&) { return false; },
+        [](uint8_t, uint16_t, uint16_t, std::vector<uint16_t>&) { return false; });
+    REQUIRE(!failing.emergencyStop());
+    REQUIRE(failing.emergencyStopped());
+    REQUIRE(!failing.telemetry("EXHAUST-FAN-01").online);
+}
+
+void emergency_stop_preempts_a_blocked_runtime_start() {
+    TempDir data; marine::MarineRepository repository(data.path()); REQUIRE(repository.load().empty());
+    auto app = makeApplication({{"M01"}}); REQUIRE(repository.saveApp(app).empty());
+    auto motors = std::make_shared<marine::MotorAtomicService>(true);
+    std::atomic<bool> writeEntered{false}; std::atomic<bool> releaseWrite{false};
+    motors->attachIo(
+        [&](uint8_t, uint16_t, const std::vector<uint16_t>&) { writeEntered = true; while (!releaseWrite.load()) std::this_thread::sleep_for(std::chrono::milliseconds(1)); return true; },
+        [](uint8_t, uint16_t, uint16_t, std::vector<uint16_t>&) { return false; },
+        [&](const std::vector<uint8_t>& addresses) { releaseWrite = true; return std::vector<bool>(addresses.size(), true); });
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }), motors);
+    auto start = std::async(std::launch::async, [&] { return runtime.createRun(app.id); });
+    for (int attempt = 0; attempt < 200 && !writeEntered.load(); ++attempt) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    REQUIRE(writeEntered.load());
+    auto stop = std::async(std::launch::async, [&] { return runtime.emergencyStopMotors(); });
+    REQUIRE(stop.wait_for(std::chrono::milliseconds(500)) == std::future_status::ready);
+    REQUIRE(stop.get());
+    REQUIRE(start.wait_for(std::chrono::milliseconds(500)) == std::future_status::ready);
+    REQUIRE(start.get().status == marine::RunStatus::Failed);
+}
+
 void runtime_waits_for_all_parallel_nodes_before_next_step() {
     TempDir data;
     marine::MarineRepository repository(data.path());
@@ -268,6 +314,7 @@ void api_runs_updates_and_emergency_stops_motor_service() {
     REQUIRE(api.handle(request("GET", "/api/v1/marine/motors")).body.find("IDS57-R") != std::string::npos);
     const auto updated = api.handle(request("PATCH", "/api/v1/marine/runs/RUN-1/nodes/NODE-1-1/motor", "{\"executorId\":\"EXHAUST-FAN-01\",\"speedRpm\":300,\"direction\":\"reverse\",\"acceleration\":10,\"deceleration\":10}")); REQUIRE(updated.statusCode == 200);
     const auto invalid = api.handle(request("PATCH", "/api/v1/marine/runs/RUN-1/nodes/NODE-1-1/motor", "{\"executorId\":\"EXHAUST-FAN-01\",\"speedRpm\":501,\"direction\":\"forward\",\"acceleration\":10,\"deceleration\":10}")); REQUIRE(invalid.statusCode == 400);
+    const auto manualStop = api.handle(request("POST", "/api/v1/marine/runs/RUN-1/nodes/NODE-1-1/stop", "{}")); REQUIRE(manualStop.statusCode == 200); REQUIRE(manualStop.body.find("cancelled") != std::string::npos);
     const auto stopped = api.handle(request("POST", "/api/v1/marine/emergency-stop", "{\"operator\":\"演示员\"}")); REQUIRE(stopped.statusCode == 200); REQUIRE(stopped.body.find("true") != std::string::npos);
     const auto reset = api.handle(request("POST", "/api/v1/marine/emergency-reset", "{\"operator\":\"演示员\"}")); REQUIRE(reset.statusCode == 200);
 }
@@ -285,6 +332,8 @@ int main() {
     executor_returns_simulated_result_without_command_callback();
     offline_sensor_is_reported_as_demo_data();
     motor_service_locks_resources_and_latches_emergency_stop();
+    motor_service_reads_signed_32_bit_speed_and_reports_failed_emergency_stop();
+    emergency_stop_preempts_a_blocked_runtime_start();
     runtime_waits_for_all_parallel_nodes_before_next_step();
     cancelling_one_run_does_not_cancel_another_run();
     api_creates_lists_and_starts_persisted_application();

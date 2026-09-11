@@ -20,6 +20,7 @@
 #include <map>
 #include <cstdint>
 #include <chrono>
+#include <vector>
 
 class AsyncBus;
 class ModbusService;
@@ -43,6 +44,7 @@ struct CommandResult {
     uint8_t       responseData[256];
     size_t        responseLen;
     double        execTimeMs;
+    std::vector<uint16_t> registers;
 
     CommandResult()
         : status(CommandStatus::PENDING), errorCode(0),
@@ -60,6 +62,7 @@ struct Command {
     int               timeoutMs;
     std::string       description;
     std::function<void(const CommandResult &)> callback;
+    std::vector<uint16_t> values;
 
     Command()
         : id(0), type(CommandType::WRITE_REG),
@@ -96,6 +99,11 @@ public:
     uint64_t writeCoil(uint8_t devAddr, uint16_t coilAddr, bool value,
                        CommandPriority priority = CommandPriority::NORMAL,
                        std::function<void(const CommandResult &)> callback = nullptr);
+    uint64_t writeRegisters(uint8_t devAddr, uint16_t regAddr, const std::vector<uint16_t>& values,
+                            CommandPriority priority = CommandPriority::NORMAL,
+                            std::function<void(const CommandResult&)> callback = nullptr);
+    uint64_t readRegisters(uint8_t devAddr, uint16_t regAddr, uint16_t count,
+                           std::function<void(const CommandResult&)> callback = nullptr);
 
     CommandResult waitResult(uint64_t id, int timeoutMs = 5000);
     bool queryResult(uint64_t id, CommandResult &result);

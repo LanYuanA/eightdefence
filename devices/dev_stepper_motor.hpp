@@ -23,7 +23,10 @@
 
 #include "device_base.hpp"
 #include <atomic>
+#include <array>
 #include <string>
+
+std::array<uint16_t, 2> motorI32Words(int32_t value);
 
 class DevStepperMotor : public DeviceBase {
 public:
@@ -37,6 +40,8 @@ public:
     // 控制接口 (供外部调用)
     bool start(ModbusService& svc, int speedRpm);
     bool stop(ModbusService& svc);
+    bool setSpeed(ModbusService& svc, int signedSpeedRpm);
+    bool readTelemetry(ModbusService& svc, int& actualSpeedRpm, uint16_t& statusWord);
 
     bool isRunning() const { return running_.load(); }
     int  getSpeed() const { return speed_.load(); }

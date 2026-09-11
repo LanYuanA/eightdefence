@@ -18,6 +18,13 @@
 #define REG_ACCEL       0x6083  // 加速度 (32-bit)
 #define REG_DECEL       0x6084  // 减速度 (32-bit)
 #define REG_TARGET_SPEED 0x60FF // 目标速度 (32-bit, rpm)
+#define REG_ACTUAL_SPEED 0x606C
+#define REG_STATUS_WORD  0x6041
+
+std::array<uint16_t, 2> motorI32Words(int32_t value) {
+    const uint32_t encoded = static_cast<uint32_t>(value);
+    return {static_cast<uint16_t>(encoded >> 16), static_cast<uint16_t>(encoded & 0xFFFF)};
+}
 
 void DevStepperMotor::init() {
     status_.reset();
@@ -68,9 +75,9 @@ bool DevStepperMotor::start(ModbusService& svc, int speedRpm) {
 
     // 7. 目标速度
     {
-        int rpm = (speedRpm > 0) ? speedRpm : 100;  // 默认100rpm
-        uint16_t vals[2] = { 0x0000, static_cast<uint16_t>(rpm) };
-        rc = svc.writeMultiReg(addr_, REG_TARGET_SPEED, 2, vals, resp, sizeof(resp), &respLen);
+        const int rpm = speedRpm == 0 ? 100 : speedRpm;
+        const auto vals = motorI32Words(rpm);
+        rc = svc.writeMultiReg(addr_, REG_TARGET_SPEED, 2, vals.data(), resp, sizeof(resp), &respLen);
     }
     if (rc != 0) { printf("  => [❌ %s] 设置速度失败 rc=%d\n", name_.c_str(), rc); return false; }
 
@@ -81,6 +88,24 @@ bool DevStepperMotor::start(ModbusService& svc, int speedRpm) {
     Logger::instance().log(LogLevel::INFO, __FILE__, __LINE__,
         "[%s] 电机启动, 地址=0x%02X, 转速=%drpm", name_.c_str(), addr_, speedRpm);
     return true;
+}
+
+bool DevStepperMotor::setSpeed(ModbusService& svc, int signedSpeedRpm) {
+    if (signedSpeedRpm < -500 || signedSpeedRpm > 500) return false;
+    uint8_t resp[512]; size_t respLen = 0;
+    const auto values = motorI32Words(signedSpeedRpm);
+    if (svc.writeMultiReg(addr_, REG_TARGET_SPEED, 2, values.data(), resp, sizeof(resp), &respLen) != 0) return false;
+    speed_.store(signedSpeedRpm); running_.store(signedSpeedRpm != 0); status_.onSuccess(); return true;
+}
+
+bool DevStepperMotor::readTelemetry(ModbusService& svc, int& actualSpeedRpm, uint16_t& statusWord) {
+    uint8_t resp[32]; size_t len = 0;
+    if (svc.readReg(addr_, REG_ACTUAL_SPEED, 2, resp, sizeof(resp), &len) != 0 || len < 9 || resp[0] != addr_ || resp[1] != 0x03 || resp[2] != 4) return false;
+    const uint32_t encoded = (static_cast<uint32_t>(resp[3]) << 24) | (static_cast<uint32_t>(resp[4]) << 16) | (static_cast<uint32_t>(resp[5]) << 8) | resp[6];
+    actualSpeedRpm = static_cast<int32_t>(encoded);
+    if (svc.readReg(addr_, REG_STATUS_WORD, 1, resp, sizeof(resp), &len) != 0 || len < 7 || resp[0] != addr_ || resp[1] != 0x03 || resp[2] != 2) return false;
+    statusWord = static_cast<uint16_t>((resp[3] << 8) | resp[4]);
+    speed_.store(actualSpeedRpm); running_.store((statusWord & (1u << 9)) != 0); status_.onSuccess(); return true;
 }
 
 // ---------- 停止电机 ----------

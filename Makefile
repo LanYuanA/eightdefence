@@ -4,7 +4,7 @@ CFLAGS = -Wall -I. -I./devices -I./core -I./application -I./service
 CXXFLAGS = -Wall -std=c++17 -I. -I./devices -I./core -I./application -I./service
 LDFLAGS = -lpthread
 
-MARINE_TEST_SRCS = application/marine/json_value.cpp application/marine/marine_types.cpp application/marine/marine_repository.cpp application/marine/marine_safety.cpp application/marine/marine_executor.cpp application/marine/marine_runtime.cpp application/marine/marine_api.cpp tests/marine_backend_test.cpp
+MARINE_TEST_SRCS = application/marine/json_value.cpp application/marine/marine_types.cpp application/marine/marine_repository.cpp application/marine/marine_safety.cpp application/marine/marine_executor.cpp application/marine/marine_runtime.cpp application/marine/marine_api.cpp service/atomic/svc_motor_speed.cpp tests/marine_backend_test.cpp
 
 TARGET = app_gateway
 
@@ -20,6 +20,7 @@ CXX_SRCS = service/modbus_service.cpp service/parse_service.cpp \
            service/atomic/svc_command_center.cpp \
            service/atomic/svc_air_quality_alert.cpp service/atomic/svc_ventilation.cpp \
            service/atomic/svc_fire_cabin.cpp service/atomic/svc_fire_sprinkler.cpp service/atomic/svc_fire_fan.cpp \
+           service/atomic/svc_motor_speed.cpp \
            devices/dev_smoke.cpp devices/dev_water.cpp \
            devices/dev_infrared.cpp devices/dev_light.cpp \
            devices/dev_cloud_sensors.cpp devices/dev_humidifier.cpp \
@@ -45,9 +46,15 @@ OBJS = $(C_OBJS) $(CXX_OBJS)
 # 强制每次都检查编译（Vite使用哈希文件名，Make无法追踪依赖变化）
 .PHONY: frontend
 .PHONY: test-backend
+.PHONY: test-motor
 test-backend:
 	$(CXX) $(CXXFLAGS) $(MARINE_TEST_SRCS) -o marine_backend_test $(LDFLAGS)
 	./marine_backend_test
+
+test-motor:
+	$(CC) $(CFLAGS) -c core/modbus_core.c -o core/modbus_core.o
+	$(CXX) $(CXXFLAGS) core/modbus_core.o service/modbus_service.cpp core/serial_bus.cpp core/logger.cpp devices/dev_stepper_motor.cpp tests/motor_protocol_test.cpp -o motor_protocol_test $(LDFLAGS)
+	./motor_protocol_test
 
 frontend:
 	cd ui && npm run build

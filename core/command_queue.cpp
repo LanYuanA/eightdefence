@@ -66,6 +66,18 @@ uint64_t CommandQueue::writeCoil(uint8_t devAddr, uint16_t coilAddr, bool value,
     return submit(cmd);
 }
 
+uint64_t CommandQueue::writeRegisters(uint8_t devAddr, uint16_t regAddr, const std::vector<uint16_t>& values,
+                                      CommandPriority priority, std::function<void(const CommandResult&)> callback) {
+    if (values.empty() || values.size() > 24) return 0;
+    Command cmd; cmd.id = nextId(); cmd.type = CommandType::WRITE_REG; cmd.priority = priority; cmd.devAddr = devAddr; cmd.regAddr = regAddr; cmd.count = static_cast<uint16_t>(values.size()); cmd.values = values; cmd.callback = callback; return submit(cmd);
+}
+
+uint64_t CommandQueue::readRegisters(uint8_t devAddr, uint16_t regAddr, uint16_t count,
+                                     std::function<void(const CommandResult&)> callback) {
+    if (count == 0 || count > 24) return 0;
+    Command cmd; cmd.id = nextId(); cmd.type = CommandType::READ_REG; cmd.devAddr = devAddr; cmd.regAddr = regAddr; cmd.count = count; cmd.callback = callback; return submit(cmd);
+}
+
 uint64_t CommandQueue::submit(const Command &cmd) {
     if (!running_.load()) return 0;
 
@@ -81,12 +93,16 @@ uint64_t CommandQueue::submit(const Command &cmd) {
 
     switch (c.type) {
         case CommandType::WRITE_REG:
-            ModbusService::buildWriteRegFrame(c.devAddr, c.regAddr, c.value,
-                                               req.data, sizeof(req.data), &req.len);
+            if (c.values.empty()) ModbusService::buildWriteRegFrame(c.devAddr, c.regAddr, c.value, req.data, sizeof(req.data), &req.len);
+            else ModbusService::buildWriteMultiRegFrame(c.devAddr, c.regAddr, c.count, c.values.data(), req.data, sizeof(req.data), &req.len);
             break;
         case CommandType::WRITE_COIL:
             ModbusService::buildWriteCoilFrame(c.devAddr, c.regAddr, c.value != 0,
                                                 req.data, sizeof(req.data), &req.len);
+            break;
+        case CommandType::READ_REG:
+            req.isWrite = false;
+            ModbusService::buildReadRegFrame(c.devAddr, c.regAddr, c.count, req.data, sizeof(req.data), &req.len);
             break;
         default:
             return 0;
@@ -99,16 +115,23 @@ uint64_t CommandQueue::submit(const Command &cmd) {
     auto startTime = std::make_shared<std::chrono::steady_clock::time_point>(
         std::chrono::steady_clock::now());
 
-    req.callback = [self, cmdId, cmdCb, startTime](const uint8_t *resp, size_t resp_len, int rc) {
+    const auto expectedAddr = c.devAddr; const auto expectedType = c.type; const auto expectedCount = c.count; const auto expectedReg = c.regAddr; const bool multi = !c.values.empty();
+    req.callback = [self, cmdId, cmdCb, startTime, expectedAddr, expectedType, expectedCount, expectedReg, multi](const uint8_t *resp, size_t resp_len, int rc) {
         auto endTime = std::chrono::steady_clock::now();
         double ms = std::chrono::duration<double, std::milli>(endTime - *startTime).count();
 
         CommandResult result;
         result.execTimeMs = ms;
+        const uint8_t expectedFunction = expectedType == CommandType::READ_REG ? 0x03 : (multi ? 0x10 : (expectedType == CommandType::WRITE_COIL ? 0x05 : 0x06));
+        if (rc == 0 && (resp_len < 5 || resp[0] != expectedAddr || resp[1] != expectedFunction)) rc = -61;
+        if (rc == 0 && crc16_modbus(resp, resp_len - 2) != static_cast<uint16_t>(resp[resp_len - 2] | (resp[resp_len - 1] << 8))) rc = -63;
+        if (rc == 0 && expectedType == CommandType::READ_REG && (resp_len < static_cast<size_t>(5 + expectedCount * 2) || resp[2] != expectedCount * 2)) rc = -62;
+        if (rc == 0 && expectedType != CommandType::READ_REG && (resp[2] != static_cast<uint8_t>(expectedReg >> 8) || resp[3] != static_cast<uint8_t>(expectedReg))) rc = -64;
         if (rc == 0) {
             result.status = CommandStatus::SUCCESS;
             result.errorCode = 0;
             self->stats_.totalSuccess++;
+            if (expectedType == CommandType::READ_REG) for (uint16_t i = 0; i < expectedCount; ++i) result.registers.push_back(static_cast<uint16_t>((resp[3 + i * 2] << 8) | resp[4 + i * 2]));
         } else {
             result.status = CommandStatus::FAILED;
             result.errorCode = rc;

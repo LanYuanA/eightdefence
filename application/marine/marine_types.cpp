@@ -59,7 +59,7 @@ std::vector<std::string> validateApplication(const Application& app) {
             if (!nodeIds.insert(node.id).second) errors.push_back("存在重复的服务实例。");
             if (kAreas.find(node.area) == kAreas.end() || node.intensity < 10 || node.intensity > 100 || node.duration < 2 || node.duration > 30 || (isAwarenessService(node.serviceId) && (node.threshold < 0 || (node.thresholdOperator != "gte" && node.thresholdOperator != "lte")))) errors.push_back(node.serviceId + " 的参数不完整或超出范围。");
             if (node.serviceId == "M01" && (kMotorExecutors.find(node.motor.executorId) == kMotorExecutors.end() || node.motor.speedRpm < 1 || node.motor.speedRpm > 500 || node.motor.acceleration < 1 || node.motor.acceleration > 100 || node.motor.deceleration < 1 || node.motor.deceleration > 100)) errors.push_back("电机参数不完整或超出范围。");
-            const std::string resource = serviceResource(node.serviceId);
+            const std::string resource = node.serviceId == "M01" ? node.motor.executorId : serviceResource(node.serviceId);
             if (!resource.empty() && !resources.insert(resource).second) errors.push_back("步骤 " + std::to_string(stepIndex + 1) + " 的服务共用" + resource + "，请拆成顺序步骤。");
         }
     }

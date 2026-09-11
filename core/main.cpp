@@ -61,6 +61,7 @@ extern "C" {
 #include "service/atomic/svc_fire_cabin.hpp"
 #include "service/atomic/svc_fire_sprinkler.hpp"
 #include "service/atomic/svc_fire_fan.hpp"
+#include "service/atomic/svc_motor_speed.hpp"
 #include "devices/dev_stepper_motor.hpp"
 #include "service/atomic/svc_fire_suppression.hpp"
 #include "service/atomic/svc_evacuation.hpp"
@@ -87,9 +88,9 @@ DevHumidifier       dev_humidifier;
 DevAirConditioner   dev_ac;
 DevAirPurifier      dev_purifier;
 DevAlarmDevice      dev_alarm;
-DevStepperMotor     dev_stepper_cabin("舱门电机", DEV_STEPPER_CABIN_ADDR);
-DevStepperMotor     dev_stepper_sprinkler("水淋电机", DEV_STEPPER_SPRINKLER_ADDR);
-DevStepperMotor     dev_stepper_exhaust("排烟风机", DEV_STEPPER_EXHAUST_ADDR);
+DevStepperMotor     dev_stepper_cabin("舱底排水泵", DEV_STEPPER_CABIN_ADDR);
+DevStepperMotor     dev_stepper_sprinkler("消防水泵", DEV_STEPPER_SPRINKLER_ADDR);
+DevStepperMotor     dev_stepper_exhaust("机舱排烟风机", DEV_STEPPER_EXHAUST_ADDR);
 
 ModbusService*      g_modbus = nullptr;
 SerialBus*          g_serial_bus = nullptr;
@@ -275,9 +276,10 @@ int main(int argc, char *argv[]) {
         return snapshot;
     });
     marine::MarineSafety marineSafety("./data/marine/events.jsonl");
-    marine::MarineRuntime marineRuntime(marineRepository, std::move(marineExecutor));
+    auto motorService = std::make_shared<marine::MotorAtomicService>(true);
+    marine::MarineRuntime marineRuntime(marineRepository, std::move(marineExecutor), motorService);
     marineRuntime.start();
-    marine::MarineApi marineApi(marineRepository, marineRuntime, marineSafety);
+    marine::MarineApi marineApi(marineRepository, marineRuntime, marineSafety, motorService);
 
     /* 启动 Web 服务器 */
     pthread_t web_tid;
@@ -318,6 +320,22 @@ int main(int argc, char *argv[]) {
     CommandQueue cmdQueue(&asyncBus, &modbusService);
     g_cmd_queue = &cmdQueue;
     cmdQueue.start();
+
+    motorService->attachIo(
+        [&cmdQueue](uint8_t address, uint16_t reg, const std::vector<uint16_t>& values) {
+            const uint64_t id = values.size() == 1
+                ? cmdQueue.writeRegister(address, reg, values.front(), CommandPriority::HIGH)
+                : cmdQueue.writeRegisters(address, reg, values, CommandPriority::HIGH);
+            return id != 0 && cmdQueue.waitResult(id, 3000).status == CommandStatus::SUCCESS;
+        },
+        [&cmdQueue](uint8_t address, uint16_t reg, uint16_t count, std::vector<uint16_t>& values) {
+            const uint64_t id = cmdQueue.readRegisters(address, reg, count);
+            if (id == 0) return false;
+            const auto result = cmdQueue.waitResult(id, 3000);
+            if (result.status != CommandStatus::SUCCESS) return false;
+            values = result.registers;
+            return values.size() == count;
+        });
 
     LOG_INFO("异步总线已就绪");
 

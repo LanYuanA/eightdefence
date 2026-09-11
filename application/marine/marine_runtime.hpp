@@ -9,8 +9,10 @@
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <memory>
 
 namespace marine {
+class MotorAtomicService;
 
 struct NodeRun { TaskNode node; NodeStatus status = NodeStatus::Waiting; uint64_t elapsedMs = 0; double progress = 0; ServiceResult result; };
 struct RunEvent { uint64_t atMs = 0; std::string message; std::string kind; };
@@ -18,7 +20,7 @@ struct MarineRun { std::string id; std::string appId; Application app; RunStatus
 
 class MarineRuntime {
 public:
-    MarineRuntime(MarineRepository& repository, MarineExecutor executor);
+    MarineRuntime(MarineRepository& repository, MarineExecutor executor, std::shared_ptr<MotorAtomicService> motors = nullptr);
     ~MarineRuntime();
     void start();
     void stop();
@@ -26,6 +28,8 @@ public:
     std::string pauseRun(const std::string& runId);
     std::string resumeRun(const std::string& runId);
     std::string cancelRun(const std::string& runId);
+    std::string updateMotor(const std::string& runId, const std::string& nodeId, const MotorParameters& parameters);
+    std::string stopMotor(const std::string& runId, const std::string& nodeId);
     std::vector<MarineRun> listRuns() const;
     std::optional<MarineRun> getRun(const std::string& runId) const;
     void advanceForTest(uint64_t milliseconds);
@@ -33,6 +37,7 @@ public:
 private:
     MarineRepository& repository_;
     MarineExecutor executor_;
+    std::shared_ptr<MotorAtomicService> motors_;
     mutable std::mutex mutex_;
     std::map<std::string, MarineRun> runs_;
     std::atomic<bool> running_{false};
@@ -43,6 +48,7 @@ private:
     void startStep(MarineRun& run);
     void addEvent(MarineRun& run, const std::string& message, const std::string& kind = "info");
     void persistLocked();
+    void stopMotors(MarineRun& run);
 };
 
 } // namespace marine

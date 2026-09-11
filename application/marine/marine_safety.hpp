@@ -8,7 +8,7 @@
 
 namespace marine {
 
-struct SafetyStatus { bool actuatorControlEnabled = false; bool unlocked = false; uint64_t unlockExpiresAt = 0; uint64_t remainingSeconds = 0; };
+struct SafetyStatus { bool actuatorControlEnabled = true; bool unlocked = true; bool emergencyStopped = false; uint64_t unlockExpiresAt = 0; uint64_t remainingSeconds = 0; };
 
 class MarineSafety {
 public:
@@ -17,10 +17,13 @@ public:
     SafetyStatus unlock(const std::string& operatorName, uint64_t nowMs);
     SafetyStatus lock(const std::string& operatorName, uint64_t nowMs);
     bool mayControl(const Binding& binding, uint64_t nowMs);
+    void emergencyStop(const std::string& operatorName, uint64_t nowMs);
+    void resetEmergency(const std::string& operatorName, uint64_t nowMs);
 
 private:
     std::string eventPath_;
     uint64_t unlockExpiresAt_ = 0;
+    bool emergencyStopped_ = false;
     void audit(const std::string& type, const std::string& message, uint64_t nowMs) const;
 };
 

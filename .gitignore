@@ -1,6 +1,7 @@
 .vscode/
 doc/
 .claude/
+.worktrees/
 logs/*
 *.o
 

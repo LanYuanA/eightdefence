@@ -1,0 +1,27 @@
+.cooling-screen{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;background:radial-gradient(ellipse at 56% 40%,#102535 0,#081522 55%,#060f19 100%);color:#dcebf4;font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif;overflow:hidden}
+.cooling-screen *{box-sizing:border-box}
+.cooling-header{height:76px;flex-shrink:0;padding:0 3%;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1d3040}
+.cooling-heading{display:flex;align-items:center;gap:16px}.cooling-mark{color:#70dece;font-size:29px}.cooling-heading h1{font-size:23px;font-weight:500;letter-spacing:2px;margin:0}.cooling-submark{font-size:13px;color:#8297a9;border-left:1px solid #344553;padding-left:16px}.cooling-mode{font-size:13px;color:#94a8b8}
+.cooling-canvas{flex:1;min-height:0;display:flex;justify-content:center;align-items:center;padding:0 2%}
+.cooling-topology{width:100%;height:100%;max-width:1800px}
+.tier-label{fill:#9ab0c1;font-size:20px}.tier-label .tier-number{fill:#415c70;font-size:14px;letter-spacing:3px}.tier-label path{stroke:#263c4e}
+.topology-node>circle:first-child{stroke:#375b71;stroke-width:1.5}.node-icon{stroke:#a4dce5;stroke-width:1.7;fill:none;stroke-linejoin:round}.node-title{font-size:25px;fill:#dcecf4;letter-spacing:1px}.node-detail{font-size:16px;fill:#7897ab}
+.wire{fill:none;stroke:currentColor;stroke-width:1.5;opacity:.4}
+.upper-wires{color:#73bccc}.wire-stream{fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-dasharray:3 65;animation:cool-travel 3.4s linear infinite}
+.arrow{fill:none;stroke:#73bccc;stroke-width:1.2}.port{fill:currentColor;stroke:#081522;stroke-width:2}.topology-node{color:#79bdca}.link-caption{fill:#658798;font-size:14px}
+.pool-outline{stroke:#294252;stroke-width:1;stroke-dasharray:6 7}.pool-caption{fill:#69899c;font-size:16px}
+.resource-hub rect{fill:#122e3e;stroke:#426270}.resource-hub text{fill:#b4d4df;font-size:17px}
+.pump-branch{color:#3e596a}.pump-branch.live{color:#64d9b6}.pump-branch.pending{color:#efbd70}.pump-branch.broken{color:#e28080}.pump-branch.broken .wire{stroke-dasharray:5 8;opacity:.65}
+.pump-node{color:#688799;outline:none}.pump-node.live{color:#64d9b6}.pump-node.pending{color:#efbd70}.pump-node.broken{color:#e28080}
+.pump-hit{fill:transparent;stroke:transparent;transition:fill .2s,stroke .2s}.pump-node.selectable{cursor:pointer}.pump-node.selectable:hover .pump-hit,.pump-node:focus-visible .pump-hit{fill:#132e3d;stroke:#486779}.pump-node.pending .pump-hit{fill:#c8963e08;stroke:#d9a65f50}
+.pump-ring{fill:#0b1c29;stroke:currentColor;stroke-width:1.3}.pump-rotor{fill:none;stroke:currentColor;stroke-width:1.5}.pump-rotor.spinning{animation:cool-rotate 4s linear infinite}.pump-rotor.reverse{animation-direction:reverse}
+.pump-name{fill:#dceaf3;font-size:24px;font-weight:500}.pump-status{fill:currentColor;font-size:16px}.pump-role{fill:#7b95a7;font-size:14px}.pump-rpm{fill:#e0eff6;font-size:37px;font-variant-numeric:tabular-nums}.rpm-unit{fill:#718d9f;font-size:13px}.pump-direction{fill:#90a6b5;font-size:14px}
+.rs485-label{fill:#67cfae;font-size:16px}.protocol-options{fill:#617282;font-size:10px}.protocol-note{fill:#647e91;font-size:12px}
+.cooling-toolbar{min-height:64px;flex-shrink:0;margin:0 3%;border-top:1px solid #213646;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.cooling-operation{display:flex;align-items:center;gap:12px}.operation-state{color:#91adbd;font-size:14px;margin-right:16px;min-width:142px}
+.cooling-toolbar button{font:inherit;font-size:13px;padding:8px 18px;border:1px solid #586071;border-radius:6px;background:#162332;color:#d4dfe8;cursor:pointer}.cooling-toolbar .confirm-pump{border-color:#438775;color:#89dfc3;background:#183a32}.cooling-toolbar button:disabled{opacity:.35;cursor:default}
+.cooling-toolbar nav{display:flex;gap:22px}.cooling-toolbar a{color:#7994a8;text-decoration:none;font-size:12px}.cooling-toolbar a:hover{color:#bddeeb}
+@keyframes cool-travel{to{stroke-dashoffset:-136}}
+@keyframes cool-rotate{to{transform:rotate(360deg)}}
+@media(max-height:740px){.cooling-header{height:55px}.cooling-toolbar{min-height:52px}.cooling-heading h1{font-size:19px}}
+@media(prefers-reduced-motion:reduce){.cooling-screen *{animation:none!important}}

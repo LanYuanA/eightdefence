@@ -1,0 +1,15 @@
+/* 连接与粒子视觉层：独立于业务布局，便于演示屏调校 */
+.layer-map{position:relative;overflow:hidden}
+.flow-link{height:38px;position:relative;display:flex;align-items:center;justify-content:center;color:#6f94a4;font-size:11px;letter-spacing:.4px}
+.flow-link:before{content:"";height:100%;width:2px;background:linear-gradient(180deg,rgba(84,214,231,.12),rgba(99,228,176,.75),rgba(84,214,231,.12));box-shadow:0 0 12px rgba(99,228,176,.28)}
+.flow-link:after{content:"";position:absolute;bottom:2px;border:4px solid transparent;border-top-color:#63e4b0;filter:drop-shadow(0 0 4px #63e4b0)}
+.flow-link i{position:absolute;z-index:2;top:0;width:7px;height:7px;border-radius:50%;background:#d9fff3;box-shadow:0 0 0 3px rgba(99,228,176,.14),0 0 14px 4px rgba(99,228,176,.8);animation:flow-particle 2.2s cubic-bezier(.45,0,.55,1) infinite}
+.flow-link span{position:absolute;left:calc(50% + 16px);padding:3px 7px;border:1px solid rgba(80,131,149,.22);border-radius:4px;background:rgba(5,16,24,.82);white-space:nowrap}
+.layer-row{position:relative;z-index:1;box-shadow:0 0 0 1px rgba(84,214,231,.05),0 10px 28px rgba(0,0,0,.12)}
+.layer-row:after{content:"";position:absolute;left:50%;bottom:-6px;width:10px;height:10px;border-radius:50%;background:#63e4b0;box-shadow:0 0 0 4px rgba(99,228,176,.1),0 0 15px rgba(99,228,176,.8);transform:translateX(-50%);z-index:3}
+.hardware-layer-title{position:relative}.hardware-layer-title:before{content:"";position:absolute;left:50%;top:-8px;width:10px;height:10px;border-radius:50%;background:#63e4b0;box-shadow:0 0 0 4px rgba(99,228,176,.1),0 0 16px rgba(99,228,176,.85);transform:translateX(-50%)}
+.phase-protected .flow-link:before{background:linear-gradient(180deg,rgba(255,111,113,.12),rgba(255,111,113,.65),rgba(255,111,113,.12))}.phase-protected .flow-link i{background:#ffd2a0;box-shadow:0 0 0 3px rgba(244,189,98,.12),0 0 14px 4px rgba(244,189,98,.75)}.phase-protected .flow-link:after{border-top-color:#f4bd62;filter:drop-shadow(0 0 4px #f4bd62)}
+.phase-switching .flow-link i{animation-duration:1.1s}.phase-switching .flow-link:before{background:linear-gradient(180deg,rgba(244,189,98,.12),rgba(244,189,98,.8),rgba(244,189,98,.12))}
+.motor-pool{position:relative}.motor-pool:before{content:"";position:absolute;left:7%;right:7%;top:-8px;height:2px;background:linear-gradient(90deg,transparent,#63e4b0 18%,#63e4b0 82%,transparent);box-shadow:0 0 12px rgba(99,228,176,.45)}
+@keyframes flow-particle{0%{transform:translate(-50%,-3px);opacity:0}12%{opacity:1}85%{opacity:1}100%{transform:translate(-50%,34px);opacity:0}}
+@media(prefers-reduced-motion:reduce){.flow-link i{animation:none;top:50%;opacity:.8}}

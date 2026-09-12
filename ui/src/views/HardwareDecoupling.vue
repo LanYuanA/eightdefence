@@ -4,6 +4,7 @@ import { advanceActuatorDemo, confirmActuatorSwitch, connectActuator, createActu
 import type { ActuatorDevice, ActuatorPhase } from '../marine/actuators'
 import { marineApi } from '../marine/api'
 import '../styles/hardware-decoupling.css'
+import '../styles/hardware-decoupling-flow.css'
 const demo = ref(createActuatorDemo()); const fullscreen = ref(false); const gatewayConnected = ref(false); let timer: ReturnType<typeof setInterval> | undefined
 const candidate = computed(() => demo.value.devices.find(device => device.id === demo.value.candidateId));
 const statusLabels = { offline: '离线', standby: '在线待机', running: '在线运行', faulted: '设备异常' }; const phaseLabels: Record<ActuatorPhase, string> = { running: '任务运行中', protected: '保护暂停', 'awaiting-confirmation': '等待确认切换', switching: '正在切换', recovered: '任务已恢复' }; const canProtect = computed(() => ['running', 'recovered'].includes(demo.value.phase))

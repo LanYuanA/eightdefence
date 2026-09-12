@@ -10,6 +10,8 @@ motor_protocol_test
 data/
 release/
 test_results/
+public/assets/index-*.js
+public/assets/index-*.css
 
 # AI 模型文件
 *.rkllm

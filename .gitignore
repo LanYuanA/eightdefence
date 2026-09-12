@@ -4,6 +4,12 @@ doc/
 .worktrees/
 logs/*
 *.o
+*.d
+marine_backend_test
+motor_protocol_test
+data/
+release/
+test_results/
 
 # AI 模型文件
 *.rkllm

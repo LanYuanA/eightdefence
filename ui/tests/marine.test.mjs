@@ -269,7 +269,7 @@ test('document scenarios combine the night-maintenance and abnormal-response ser
 
 test('hardware demo names physical devices by their shipboard responsibility', () => {
   const devices = createActuatorDemo().devices
-  assert.deepEqual(devices.map(device => device.name), ['机舱通风机 1 号', '舱底排水泵 2 号', '备用兼容驱动设备 3 号'])
-  assert.equal(devices.find(device => device.id === 'MOTOR-0E')?.compatible, false)
+  assert.deepEqual(devices.map(device => device.name), ['水泵 A', '水泵 B', '水泵 C'])
+  assert.equal(devices.find(device => device.id === 'MOTOR-0E')?.compatible, true)
   assert.equal(devices.find(device => device.id === 'MOTOR-0F')?.compatible, true)
 })

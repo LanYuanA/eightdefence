@@ -10,13 +10,13 @@ import type { SensorSnapshot } from '../marine/sensors'
 import { realtimeApi } from '../api/realtime'
 import { marineApi } from '../marine/api'
 import ShipDiagram from '../components/marine/ShipDiagram.vue'
-import ApplicationFlow from '../components/marine/ApplicationFlow.vue'
-import ApplicationCommandCenter from '../components/marine/ApplicationCommandCenter.vue'
+import IndependentApplication from '../components/marine/IndependentApplication.vue'
 import '../styles/marine.css'
 
 const route = useRoute()
 const tab = ref<'compose' | 'run' | 'catalog'>(route.path === '/atomic-services' ? 'catalog' : 'compose')
 watch(() => route.path, path => { tab.value = path === '/atomic-services' ? 'catalog' : 'compose' })
+const detailOpen = ref(false)
 const app = ref<MarineApp>(createPreset('D'))
 const original = ref(JSON.stringify(app.value))
 const selectedId = ref(app.value.steps[0]!.nodes[0]!.id)
@@ -50,11 +50,13 @@ const idleRun = emptyRun()
 const activeSession = computed(() => runtimeSessions.value.find(session => session.id === activeRuntimeId.value))
 const editingSession = computed(() => runtimeSessions.value.find(session => session.id === app.value.id))
 const run = computed(() => runtimeSessions.value.find(session => session.id === activeRuntimeId.value)?.state ?? idleRun)
+const runNodes = computed(() => Object.values(run.value.nodes))
 let timer: ReturnType<typeof setInterval> | undefined
 let sensorTimer: ReturnType<typeof setInterval> | undefined
 let gatewayTimer: ReturnType<typeof setInterval> | undefined
 const fullscreen = ref(false)
 const gatewayConnected = ref(false)
+const gatewayLost = ref(false)
 const motorMode = ref<'real' | 'simulation'>('simulation')
 const emergencyStopped = ref(false)
 const motors = ref<any[]>([])
@@ -75,18 +77,13 @@ const nodes = computed(() => app.value.steps.flatMap(step => step.nodes))
 const selected = computed(() => nodes.value.find(node => node.id === selectedId.value))
 const errors = computed(() => validateApp(app.value))
 const duration = computed(() => plannedDuration(app.value))
-const runNodes = computed(() => Object.values(run.value.nodes))
 const awarenessServices = computed(() => services.filter(service => service.available && service.kind === 'awareness'))
 const actionServices = computed(() => services.filter(service => service.available && service.kind === 'action'))
 const onlineSensorCount = computed(() => Object.values(sensorSnapshot.value.values).filter(sensor => sensor.online).length)
-const completedCount = computed(() => runNodes.value.filter(node => node.status === 'completed').length)
-const progress = computed(() => runNodes.value.length ? Math.round(runNodes.value.reduce((sum, node) => sum + node.progress, 0) / runNodes.value.length * 100) : 0)
 const filteredServices = computed(() => services.filter(service => (service.name + service.description + service.id).includes(search.value) && (catalogFilter.value === '全部服务' || (catalogFilter.value === '可运行' ? service.available : !service.available))))
 const reused = computed(() => [...new Set(nodes.value.map(node => node.serviceId))].filter(id => ['01', '04', '05'].includes(id)))
-const runReused = computed(() => [...new Set(runNodes.value.map(item => item.node.serviceId))].filter(id => ['01', '04', '05'].includes(id)))
 const generationReuseNames = computed(() => generationPreview.value?.reusedServiceIds.map(id => `${id} ${serviceById(id).name}`).join('　＋　') || '')
 const statusLabels = { idle: '等待运行', running: '正在执行', paused: '已暂停', completed: '任务完成', cancelled: '已停止', failed: '执行异常' }
-const nodeLabels = { waiting: '等待执行', running: '运行中', completed: '已完成', cancelled: '已取消', failed: '异常' }
 const storageKey = 'marine-demo.apps.v1'
 function notify(message: string, error = false) {
   notice.value = message; noticeError.value = error
@@ -194,6 +191,7 @@ function runtimeStatus(id: string): RunState['status'] { return runtimeSessions.
 function selectApplicationPage(target: MarineApp) {
   const session = ensureRuntime(target)
   activeRuntimeId.value = session.id
+  detailOpen.value = true
   tab.value = 'run'
 }
 function gatewayRunToState(remote: any, target: MarineApp): RunState {
@@ -208,7 +206,7 @@ async function syncGatewayRuns() {
   if (!gatewayConnected.value) return
   try {
     const runs = await marineApi.listRuns()
-    for (const remote of runs) {
+    for (const remote of runs.sort((a:any,b:any)=>String(a.id).localeCompare(String(b.id),undefined,{numeric:true}))) {
       const target = savedApps.value.find(item => item.id === remote.appId) || (app.value.id === remote.appId ? app.value : undefined)
       if (!target) continue
       const session = ensureRuntime(target)
@@ -217,7 +215,8 @@ async function syncGatewayRuns() {
     }
     runtimeSessions.value = [...runtimeSessions.value]
     motors.value = await marineApi.listMotors()
-  } catch { gatewayConnected.value = false; notify('网关连接中断，后续操作将使用本地演示。', true) }
+    gatewayLost.value = false
+  } catch { gatewayLost.value = true; notify('网关连接中断，等待恢复；当前应用不会切换成本地模拟。', true) }
 }
 const executorNames: Record<string,string> = { 'EXHAUST-FAN-01': '机舱排烟风机', 'FIRE-PUMP-01': '消防水泵', 'DRAIN-PUMP-01': '舱底排水泵' }
 async function applyMotor(node: TaskNode) { const runId = activeSession.value ? gatewayRunIds.get(activeSession.value.app.id) : ''; if (!runId || !node.motor) return; try { const remote = await marineApi.updateMotor(runId, node.id, node.motor); activeSession.value!.state = gatewayRunToState(remote, activeSession.value!.app); motors.value = await marineApi.listMotors(); runtimeSessions.value = [...runtimeSessions.value]; notify('电机参数已下发。') } catch (error) { notify(error instanceof Error ? error.message : '电机参数下发失败', true) } }
@@ -232,6 +231,7 @@ async function triggerEmergency() {
 }
 async function resetEmergency() { await marineApi.emergencyReset('演示员'); emergencyStopped.value = false; notify('执行器急停已复位。') }
 async function startApplication(target: MarineApp) {
+  if(gatewayLost.value) return
   try {
     const session = ensureRuntime(target)
     if (gatewayConnected.value) {
@@ -244,6 +244,7 @@ async function startApplication(target: MarineApp) {
     session.lastTick = performance.now()
     if (!gatewayConnected.value) syncRun(session)
     activeRuntimeId.value = session.id
+    detailOpen.value = true
     tab.value = 'run'
     journeyStage.value = 4
   } catch (error) { notify(error instanceof Error ? error.message : '任务无法启动', true) }
@@ -296,6 +297,7 @@ function startRun() {
   void startApplication(app.value)
 }
 async function pauseResume() {
+  if(gatewayLost.value) return
   const session = activeSession.value
   if (!session) return
   if (gatewayConnected.value) {
@@ -306,11 +308,6 @@ async function pauseResume() {
   } else { if (session.state.status === 'paused') { session.runner.resume(); session.lastTick = performance.now() } else session.runner.pause(); syncRun(session) }
 }
 async function stopRun() { const session = activeSession.value; if (!session) return; if (gatewayConnected.value) { const runId = gatewayRunIds.get(session.app.id); if (!runId) return; const remote = await marineApi.cancelRun(runId); session.state = gatewayRunToState(remote, session.app); runtimeSessions.value = [...runtimeSessions.value] } else { session.runner.cancel(); syncRun(session) } }
-function injectFailure() {
-  const session = activeSession.value
-  const active = runNodes.value.find(node => node.status === 'running')
-  if (session && active) { session.runner.fail(active.node.id, '演示故障'); syncRun(session) }
-}
 async function toggleFullscreen() {
   try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen() }
   catch { notify('当前环境不支持全屏，请使用浏览器全屏功能。', true) }
@@ -363,9 +360,9 @@ onUnmounted(() => { clearInterval(timer); clearInterval(sensorTimer); clearInter
 
 <template>
   <div class="marine">
-    <header class="marine-header">
+    <header v-if="!detailOpen || tab !== 'run'" class="marine-header">
       <div class="marine-brand"><span class="brand-mark"><svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 19L16 15L27 19L23 26H9ZM10 17V9H22V17M16 9V4M4 28Q8 25 12 28T20 28T28 28"/></svg></span><div><strong>船舶软件定义平台</strong><small>SOFTWARE DEFINED VESSEL</small></div></div>
-      <nav aria-label="演示导航"><button :class="{active:tab === 'compose'}" @click="tab = 'compose'">任务编排</button><button :class="{active:tab === 'run'}" @click="tab = 'run'">应用运行<span v-if="activeRuntimeCount" class="live-dot"/> <small v-if="activeRuntimeCount">{{ activeRuntimeCount }}</small></button><button :class="{active:tab === 'catalog'}" @click="tab = 'catalog'">服务目录</button><RouterLink class="scene-link" to="/hardware-decoupling">硬件解耦 <span>↗</span></RouterLink></nav>
+      <nav aria-label="演示导航"><button :class="{active:tab === 'compose'}" @click="tab = 'compose'">任务编排</button><button :class="{active:tab === 'run'}" @click="detailOpen=false;tab = 'run'">应用中心<span v-if="activeRuntimeCount" class="live-dot"/> <small v-if="activeRuntimeCount">{{ activeRuntimeCount }}</small></button><button :class="{active:tab === 'catalog'}" @click="tab = 'catalog'">服务目录</button><RouterLink class="scene-link" to="/hardware-decoupling">硬件解耦 <span>↗</span></RouterLink></nav>
       <span class="mode-pill"><i/> 演示模式</span><button class="fullscreen-button" @click="toggleFullscreen" :aria-label="fullscreen ? '退出全屏' : '进入全屏'">⛶ <span>{{ fullscreen ? '退出全屏' : '全屏演示' }}</span></button>
     </header>
 
@@ -428,26 +425,19 @@ onUnmounted(() => { clearInterval(timer); clearInterval(sensorTimer); clearInter
       </template>
 
       <template v-else-if="tab === 'run'">
-        <section class="page-heading"><div><p class="eyebrow">SOFTWARE BASE</p><h1>{{ activeSession?.app.name || '应用运行' }}<span>.</span></h1></div><div class="button-group"><button @click="tab = 'compose'">＋ 生成新应用</button><template v-if="busy"><button @click="pauseResume">{{ run.status === 'paused' ? '▶ 继续' : 'Ⅱ 暂停' }}</button><button class="danger-button" @click="stopRun">■ 停止当前应用</button></template><button v-else class="primary" :disabled="!activeSession" @click="activeSession && startApplication(activeSession.app)">▶ {{ run.app ? '重新运行' : '启动当前应用' }}</button></div></section>
-        <section class="application-base panel">
-          <div class="application-base-heading"><div><p class="eyebrow">APPLICATION PAGES / 应用页面</p><h2>一个基座，承载多个独立应用</h2></div><div class="base-runtime-summary"><strong>{{ applicationPages.length }}</strong><span>个应用</span><i/><strong>{{ activeRuntimeCount }}</strong><span>个正在运行</span></div></div>
-          <div v-if="applicationPages.length" class="application-page-tabs">
-            <article v-for="(page,index) in applicationPages" :key="page.id" class="application-page-tab" :class="[runtimeStatus(page.id), {selected:activeRuntimeId === page.id}]">
-              <button class="application-page-main" @click="selectApplicationPage(page)"><span>APP {{ String(index+1).padStart(2,'0') }}</span><strong>{{ page.name }}</strong><small>{{ page.steps.flatMap(step => step.nodes).length }} 项服务 · {{ page.steps.length }} 个步骤</small></button>
-              <button class="application-page-action" :disabled="['running','paused'].includes(runtimeStatus(page.id))" @click.stop="startApplication(page)">{{ ['running','paused'].includes(runtimeStatus(page.id)) ? statusLabels[runtimeStatus(page.id)] : '▶ 启动' }}</button>
+        <section v-if="!detailOpen" class="page-heading"><div><p class="eyebrow">APPLICATION CENTER</p><h1>应用中心<span>.</span></h1></div><button @click="tab='compose'">返回任务编排</button></section>
+        <section v-if="!detailOpen" class="application-base panel">
+          <div class="application-base-heading"><h2>已生成应用</h2><div class="base-runtime-summary"><strong>{{ applicationPages.length }}</strong><span>个应用</span><i/><strong>{{ activeRuntimeCount }}</strong><span>个运行中</span></div></div>
+          <div class="application-page-tabs">
+            <article v-for="(page,index) in applicationPages" :key="page.id" class="application-page-tab" :class="runtimeStatus(page.id)">
+              <button class="application-page-main" @click="selectApplicationPage(page)"><span>应用 {{ String(index+1).padStart(2,'0') }}</span><strong>{{ page.name }}</strong><small>{{ page.steps.flatMap(step=>step.nodes).length }} 项服务 · {{ page.steps.length }} 个阶段 · {{ statusLabels[runtimeStatus(page.id)] }}</small></button>
+              <button class="application-page-action" @click="selectApplicationPage(page)">进入应用 →</button>
             </article>
-            <button class="application-page-new" @click="tab = 'compose'"><span>＋</span><strong>生成新应用</strong><small>新增独立页面</small></button>
           </div>
-          <div v-else class="application-base-empty"><span>＋</span><div><strong>还没有生成应用</strong><p>返回任务编排，组合服务并点击“生成并保存应用”。</p></div><button class="primary" @click="tab = 'compose'">前往任务编排</button></div>
+          <div v-if="!applicationPages.length" class="application-base-empty">请在任务编排中生成应用。</div>
         </section>
-        <section v-if="activeSession" class="motor-safety-bar" :class="{stopped:emergencyStopped}"><div><strong>{{ motorMode === 'real' ? '真实设备控制' : '模拟演示模式' }}</strong><span>{{ emergencyStopped ? '执行器已急停锁定' : '三台电机控制可用' }}</span></div><button v-if="!emergencyStopped" @click="triggerEmergency">执行器急停</button><button v-else class="reset" @click="resetEmergency">复位急停</button></section>
-        <ApplicationCommandCenter v-if="activeSession" :app="activeSession.app" :nodes="runNodes" :snapshot="sensorSnapshot" :status="run.status" />
-        <ApplicationFlow v-if="activeSession" :app="activeSession.app" :nodes="runNodes" :snapshot="sensorSnapshot" :status="run.status" />
-        <div class="runtime-stats"><div><span>任务状态</span><strong :class="run.status">{{ statusLabels[run.status] }}</strong></div><div><span>整体进度</span><strong>{{ progress }}<small>%</small></strong></div><div><span>服务完成</span><strong>{{ completedCount }}<small>/ {{ runNodes.length }}</small></strong></div><div><span>执行用时</span><strong>{{ run.elapsed.toFixed(1) }}<small>秒</small></strong></div><div class="runtime-mode"><span class="mode-pill">混合运行</span><p>感知读取数据 · 电机{{ motorMode === 'real' ? '真实控制' : '模拟执行' }}</p></div></div>
-        <aside class="panel timeline"><div class="panel-heading"><h2>执行时间线</h2><span>{{ run.events.length }} 条事件</span></div><div class="timeline-list" role="log" aria-live="polite"><p v-if="!run.events.length" class="muted">任务开始后，这里显示服务执行过程。</p><article v-for="(event,index) in [...run.events].reverse()" :key="run.events.length-index" :class="event.kind"><time>+{{ event.time.toFixed(1) }}s</time><p>{{ event.message }}</p></article></div><button class="text-button fault-button" :disabled="!busy" @click="injectFailure">模拟服务异常</button></aside>
-        <section v-if="run.app" class="panel execution-panel"><div class="panel-heading"><h2>应用执行链</h2><span>并行服务同时运行，全部完成后进入下一步</span></div><div class="execution-chain"><article v-for="(step,index) in run.app.steps" :key="step.id" class="execution-step" :class="{current:run.stepIndex === index && busy}"><header><span>步骤 {{ String(index+1).padStart(2,'0') }}</span><span>{{ step.nodes.length > 1 ? '并行执行' : '顺序执行' }}</span></header><div v-for="node in step.nodes" :key="node.id" class="execution-node" :style="{'--service-color':serviceById(node.serviceId).color}"><div><h3>{{ node.serviceId }} {{ serviceById(node.serviceId).name }}</h3><span :class="run.nodes[node.id]!.status">{{ run.status === 'paused' && run.nodes[node.id]!.status === 'running' ? '已暂停' : nodeLabels[run.nodes[node.id]!.status] }}</span></div><p>{{ node.area }} · {{ node.serviceId === 'M01' && node.motor ? `${executorNames[node.motor.executorId]} · ${node.motor.direction === 'reverse' ? '反转' : '正转'} · ${node.motor.speedRpm} rpm` : serviceById(node.serviceId).kind === 'awareness' ? `${node.duration} 秒采样` : `${node.intensity}% 强度 · ${node.duration} 秒` }}</p><div class="progress-track"><span :style="{width:`${run.nodes[node.id]!.progress*100}%`}"/></div><div class="metric-result"><span>{{ run.nodes[node.id]!.result.metric }}<small class="result-source">{{ run.nodes[node.id]!.result.source }}</small></span><strong>{{ run.nodes[node.id]!.status === 'waiting' ? '—' : run.nodes[node.id]!.result.value }} <small>{{ run.nodes[node.id]!.result.unit }}</small></strong></div><div v-if="node.serviceId === 'M01' && node.motor && run.nodes[node.id]!.status === 'running'" class="motor-live-controls"><input v-model.number="node.motor.speedRpm" type="range" min="1" max="500"/><strong>{{ node.motor.speedRpm }} rpm</strong><button @click="node.motor.direction = node.motor.direction === 'forward' ? 'reverse' : 'forward'; applyMotor(node)">{{ node.motor.direction === 'forward' ? '切换反转' : '切换正转' }}</button><button @click="applyMotor(node)">下发转速</button><button class="stop" @click="stopMotorNode(node)">停止电机</button></div><p class="result-detail">{{ run.nodes[node.id]!.result.detail }}</p></div></article></div></section>
-        <section v-if="run.status === 'completed'" class="result-banner" role="status"><span class="result-check">✓</span><div><h2>任务执行完成</h2><p>{{ runNodes.length }} 项服务全部完成，耗时 {{ run.elapsed.toFixed(1) }} 秒。{{ runReused.length ? `复用服务：${runReused.map(id => serviceById(id).name).join('、')}。` : '' }}</p></div><button @click="tab = 'compose'">重新组合，生成新应用 →</button></section>
-        <section v-else-if="run.status === 'failed' || run.status === 'cancelled'" class="info-banner" role="status">{{ run.status === 'failed' ? '服务出现演示异常，后续步骤已停止。可重新运行验证恢复。' : '任务已停止，未完成的服务已取消。' }}</section>
+<IndependentApplication v-if="detailOpen && activeSession" :key="activeSession.id" :blocked="gatewayLost" :app="activeSession.app" :run="run" :snapshot="sensorSnapshot" :gateway="gatewayConnected" :motors="motors" :motor-mode="motorMode" :emergency-stopped="emergencyStopped" :notice="notice"
+          @back="detailOpen=false" @start="startApplication(activeSession.app)" @pause="pauseResume" @stop="stopRun" @emergency="triggerEmergency" @reset="resetEmergency" @motor="applyMotor" @motor-stop="stopMotorNode"/>
       </template>
 
       <template v-else>

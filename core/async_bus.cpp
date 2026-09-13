@@ -89,15 +89,24 @@ void AsyncBus::submit(const AsyncRequest &req) {
 
     AsyncRequest queued = req;
     queued.sequence = ++nextSequence_;
+    bool dropped = false;
     {
         std::lock_guard<std::mutex> lock(queueMtx_);
-        queue_.push(std::move(queued));
-        size_t qs = queue_.size();
-        uint64_t hwm = stats_.queueHighWaterMark.load();
-        while (qs > hwm) {
-            if (stats_.queueHighWaterMark.compare_exchange_weak(hwm, qs)) break;
+        // 遥测允许丢弃过期采样，避免传感器洪峰淹没控制命令。
+        // 写入/控制请求永不走此分支，仍按优先级立即排队。
+        if (!req.isWrite && req.priority <= 0 && queue_.size() >= 64) {
+            stats_.droppedTelemetry++;
+            dropped = true;
+        } else {
+            queue_.push(std::move(queued));
+            size_t qs = queue_.size();
+            uint64_t hwm = stats_.queueHighWaterMark.load();
+            while (qs > hwm) {
+                if (stats_.queueHighWaterMark.compare_exchange_weak(hwm, qs)) break;
+            }
         }
     }
+    if (dropped) { if (req.callback) req.callback(nullptr, 0, -70); return; }
     queueCv_.notify_one();
 }
 

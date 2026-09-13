@@ -82,6 +82,7 @@ struct AsyncBusStats {
     std::atomic<uint64_t> totalWriteOps{0};
     std::atomic<double>   avgTransactMs{0.0};
     std::atomic<uint64_t> queueHighWaterMark{0};
+    std::atomic<uint64_t> droppedTelemetry{0};
 
     void reset() {
         totalSubmitted = 0;
@@ -92,6 +93,7 @@ struct AsyncBusStats {
         totalWriteOps = 0;
         avgTransactMs = 0.0;
         queueHighWaterMark = 0;
+        droppedTelemetry = 0;
     }
 };
 

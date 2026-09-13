@@ -277,7 +277,8 @@ int main(int argc, char *argv[]) {
         return snapshot;
     });
     marine::MarineSafety marineSafety("./data/marine/events.jsonl");
-    auto motorService = std::make_shared<marine::MotorAtomicService>(true);
+    // 演示模式不触碰串口；真实启动时将电机原子服务绑定到 RS485 命令队列。
+    auto motorService = std::make_shared<marine::MotorAtomicService>(marine_demo);
     marine::MarineRuntime marineRuntime(marineRepository, std::move(marineExecutor), motorService,
         [&marineRepository, &marineSafety](const marine::MotorParameters& parameters) {
             const auto& bindings = marineRepository.listBindings();
@@ -336,7 +337,9 @@ int main(int argc, char *argv[]) {
         [&cmdQueue](uint8_t address, uint16_t reg, uint16_t count, std::vector<uint16_t>& values) {
             const uint64_t id = cmdQueue.readRegisters(address, reg, count);
             if (id == 0) return false;
-            const auto result = cmdQueue.waitResult(id, 3000);
+            // 遥测是周期性状态读取，不能让一个无响应设备阻塞 Web API；
+            // 控制写入仍使用独立的 3 秒确认窗口。
+            const auto result = cmdQueue.waitResult(id, 500);
             if (result.status != CommandStatus::SUCCESS) return false;
             values = result.registers;
             return values.size() == count;

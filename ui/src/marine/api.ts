@@ -19,6 +19,8 @@ export interface MarineApiClient {
   unlock(operator: string): Promise<any>
   lock(operator: string): Promise<any>
   listMotors(): Promise<any[]>
+  startMotor(executorId: string, parameters: unknown): Promise<any>
+  stopDirectMotor(executorId: string, operator: string): Promise<any>
   updateMotor(runId: string, nodeId: string, parameters: unknown): Promise<any>
   stopMotor(runId: string, nodeId: string): Promise<any>
   emergencyStop(operator: string): Promise<any>
@@ -27,9 +29,9 @@ export interface MarineApiClient {
 
 export function createMarineApi(fetcher: FetchLike = fetch as unknown as FetchLike): MarineApiClient {
   let backendMode: MarineBackendMode = 'local-demo'
-  async function request(path: string, method = 'GET', body?: unknown) {
+  async function request(path: string, method = 'GET', body?: unknown, timeoutMs = 3000) {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 3000)
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
     try {
       const response = await fetcher(`/api/v1${path}`, {
         method,
@@ -65,7 +67,9 @@ export function createMarineApi(fetcher: FetchLike = fetch as unknown as FetchLi
     safety: () => request('/safety'),
     unlock: operator => request('/safety/unlock', 'POST', { operator }),
     lock: operator => request('/safety/lock', 'POST', { operator }),
-    listMotors: () => request('/marine/motors') as Promise<any[]>,
+    listMotors: () => request('/marine/motors', 'GET', undefined, 12000) as Promise<any[]>,
+    startMotor: (executorId, parameters) => request(`/marine/motors/${encodeURIComponent(executorId)}/start`, 'POST', parameters, 15000),
+    stopDirectMotor: (executorId, operator) => request(`/marine/motors/${encodeURIComponent(executorId)}/stop`, 'POST', { operator }, 15000),
     updateMotor: (runId, nodeId, parameters) => request(`/marine/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/motor`, 'PATCH', parameters),
     stopMotor: (runId, nodeId) => request(`/marine/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/stop`, 'POST', {}),
     emergencyStop: operator => request('/marine/emergency-stop', 'POST', { operator }),

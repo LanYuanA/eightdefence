@@ -42,6 +42,7 @@ void PollingManager::addTasks(const std::vector<DeviceTask> &tasks) {
                 g.name = task.description;
                 g.devAddr = task.devAddr;
                 g.priority = task.priority;
+                g.pollIntervalMs = task.pollIntervalMs;
                 addrGroups[task.devAddr] = g;
             }
             addrGroups[task.devAddr].tasks.push_back(task);

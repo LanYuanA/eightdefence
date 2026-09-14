@@ -57,6 +57,7 @@ let gatewayTimer: ReturnType<typeof setInterval> | undefined
 const fullscreen = ref(false)
 const gatewayConnected = ref(false)
 const gatewayLost = ref(false)
+let gatewaySyncBusy = false
 const motorMode = ref<'real' | 'simulation'>('simulation')
 const emergencyStopped = ref(false)
 const motors = ref<any[]>([])
@@ -203,7 +204,8 @@ function gatewayRunToState(remote: any, target: MarineApp): RunState {
   return { status: ['idle', 'running', 'paused', 'completed', 'cancelled', 'failed'].includes(remote.status) ? remote.status : 'failed', app: target, stepIndex: Number(remote.stepIndex || 0), elapsed: Number(remote.elapsed || 0), nodes, events: Array.isArray(remote.events) ? remote.events : [] }
 }
 async function syncGatewayRuns() {
-  if (!gatewayConnected.value) return
+  if (!gatewayConnected.value || gatewaySyncBusy) return
+  gatewaySyncBusy = true
   try {
     const runs = await marineApi.listRuns()
     for (const remote of runs.sort((a:any,b:any)=>String(a.id).localeCompare(String(b.id),undefined,{numeric:true}))) {
@@ -216,7 +218,10 @@ async function syncGatewayRuns() {
     runtimeSessions.value = [...runtimeSessions.value]
     motors.value = await marineApi.listMotors()
     gatewayLost.value = false
-  } catch { gatewayLost.value = true; notify('网关连接中断，等待恢复；当前应用不会切换成本地模拟。', true) }
+  } catch {
+    if (!gatewayLost.value) notify('网关连接中断，等待恢复；当前应用不会切换成本地模拟。', true)
+    gatewayLost.value = true
+  } finally { gatewaySyncBusy = false }
 }
 const executorNames: Record<string,string> = { 'EXHAUST-FAN-01': '机舱排烟风机', 'FIRE-PUMP-01': '消防水泵', 'DRAIN-PUMP-01': '舱底排水泵' }
 async function applyMotor(node: TaskNode) { const runId = activeSession.value ? gatewayRunIds.get(activeSession.value.app.id) : ''; if (!runId || !node.motor) return; try { const remote = await marineApi.updateMotor(runId, node.id, node.motor); activeSession.value!.state = gatewayRunToState(remote, activeSession.value!.app); motors.value = await marineApi.listMotors(); runtimeSessions.value = [...runtimeSessions.value]; notify('电机参数已下发。') } catch (error) { notify(error instanceof Error ? error.message : '电机参数下发失败', true) } }
@@ -352,7 +357,7 @@ onMounted(() => {
   }, 100)
   pollSensors()
   sensorTimer = setInterval(pollSensors, 2000)
-  gatewayTimer = setInterval(() => { void syncGatewayRuns() }, 500)
+  gatewayTimer = setInterval(() => { void syncGatewayRuns() }, 5000)
   document.addEventListener('fullscreenchange', syncFullscreen); window.addEventListener('beforeunload', unload)
 })
 onUnmounted(() => { clearInterval(timer); clearInterval(sensorTimer); clearInterval(gatewayTimer); clearTimeout(toastTimer); clearTimeout(generationTimer); runtimeSessions.value.forEach(session => session.runner.cancel()); document.removeEventListener('fullscreenchange', syncFullscreen); window.removeEventListener('beforeunload', unload) })

@@ -21,7 +21,7 @@ MotorAtomicService::MotorAtomicService(bool simulation) : simulation_(simulation
 
 void MotorAtomicService::attachIo(Writer writer, Reader reader, EmergencyWriter emergencyWriter) {
     std::lock_guard<std::mutex> lock(mutex_); writer_ = std::move(writer); reader_ = std::move(reader); emergencyWriter_ = std::move(emergencyWriter); simulation_ = false;
-    for (auto& item : devices_) item.second.telemetry.source = "device";
+    for (auto& item : devices_) { item.second.telemetry.source = "device"; item.second.telemetry.online = false; }
 }
 bool MotorAtomicService::writeOne(uint8_t address, uint16_t reg, uint16_t value, const Writer& writer, bool simulation) const { return simulation || (writer && writer(address, reg, {value})); }
 bool MotorAtomicService::writeI32(uint8_t address, uint16_t reg, int32_t value, const Writer& writer, bool simulation) const { return simulation || (writer && writer(address, reg, i32Words(value))); }
@@ -106,17 +106,19 @@ std::string MotorAtomicService::stop(const std::string& owner, const std::string
 }
 
 MotorTelemetry MotorAtomicService::telemetry(const std::string& id) {
-    uint8_t address; uint64_t generation; Reader reader;
+    uint8_t address; uint64_t generation; Reader reader; bool readSpeed = false;
     {
         std::lock_guard<std::mutex> lock(mutex_); auto found = devices_.find(id); if (found == devices_.end()) return {}; auto& d = found->second; const auto now = steadyMs();
         if (simulation_ || !reader_ || now - d.lastReadMs < 500) return d.telemetry;
-        d.lastReadMs = now; address = d.address; generation = d.generation; reader = reader_;
+        d.lastReadMs = now; address = d.address; generation = d.generation; reader = reader_; readSpeed = d.telemetry.running || !d.telemetry.owner.empty() || d.telemetry.targetRpm != 0;
     }
-    std::vector<uint16_t> speed, status; const bool speedOk = reader(address, 0x606C, 2, speed) && speed.size() == 2; const bool statusOk = reader(address, 0x6041, 1, status) && status.size() == 1;
+    std::vector<uint16_t> speed, status; const bool statusOk = reader(address, 0x6041, 1, status) && status.size() == 1;
+    const bool speedOk = readSpeed && statusOk && reader(address, 0x606C, 2, speed) && speed.size() == 2;
     std::lock_guard<std::mutex> lock(mutex_); auto& d = devices_.at(id); if (d.generation != generation) return d.telemetry;
     if (speedOk) d.telemetry.actualRpm = wordsI32(speed);
     if (statusOk) d.telemetry.statusWord = status[0];
-    d.telemetry.online = speedOk && statusOk;
+    // 状态字是设备在线的心跳依据；转速寄存器偶发超时不应把整台电机判为离线。
+    d.telemetry.online = statusOk;
     d.telemetry.running = d.telemetry.online && (std::abs(d.telemetry.actualRpm) > 5 || (!d.telemetry.owner.empty() && d.telemetry.targetRpm != 0)); return d.telemetry;
 }
 
@@ -140,5 +142,14 @@ bool MotorAtomicService::emergencyStop() {
 void MotorAtomicService::resetEmergency() { std::lock_guard<std::mutex> lock(mutex_); emergencyStopped_ = false; }
 bool MotorAtomicService::emergencyStopped() const { std::lock_guard<std::mutex> lock(mutex_); return emergencyStopped_; }
 bool MotorAtomicService::simulation() const { std::lock_guard<std::mutex> lock(mutex_); return simulation_; }
-std::vector<MotorTelemetry> MotorAtomicService::list() { std::vector<MotorTelemetry> result; for (const auto& id : {"EXHAUST-FAN-01", "FIRE-PUMP-01", "DRAIN-PUMP-01"}) result.push_back(telemetry(id)); return result; }
+std::vector<MotorTelemetry> MotorAtomicService::list() {
+    static const std::array<const char*, 3> ids{{"EXHAUST-FAN-01", "FIRE-PUMP-01", "DRAIN-PUMP-01"}};
+    size_t refreshIndex;
+    { std::lock_guard<std::mutex> lock(mutex_); refreshIndex = nextInventoryRefresh_++ % ids.size(); }
+    telemetry(ids[refreshIndex]);
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<MotorTelemetry> result; result.reserve(ids.size());
+    for (const auto* id : ids) result.push_back(devices_.at(id).telemetry);
+    return result;
+}
 } // namespace marine

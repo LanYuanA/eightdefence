@@ -58,7 +58,7 @@ export function createActuatorDemo(): ActuatorDemoState {
     atomicService: { id: 'SERVICE-COOL-01', name: '冷却泵控制服务' },
     logicalExecutor: { id: 'COOL-PUMP-01', name: '中央冷却泵逻辑执行器', boundDeviceId: 'MOTOR-02' },
     devices: [
-      { id: 'MOTOR-02', name: '水泵 A', type: '中央冷却泵 · 原型号', address: '0x02', status: 'running', compatible: true, faultCode: '0x0000', speed: 860 },
+      { id: 'MOTOR-02', name: '水泵 A', type: '中央冷却泵 · 原型号', address: '0x02', status: 'offline', compatible: true, faultCode: '—', speed: 0 },
       { id: 'MOTOR-0E', name: '水泵 B', type: '中央冷却泵 · 替换型号', address: '0x0E', status: 'offline', compatible: true, faultCode: '—', speed: 0 },
       { id: 'MOTOR-0F', name: '水泵 C', type: '中央冷却泵 · 备用型号', address: '0x0F', status: 'offline', compatible: true, faultCode: '—', speed: 0 },
     ],
@@ -69,6 +69,34 @@ export function createActuatorDemo(): ActuatorDemoState {
     recoveryMs: 0,
     events: [{ id: 1, tone: 'success', title: '检修通风稳定运行', detail: 'VENT-01 当前绑定机舱通风机 1 号 · 0x02' }],
     lastMessage: '检修保障应用正通过逻辑执行器运行。',
+  }
+}
+
+export function mergeRealMotorTelemetry(devices: ActuatorDevice[], motors: any[]): ActuatorDevice[] {
+  return devices.map(device => {
+    const motor = motors.find(item => String(item.address).toLowerCase() === device.address.toLowerCase())
+    if (!motor) return { ...device, status: 'offline', speed: 0, faultCode: '—' }
+    const rpm = Number(motor.actualRpm) || 0
+    return {
+      ...device,
+      status: motor.online ? (motor.running ? 'running' : 'standby') : 'offline',
+      speed: motor.direction === 'reverse' ? -Math.abs(rpm) : rpm,
+      faultCode: motor.statusWord === 39 ? '0x0000' : `0x${Number(motor.statusWord || 0).toString(16).padStart(4, '0')}`,
+    }
+  })
+}
+
+export function syncRealRemovalState(state: ActuatorDemoState): ActuatorDemoState {
+  if (!['running', 'recovered'].includes(state.phase)) return state
+  const bound = state.devices.find(device => device.id === state.logicalExecutor.boundDeviceId)
+  if (!bound || bound.status !== 'offline') return state
+  return {
+    ...state,
+    phase: 'protected',
+    candidateId: null,
+    recoveryMs: 0,
+    events: event(state, 'warning', '检测到真实执行器离线', `${bound.name} · ${bound.address} 通信中断，任务已进入保护状态`),
+    lastMessage: '真实设备已离线，请选择已接入的兼容水泵。',
   }
 }
 
@@ -135,6 +163,25 @@ export function confirmActuatorSwitch(state: ActuatorDemoState): ActuatorDemoSta
     ...next,
     events: event(next, 'normal', '操作员确认切换', `${state.logicalExecutor.id}：${previous?.address ?? '—'} → ${candidate.address}，正在初始化`),
     lastMessage: '设备抽象层正在更新绑定并执行初始化检查。',
+  }
+}
+
+export function confirmRealActuatorSwitch(state: ActuatorDemoState): ActuatorDemoState {
+  const candidate = state.devices.find(device => device.id === state.candidateId)
+  if (state.phase !== 'awaiting-confirmation' || !candidate || candidate.status === 'offline') return state
+  const previous = state.devices.find(device => device.id === state.logicalExecutor.boundDeviceId)
+  const next = {
+    ...state,
+    phase: 'recovered' as const,
+    candidateId: null,
+    logicalExecutor: { ...state.logicalExecutor, boundDeviceId: candidate.id },
+    bindingUpdates: state.bindingUpdates + 1,
+    recoveryMs: 0,
+  }
+  return {
+    ...next,
+    events: event(next, 'success', '真实设备切换完成', `${previous?.address ?? '—'} → ${candidate.address}，上层应用保持不变`),
+    lastMessage: `${candidate.name} 已成为当前绑定设备，可按需下发运行参数。`,
   }
 }
 

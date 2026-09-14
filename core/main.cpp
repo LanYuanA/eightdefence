@@ -335,11 +335,11 @@ int main(int argc, char *argv[]) {
             return id != 0 && cmdQueue.waitResult(id, 3000).status == CommandStatus::SUCCESS;
         },
         [&cmdQueue](uint8_t address, uint16_t reg, uint16_t count, std::vector<uint16_t>& values) {
-            const uint64_t id = cmdQueue.readRegisters(address, reg, count);
+            const uint64_t id = cmdQueue.readRegisters(address, reg, count, CommandPriority::HIGH);
             if (id == 0) return false;
             // 遥测是周期性状态读取，不能让一个无响应设备阻塞 Web API；
             // 控制写入仍使用独立的 3 秒确认窗口。
-            const auto result = cmdQueue.waitResult(id, 500);
+            const auto result = cmdQueue.waitResult(id, 1500);
             if (result.status != CommandStatus::SUCCESS) return false;
             values = result.registers;
             return values.size() == count;
@@ -435,14 +435,6 @@ int main(int argc, char *argv[]) {
         all_tasks.insert(all_tasks.end(), t.begin(), t.end());
     }
     {
-        auto t = dev_humidifier.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_alarm.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
         auto t = dev_water.getTasks();
         all_tasks.insert(all_tasks.end(), t.begin(), t.end());
     }
@@ -451,13 +443,12 @@ int main(int argc, char *argv[]) {
         all_tasks.insert(all_tasks.end(), t.begin(), t.end());
     }
     {
-        auto t = dev_purifier.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
         auto t = dev_light.getTasks();
         all_tasks.insert(all_tasks.end(), t.begin(), t.end());
     }
+
+    // 现场演示时为电机状态读取和控制保留 RS485 时间窗口。
+    for (auto& task : all_tasks) task.pollIntervalMs = 10000;
 
     size_t num_tasks = all_tasks.size();
     LOG_INFO("共 %zu 个轮询任务:", num_tasks);

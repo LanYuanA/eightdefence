@@ -25,6 +25,32 @@ HttpResponse MarineApi::handle(const HttpRequest& request) {
     const auto& path = request.path;
     if (request.method == "GET" && path == "/api/v1/health") { const auto status = safety_.status(nowMs()); return respond(JsonValue::Object{{"version", "v1"}, {"storage", "ready"}, {"sensorMode", "demo"}, {"motorMode", motors_ && !motors_->simulation() ? "real" : "simulation"}, {"actuatorControlEnabled", status.actuatorControlEnabled}, {"emergencyStopped", status.emergencyStopped}, {"locked", !status.unlocked}}); }
     if (request.method == "GET" && path == "/api/v1/marine/motors") { if (!motors_) return failure(503, "motor_service_unavailable", "电机原子服务未初始化。"); JsonValue::Array values; for (const auto& motor : motors_->list()) values.emplace_back(motorJson(motor)); return respond(values); }
+    const std::string motorPrefix = "/api/v1/marine/motors/";
+    if (request.method == "POST" && path.rfind(motorPrefix, 0) == 0) {
+        if (!motors_) return failure(503, "motor_service_unavailable", "电机原子服务未初始化。");
+        const auto actionPos = path.find('/', motorPrefix.size());
+        if (actionPos != std::string::npos) {
+            const std::string executorId = path.substr(motorPrefix.size(), actionPos - motorPrefix.size());
+            const std::string action = path.substr(actionPos + 1);
+            JsonValue::Object body; HttpResponse invalid;
+            if (!objectBody(request, body, invalid)) return invalid;
+            std::string operatorName;
+            if (!stringField(body, "operator", operatorName)) return failure(400, "validation_failed", "缺少操作员名称。");
+            if (!safety_.status(nowMs()).actuatorControlEnabled) return failure(423, "emergency_stopped", "执行器急停尚未复位。");
+            std::string outcome;
+            if (action == "start") {
+                MotorParameters parameters; parameters.executorId = executorId; std::string direction;
+                if (!intField(body, "speedRpm", parameters.speedRpm) || !stringField(body, "direction", direction) || !intField(body, "acceleration", parameters.acceleration) || !intField(body, "deceleration", parameters.deceleration) || parameters.speedRpm < 1 || parameters.speedRpm > 500 || parameters.acceleration < 1 || parameters.acceleration > 100 || parameters.deceleration < 1 || parameters.deceleration > 100 || (direction != "forward" && direction != "reverse")) return failure(400, "validation_failed", "电机参数不完整或超出范围。");
+                parameters.direction = direction == "reverse" ? MotorDirection::Reverse : MotorDirection::Forward;
+                outcome = motors_->start("HARDWARE-DECOUPLING", parameters);
+                if (outcome == "resource_busy") outcome = motors_->update("HARDWARE-DECOUPLING", parameters);
+            } else if (action == "stop") {
+                outcome = motors_->stop("HARDWARE-DECOUPLING", executorId);
+            } else return failure(404, "not_found", "接口不存在。");
+            if (!outcome.empty()) return failure(outcome == "device_error" ? 502 : outcome == "unknown_executor" ? 404 : 409, outcome, "电机控制失败。");
+            return respond(motorJson(motors_->telemetry(executorId)));
+        }
+    }
     if (request.method == "POST" && (path == "/api/v1/marine/emergency-stop" || path == "/api/v1/marine/emergency-reset")) { if (!motors_) return failure(503, "motor_service_unavailable", "电机原子服务未初始化。"); JsonValue::Object body; HttpResponse invalid; if (!objectBody(request, body, invalid)) return invalid; std::string operatorName; if (!stringField(body, "operator", operatorName)) return failure(400, "validation_failed", "缺少操作员名称。"); if (path.find("reset") != std::string::npos) { motors_->resetEmergency(); safety_.resetEmergency(operatorName, nowMs()); } else { const bool stopped = runtime_.emergencyStopMotors(); safety_.emergencyStop(operatorName, nowMs()); if (!stopped) return failure(502, "emergency_stop_incomplete", "急停已锁定，但至少一台电机未确认停止，请立即检查现场。"); } const auto status = safety_.status(nowMs()); return respond(JsonValue::Object{{"actuatorControlEnabled", status.actuatorControlEnabled}, {"emergencyStopped", status.emergencyStopped}}); }
     if (request.method == "GET" && path == "/api/v1/marine/apps") { JsonValue::Array apps; for (const auto& app : repository_.listApps()) apps.push_back(applicationToJson(app)); return respond(apps); }
     if (request.method == "POST" && path == "/api/v1/marine/apps") { JsonValue body; std::string issue; Application app; if (!parseJson(request.body, body, issue) || !applicationFromJson(body, app, issue)) return failure(400, "validation_failed", issue.empty() ? "应用定义无效。" : issue); const auto saved = repository_.saveApp(app); return saved.empty() ? respond(applicationToJson(app), 201) : failure(400, "validation_failed", saved); }

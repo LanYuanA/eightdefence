@@ -11,7 +11,11 @@ import {
   createActuatorDemo,
   disconnectActive,
   injectActuatorFault,
+  mergeRealMotorTelemetry,
+  syncRealRemovalState,
+  confirmRealActuatorSwitch,
 } from '../src/marine/actuators.ts'
+import { createMarineApi } from '../src/marine/api.ts'
 
 test('A: awareness runs first, then ventilation, then cooling and water start together', () => {
   const app = createPreset('A'); const runner = new MarineRunner(); runner.start(app)
@@ -232,6 +236,66 @@ test('operator-confirmed replacement changes only the physical binding', () => {
   assert.equal(recovered.phase, 'recovered')
   assert.equal(recovered.devices.find(device => device.id === 'MOTOR-0F')?.status, 'running')
   assert.equal(recovered.recoveryMs, 1800)
+})
+
+test('hardware replacement screen starts without invented RPM and merges real motor telemetry', () => {
+  const initial = createActuatorDemo()
+  assert.ok(initial.devices.every(device => device.speed === 0))
+  assert.ok(initial.devices.every(device => device.status === 'offline'))
+
+  const devices = mergeRealMotorTelemetry(initial.devices, [
+    { address: '0x0E', online: true, running: true, actualRpm: 237, direction: 'reverse', statusWord: 39 },
+  ])
+  assert.equal(devices.find(device => device.address === '0x0E')?.speed, -237)
+  assert.equal(devices.find(device => device.address === '0x0E')?.status, 'running')
+  assert.equal(devices.find(device => device.address === '0x02')?.speed, 0)
+})
+
+test('real replacement flow enters protection only when the bound motor stops responding', () => {
+  const online = createActuatorDemo()
+  online.devices = mergeRealMotorTelemetry(online.devices, [
+    { address: '0x02', online: true, running: false, actualRpm: 0, direction: 'forward', statusWord: 39 },
+  ])
+  assert.equal(syncRealRemovalState(online).phase, 'running')
+  online.devices = mergeRealMotorTelemetry(online.devices, [])
+  const removed = syncRealRemovalState(online)
+  assert.equal(removed.phase, 'protected')
+  assert.match(removed.lastMessage, /真实设备已离线/)
+})
+
+test('real replacement confirmation binds the selected online motor without inventing motion', () => {
+  let state = createActuatorDemo()
+  state.devices = mergeRealMotorTelemetry(state.devices, [
+    { address: '0x0E', online: true, running: false, actualRpm: 0, direction: 'forward', statusWord: 39 },
+  ])
+  state = syncRealRemovalState(state)
+  state = connectActuator(state, 'MOTOR-0E')
+  state = confirmRealActuatorSwitch(state)
+  assert.equal(state.phase, 'recovered')
+  assert.equal(state.logicalExecutor.boundDeviceId, 'MOTOR-0E')
+  assert.equal(state.devices.find(device => device.id === 'MOTOR-0E')?.speed, 0)
+})
+
+test('real motor inventory request is allowed to outlive the default three-second API timeout', async () => {
+  const fetcher = (_input, init) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve({ ok: true, status: 200, json: async () => [] }), 3100)
+    init?.signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new Error('aborted')) })
+  })
+  const api = createMarineApi(fetcher)
+  assert.deepEqual(await api.listMotors(), [])
+})
+
+test('hardware decoupling motor controls use the direct gateway endpoints', async () => {
+  const requests = []
+  const api = createMarineApi(async (input, init) => {
+    requests.push({ input, init })
+    return { ok: true, status: 200, json: async () => ({ running: true }) }
+  })
+  await api.startMotor('FIRE-PUMP-01', { speedRpm: 300, direction: 'forward', acceleration: 10, deceleration: 10, operator: '演示员' })
+  await api.stopDirectMotor('FIRE-PUMP-01', '演示员')
+  assert.equal(requests[0].input, '/api/v1/marine/motors/FIRE-PUMP-01/start')
+  assert.equal(requests[0].init.method, 'POST')
+  assert.equal(requests[1].input, '/api/v1/marine/motors/FIRE-PUMP-01/stop')
 })
 
 test('fault protection cannot switch until an eligible motor is connected', () => {

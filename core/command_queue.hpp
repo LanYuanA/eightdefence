@@ -103,6 +103,7 @@ public:
                             CommandPriority priority = CommandPriority::NORMAL,
                             std::function<void(const CommandResult&)> callback = nullptr);
     uint64_t readRegisters(uint8_t devAddr, uint16_t regAddr, uint16_t count,
+                           CommandPriority priority = CommandPriority::NORMAL,
                            std::function<void(const CommandResult&)> callback = nullptr);
 
     CommandResult waitResult(uint64_t id, int timeoutMs = 5000);

@@ -73,9 +73,10 @@ uint64_t CommandQueue::writeRegisters(uint8_t devAddr, uint16_t regAddr, const s
 }
 
 uint64_t CommandQueue::readRegisters(uint8_t devAddr, uint16_t regAddr, uint16_t count,
+                                     CommandPriority priority,
                                      std::function<void(const CommandResult&)> callback) {
     if (count == 0 || count > 24) return 0;
-    Command cmd; cmd.id = nextId(); cmd.type = CommandType::READ_REG; cmd.devAddr = devAddr; cmd.regAddr = regAddr; cmd.count = count; cmd.callback = callback; return submit(cmd);
+    Command cmd; cmd.id = nextId(); cmd.type = CommandType::READ_REG; cmd.priority = priority; cmd.devAddr = devAddr; cmd.regAddr = regAddr; cmd.count = count; cmd.callback = callback; return submit(cmd);
 }
 
 uint64_t CommandQueue::submit(const Command &cmd) {

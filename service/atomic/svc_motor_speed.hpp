@@ -57,6 +57,7 @@ private:
     EmergencyWriter emergencyWriter_;
     bool simulation_;
     bool emergencyStopped_ = false;
+    size_t nextInventoryRefresh_ = 0;
 };
 
 } // namespace marine

@@ -200,9 +200,20 @@ void motor_service_reads_signed_32_bit_speed_and_reports_failed_emergency_stop()
             else return false;
             return true;
         });
+    marine::MotorParameters liveParameters; liveParameters.executorId = "EXHAUST-FAN-01";
+    REQUIRE(motors.start("TELEMETRY-TEST", liveParameters).empty());
     const auto telemetry = motors.telemetry("EXHAUST-FAN-01");
     REQUIRE(telemetry.online);
     REQUIRE(telemetry.actualRpm == -200);
+
+    marine::MotorAtomicService statusOnly(true);
+    statusOnly.attachIo(
+        [](uint8_t, uint16_t, const std::vector<uint16_t>&) { return true; },
+        [](uint8_t, uint16_t reg, uint16_t, std::vector<uint16_t>& values) {
+            if (reg != 0x6041) return false;
+            values = {0x0027}; return true;
+        });
+    REQUIRE(statusOnly.telemetry("EXHAUST-FAN-01").online);
 
     marine::MotorAtomicService failing(true);
     failing.attachIo(
@@ -211,6 +222,23 @@ void motor_service_reads_signed_32_bit_speed_and_reports_failed_emergency_stop()
     REQUIRE(!failing.emergencyStop());
     REQUIRE(failing.emergencyStopped());
     REQUIRE(!failing.telemetry("EXHAUST-FAN-01").online);
+}
+
+void motor_inventory_refreshes_only_one_device_per_request() {
+    marine::MotorAtomicService motors(true);
+    std::atomic<int> reads{0};
+    motors.attachIo(
+        [](uint8_t, uint16_t, const std::vector<uint16_t>&) { return true; },
+        [&](uint8_t, uint16_t reg, uint16_t count, std::vector<uint16_t>& values) {
+            ++reads;
+            if (reg == 0x6041) values = {0x0027};
+            else if (reg == 0x606C && count == 2) values = {0, 0};
+            else return false;
+            return true;
+        });
+    const auto inventory = motors.list();
+    REQUIRE(inventory.size() == 3);
+    REQUIRE(reads.load() == 1);
 }
 
 void emergency_stop_preempts_a_blocked_runtime_start() {
@@ -318,6 +346,24 @@ void api_runs_updates_and_emergency_stops_motor_service() {
     const auto stopped = api.handle(request("POST", "/api/v1/marine/emergency-stop", "{\"operator\":\"演示员\"}")); REQUIRE(stopped.statusCode == 200); REQUIRE(stopped.body.find("true") != std::string::npos);
     const auto reset = api.handle(request("POST", "/api/v1/marine/emergency-reset", "{\"operator\":\"演示员\"}")); REQUIRE(reset.statusCode == 200);
 }
+
+void api_directly_controls_motor_for_hardware_decoupling_screen() {
+    TempDir data; marine::MarineRepository repository(data.path()); REQUIRE(repository.load().empty());
+    auto motors = std::make_shared<marine::MotorAtomicService>(true);
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }), motors);
+    marine::MarineSafety safety(data.path() + "/events.jsonl"); marine::MarineApi api(repository, runtime, safety, motors);
+
+    const auto started = api.handle(request("POST", "/api/v1/marine/motors/FIRE-PUMP-01/start", "{\"speedRpm\":300,\"direction\":\"reverse\",\"acceleration\":10,\"deceleration\":10,\"operator\":\"演示员\"}"));
+    REQUIRE(started.statusCode == 200);
+    REQUIRE(started.body.find("\"targetRpm\":-300") != std::string::npos);
+    REQUIRE(started.body.find("\"running\":true") != std::string::npos);
+
+    const auto invalid = api.handle(request("POST", "/api/v1/marine/motors/FIRE-PUMP-01/start", "{\"speedRpm\":501,\"direction\":\"forward\",\"acceleration\":10,\"deceleration\":10,\"operator\":\"演示员\"}"));
+    REQUIRE(invalid.statusCode == 400);
+    const auto stopped = api.handle(request("POST", "/api/v1/marine/motors/FIRE-PUMP-01/stop", "{\"operator\":\"演示员\"}"));
+    REQUIRE(stopped.statusCode == 200);
+    REQUIRE(stopped.body.find("\"running\":false") != std::string::npos);
+}
 }
 
 int main() {
@@ -333,12 +379,14 @@ int main() {
     offline_sensor_is_reported_as_demo_data();
     motor_service_locks_resources_and_latches_emergency_stop();
     motor_service_reads_signed_32_bit_speed_and_reports_failed_emergency_stop();
+    motor_inventory_refreshes_only_one_device_per_request();
     emergency_stop_preempts_a_blocked_runtime_start();
     runtime_waits_for_all_parallel_nodes_before_next_step();
     cancelling_one_run_does_not_cancel_another_run();
     api_creates_lists_and_starts_persisted_application();
     api_returns_conflict_for_stale_binding_version();
     api_runs_updates_and_emergency_stops_motor_service();
+    api_directly_controls_motor_for_hardware_decoupling_screen();
     if (failures != 0) {
         std::cerr << failures << " 项测试失败\n";
         return EXIT_FAILURE;

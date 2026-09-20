@@ -43,6 +43,7 @@ public:
     bool emergencyStopped() const;
     bool simulation() const;
     std::vector<MotorTelemetry> list();
+    std::vector<MotorTelemetry> scanAll();
 
 private:
     struct Device { MotorTelemetry telemetry; uint8_t address; bool directionInverted = false; uint64_t lastReadMs = 0; uint64_t generation = 0; };

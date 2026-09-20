@@ -253,6 +253,24 @@ void motor_inventory_discovers_one_device_then_heartbeats_only_that_address() {
     REQUIRE((reads == std::vector<uint8_t>{0x02, 0x0E, 0x0E, 0x0E, 0x0F, 0x0F}));
 }
 
+void motor_inventory_can_scan_all_addresses_without_changing_the_binding() {
+    marine::MotorAtomicService motors(true);
+    std::vector<uint8_t> reads;
+    motors.attachIo(
+        [](uint8_t, uint16_t, const std::vector<uint16_t>&) { return true; },
+        [&](uint8_t address, uint16_t reg, uint16_t count, std::vector<uint16_t>& values) {
+            reads.push_back(address);
+            if (reg == 0x6041 && count == 1) { values = {0x0221}; return true; }
+            if (reg == 0x606C && count == 2) { values = {0, static_cast<uint16_t>(address)}; return true; }
+            return false;
+        });
+
+    const auto scan = motors.scanAll();
+    REQUIRE(scan.size() == 3);
+    REQUIRE(std::all_of(scan.begin(), scan.end(), [](const marine::MotorTelemetry& motor) { return motor.online; }));
+    REQUIRE((reads == std::vector<uint8_t>{0x02, 0x02, 0x0E, 0x0E, 0x0F, 0x0F}));
+}
+
 void inventory_refreshes_live_speed_after_startup_and_direction_changes() {
     marine::MotorAtomicService motors(true);
     int32_t speed = 28;
@@ -518,6 +536,35 @@ void software_demo_controls_only_the_single_detected_real_motor() {
     REQUIRE(virtualOnly.statusCode == 200);
     REQUIRE(virtualOnly.body.find("\"controlledMotorNumbers\":[]") != std::string::npos);
     REQUIRE(writes.empty());
+
+    writes.clear();
+    const auto stopped = api.handle(request("POST", "/api/v1/marine/software-demo/stop", "{\"operator\":\"演示员\"}"));
+    REQUIRE(stopped.statusCode == 200);
+    REQUIRE(stopped.body.find("\"controlledMotorNumbers\":[2]") != std::string::npos);
+    REQUIRE(stopped.body.find("\"failedMotorNumbers\":[1,3]") != std::string::npos);
+    REQUIRE(std::find(writes.begin(), writes.end(), 0x02) != writes.end());
+    REQUIRE(std::find(writes.begin(), writes.end(), 0x0E) != writes.end());
+    REQUIRE(std::find(writes.begin(), writes.end(), 0x0F) != writes.end());
+}
+
+void software_demo_stop_retries_transient_motor_failures() {
+    TempDir data; marine::MarineRepository repository(data.path()); REQUIRE(repository.load().empty());
+    auto motors = std::make_shared<marine::MotorAtomicService>(true);
+    int motorOneAttempts = 0;
+    motors->attachIo(
+        [&](uint8_t address, uint16_t, const std::vector<uint16_t>&) {
+            if (address == 0x02) return ++motorOneAttempts >= 3;
+            return true;
+        },
+        [](uint8_t, uint16_t, uint16_t, std::vector<uint16_t>&) { return false; });
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }), motors);
+    marine::MarineSafety safety(data.path() + "/events.jsonl"); marine::MarineApi api(repository, runtime, safety, motors);
+
+    const auto stopped = api.handle(request("POST", "/api/v1/marine/software-demo/stop", "{\"operator\":\"演示员\"}"));
+    REQUIRE(stopped.statusCode == 200);
+    REQUIRE(motorOneAttempts == 3);
+    REQUIRE(stopped.body.find("\"controlledMotorNumbers\":[1,2,3]") != std::string::npos);
+    REQUIRE(stopped.body.find("\"failedMotorNumbers\":[]") != std::string::npos);
 }
 }
 
@@ -535,6 +582,7 @@ int main() {
     motor_service_locks_resources_and_latches_emergency_stop();
     motor_service_reads_signed_32_bit_speed_and_reports_failed_emergency_stop();
     motor_inventory_discovers_one_device_then_heartbeats_only_that_address();
+    motor_inventory_can_scan_all_addresses_without_changing_the_binding();
     inventory_refreshes_live_speed_after_startup_and_direction_changes();
     emergency_stop_preempts_a_blocked_runtime_start();
     runtime_waits_for_all_parallel_nodes_before_next_step();
@@ -547,6 +595,7 @@ int main() {
     api_runs_hardware_replacement_with_real_motor_state_transitions();
     hardware_reset_controls_only_the_single_detected_motor();
     software_demo_controls_only_the_single_detected_real_motor();
+    software_demo_stop_retries_transient_motor_failures();
     if (failures != 0) {
         std::cerr << failures << " 项测试失败\n";
         return EXIT_FAILURE;

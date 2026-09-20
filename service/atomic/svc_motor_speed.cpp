@@ -151,6 +151,34 @@ std::vector<MotorTelemetry> MotorAtomicService::list() {
     return result;
 }
 
+std::vector<MotorTelemetry> MotorAtomicService::scanAll() {
+    static const std::array<const char*, 3> ids{{"EXHAUST-FAN-01", "FIRE-PUMP-01", "DRAIN-PUMP-01"}};
+    Reader reader; bool simulation; std::vector<std::pair<MotorTelemetry, uint8_t>> snapshot;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        reader = reader_; simulation = simulation_; snapshot.reserve(ids.size());
+        for (const auto* id : ids) snapshot.emplace_back(devices_.at(id).telemetry, devices_.at(id).address);
+    }
+    std::vector<MotorTelemetry> result; result.reserve(snapshot.size());
+    for (auto& item : snapshot) {
+        auto telemetry = item.first;
+        if (!simulation) {
+            std::vector<uint16_t> status, speed;
+            telemetry.online = reader && reader(item.second, 0x6041, 1, status) && status.size() == 1;
+            if (telemetry.online) {
+                telemetry.statusWord = status[0];
+                if (reader(item.second, 0x606C, 2, speed) && speed.size() == 2) {
+                    telemetry.actualRpm = wordsI32(speed);
+                    telemetry.running = std::abs(telemetry.actualRpm) > 5;
+                    if (telemetry.actualRpm != 0) telemetry.direction = telemetry.actualRpm < 0 ? "reverse" : "forward";
+                }
+            }
+        }
+        result.push_back(std::move(telemetry));
+    }
+    return result;
+}
+
 void MotorAtomicService::refreshInventory() {
     static const std::array<const char*, 3> ids{{"EXHAUST-FAN-01", "FIRE-PUMP-01", "DRAIN-PUMP-01"}};
     std::string id; uint8_t address; uint64_t generation; Reader reader;

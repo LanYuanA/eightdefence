@@ -25,6 +25,7 @@ MarineApi::MarineApi(MarineRepository& repository, MarineRuntime& runtime, Marin
 HttpResponse MarineApi::handle(const HttpRequest& request) {
     const auto& path = request.path;
     if (request.method == "GET" && path == "/api/v1/health") { const auto status = safety_.status(nowMs()); return respond(JsonValue::Object{{"version", "v1"}, {"storage", "ready"}, {"sensorMode", "demo"}, {"motorMode", motors_ && !motors_->simulation() ? "real" : "simulation"}, {"actuatorControlEnabled", status.actuatorControlEnabled}, {"emergencyStopped", status.emergencyStopped}, {"locked", !status.unlocked}}); }
+    if (request.method == "GET" && path == "/api/v1/marine/motors/scan") { if (!motors_) return failure(503, "motor_service_unavailable", "电机原子服务未初始化。"); JsonValue::Array values; for (const auto& motor : motors_->scanAll()) values.emplace_back(motorJson(motor)); return respond(values); }
     if (request.method == "GET" && path == "/api/v1/marine/motors") { if (!motors_) return failure(503, "motor_service_unavailable", "电机原子服务未初始化。"); JsonValue::Array values; for (const auto& motor : motors_->list()) values.emplace_back(motorJson(motor)); return respond(values); }
     const std::string hardwareDemoPrefix = "/api/v1/marine/hardware-demo/";
     if (request.method == "POST" && path.rfind(hardwareDemoPrefix, 0) == 0) {
@@ -95,7 +96,7 @@ HttpResponse MarineApi::handle(const HttpRequest& request) {
 
         // 真实串口模式下一次只会绑定一台电机。场景中的其余编号由前端模拟，
         // 后端不得继续向未接入地址发送控制帧，否则一次正常演示会被离线设备拖失败。
-        if (!motors_->simulation()) {
+        if (!motors_->simulation() && action != "stop") {
             const auto inventory = motors_->list();
             std::vector<int> onlineNumbers;
             for (size_t index = 0; index < executors.size(); ++index) {
@@ -110,6 +111,7 @@ HttpResponse MarineApi::handle(const HttpRequest& request) {
         }
 
         JsonValue::Array controlled;
+        JsonValue::Array failed;
         JsonValue::Array telemetry;
         for (const int number : targets) {
             const auto& executor = executors.at(static_cast<size_t>(number - 1));
@@ -118,12 +120,21 @@ HttpResponse MarineApi::handle(const HttpRequest& request) {
                 motors_->stop("", executor);
                 MotorParameters parameters; parameters.executorId = executor; parameters.speedRpm = 200; parameters.direction = MotorDirection::Forward; parameters.acceleration = 10; parameters.deceleration = 10;
                 outcome = motors_->start("SOFTWARE-DECOUPLING", parameters);
-            } else outcome = motors_->stop("", executor);
-            if (!outcome.empty()) return failure(outcome == "device_error" ? 502 : 409, outcome, "场景电机控制失败：电机" + std::to_string(number));
+            } else {
+                const int attempts = action == "stop" && !motors_->simulation() ? 3 : 1;
+                for (int attempt = 0; attempt < attempts; ++attempt) {
+                    outcome = motors_->stop("", executor);
+                    if (outcome.empty()) break;
+                }
+            }
+            if (!outcome.empty()) {
+                if (action == "stop") { failed.emplace_back(number); continue; }
+                return failure(outcome == "device_error" ? 502 : 409, outcome, "场景电机控制失败：电机" + std::to_string(number));
+            }
             controlled.emplace_back(number);
             telemetry.emplace_back(motorJson(motors_->telemetry(executor)));
         }
-        return respond(JsonValue::Object{{"action", action}, {"controlledMotorNumbers", std::move(controlled)}, {"motors", std::move(telemetry)}});
+        return respond(JsonValue::Object{{"action", action}, {"controlledMotorNumbers", std::move(controlled)}, {"failedMotorNumbers", std::move(failed)}, {"motors", std::move(telemetry)}});
     }
     const std::string motorPrefix = "/api/v1/marine/motors/";
     if (request.method == "POST" && path.rfind(motorPrefix, 0) == 0) {

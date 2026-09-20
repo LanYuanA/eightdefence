@@ -48,3 +48,9 @@ export function terminateSoftwareDemoState() {
     state: 'pending' as const,
   }
 }
+
+export function softwareTerminationMessage(failedMotorNumbers: number[]) {
+  return failedMotorNumbers.length === 0
+    ? '三台真实电机停止指令均已确认，演示已终止'
+    : `电机${failedMotorNumbers.join('、')}未确认停止，请检查设备连接后重试`
+}

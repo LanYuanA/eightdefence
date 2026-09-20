@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import DecouplingSwitch from '../components/DecouplingSwitch.vue'
 import ReferenceRegion from '../components/ReferenceRegion.vue'
-import { buildGroupControlCommands, resolveSoftwareTask, terminateSoftwareDemoState, type SoftwareTaskPlan } from '../marine/software-defined-tasks'
+import { buildGroupControlCommands, resolveSoftwareTask, softwareTerminationMessage, terminateSoftwareDemoState, type SoftwareTaskPlan } from '../marine/software-defined-tasks'
 import { marineApi } from '../marine/api'
 
 const DESIGN_WIDTH = 1678
@@ -80,14 +80,14 @@ async function resetDevices() {
 
 async function stopDemo() {
   await runProcess('stop', async () => {
-    await marineApi.stopSoftwareDemo('现场演示员')
+    const result = await marineApi.stopSoftwareDemo('现场演示员')
     const terminated = terminateSoftwareDemoState()
     stopped.value = terminated.stopped
     activePlan.value = terminated.activePlan
     revealStage.value = terminated.revealStage
     state.value = terminated.state
     taskEdited.value = false
-    message.value = '当前在线真实电机已停止，演示已终止'
+    message.value = softwareTerminationMessage(result?.failedMotorNumbers ?? [])
   })
 }
 

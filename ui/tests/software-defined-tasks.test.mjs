@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildGroupControlCommands, resolveSoftwareTask, terminateSoftwareDemoState } from '../src/marine/software-defined-tasks.ts'
+import { buildGroupControlCommands, resolveSoftwareTask, softwareTerminationMessage, terminateSoftwareDemoState } from '../src/marine/software-defined-tasks.ts'
 
 test('任务一 maps to the fixed 125 plan and separates controllable motors', () => {
   assert.deepEqual(resolveSoftwareTask('任务一：机舱静音控制'), {
@@ -47,4 +47,9 @@ test('terminating the demo clears the AI plan and only marks physical motors sto
     stopped: [1, 2, 3],
     state: 'pending',
   })
+})
+
+test('termination reports motors whose stop command was not confirmed', () => {
+  assert.equal(softwareTerminationMessage([]), '三台真实电机停止指令均已确认，演示已终止')
+  assert.equal(softwareTerminationMessage([1, 3]), '电机1、3未确认停止，请检查设备连接后重试')
 })

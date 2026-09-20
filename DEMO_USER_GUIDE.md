@@ -6,7 +6,7 @@
 
 ### 1. 硬件和软件
 
-- 一台安装 Ubuntu 或其他 Linux 系统的电脑。
+- 一台安装 Ubuntu、麒麟或其他 Linux 系统的电脑。
 - 本项目代码，默认目录为 `/home/kylin/ylz/work/eightdefence`。
 - 一个通过 RS485 接入的电机驱动器。系统当前按“一次只接一台真实电机”工作。
 - 串口设备默认为 `/dev/ttyS9`，波特率默认为 `9600`。
@@ -40,6 +40,8 @@ npm --version
 
 每条命令都能显示版本号即可。
 
+建议使用 Node.js `24.11.0` 或更高版本。Node.js `22.16.0` 执行 `npm ci` 时可能出现 `npm warn EBADENGINE`：这是因为 `vue-router` 引入的 Babel 工具建议 Node.js 至少为 `22.18.0`。如果命令最后显示 `added ... packages` 且回到了命令提示符，说明安装已经完成，可以继续执行后面的 `make all`；本项目也已在 Node.js `22.16.0` 下通过完整构建。该提示不是编译失败。
+
 ### 3. 第一次使用或代码更新后编译
 
 ```bash
@@ -49,6 +51,8 @@ npm ci
 cd ..
 make all
 ```
+
+如果 `npm ci` 只出现 `npm warn EBADENGINE`，同时最后显示 `added ... packages`，不要重复安装，直接继续执行 `cd ..` 和 `make all`。
 
 编译完成后，项目目录中应有 `app_gateway` 文件。以后如果代码没有更新，可以直接启动，无需重复安装依赖和编译。
 

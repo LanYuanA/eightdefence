@@ -44,13 +44,13 @@ export function terminateSoftwareDemoState() {
   return {
     activePlan: null,
     revealStage: 0,
-    stopped: [1, 2, 3],
+    stopped: [1, 2, 3, 4, 5, 6, 7, 8],
     state: 'pending' as const,
   }
 }
 
 export function softwareTerminationMessage(failedMotorNumbers: number[]) {
   return failedMotorNumbers.length === 0
-    ? '三台真实电机停止指令均已确认，演示已终止'
+    ? '三台真实电机均已停止，虚拟电机已同步关闭，演示已终止'
     : `电机${failedMotorNumbers.join('、')}未确认停止，请检查设备连接后重试`
 }

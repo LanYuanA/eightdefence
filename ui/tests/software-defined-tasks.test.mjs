@@ -40,16 +40,16 @@ test('group control converts AI targets into stop and keep-running outputs', () 
   assert.deepEqual(buildGroupControlCommands(null), [])
 })
 
-test('terminating the demo clears the AI plan and only marks physical motors stopped', () => {
+test('terminating the demo clears the AI plan and marks all real and virtual motors stopped', () => {
   assert.deepEqual(terminateSoftwareDemoState(), {
     activePlan: null,
     revealStage: 0,
-    stopped: [1, 2, 3],
+    stopped: [1, 2, 3, 4, 5, 6, 7, 8],
     state: 'pending',
   })
 })
 
 test('termination reports motors whose stop command was not confirmed', () => {
-  assert.equal(softwareTerminationMessage([]), '三台真实电机停止指令均已确认，演示已终止')
+  assert.equal(softwareTerminationMessage([]), '三台真实电机均已停止，虚拟电机已同步关闭，演示已终止')
   assert.equal(softwareTerminationMessage([1, 3]), '电机1、3未确认停止，请检查设备连接后重试')
 })

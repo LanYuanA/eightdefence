@@ -143,13 +143,50 @@ void MotorAtomicService::resetEmergency() { std::lock_guard<std::mutex> lock(mut
 bool MotorAtomicService::emergencyStopped() const { std::lock_guard<std::mutex> lock(mutex_); return emergencyStopped_; }
 bool MotorAtomicService::simulation() const { std::lock_guard<std::mutex> lock(mutex_); return simulation_; }
 std::vector<MotorTelemetry> MotorAtomicService::list() {
+    refreshInventory();
     static const std::array<const char*, 3> ids{{"EXHAUST-FAN-01", "FIRE-PUMP-01", "DRAIN-PUMP-01"}};
-    size_t refreshIndex;
-    { std::lock_guard<std::mutex> lock(mutex_); refreshIndex = nextInventoryRefresh_++ % ids.size(); }
-    telemetry(ids[refreshIndex]);
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<MotorTelemetry> result; result.reserve(ids.size());
     for (const auto* id : ids) result.push_back(devices_.at(id).telemetry);
     return result;
+}
+
+void MotorAtomicService::refreshInventory() {
+    static const std::array<const char*, 3> ids{{"EXHAUST-FAN-01", "FIRE-PUMP-01", "DRAIN-PUMP-01"}};
+    std::string id; uint8_t address; uint64_t generation; Reader reader;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (simulation_ || !reader_) return;
+        if (!detectedExecutorId_.empty()) id = detectedExecutorId_;
+        else { id = ids[discoveryIndex_]; discoveryIndex_ = (discoveryIndex_ + 1) % ids.size(); }
+        const auto& device = devices_.at(id);
+        address = device.address; generation = device.generation; reader = reader_;
+    }
+
+    std::vector<uint16_t> status, speed;
+    const bool online = reader(address, 0x6041, 1, status) && status.size() == 1;
+    // Refresh measured speed on the same detected address, including after restart.
+    // A speed-read failure alone must not mark a responding motor offline.
+    const bool speedOk = online && reader(address, 0x606C, 2, speed) && speed.size() == 2;
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto& device = devices_.at(id);
+    if (device.generation != generation) return;
+    if (online) {
+        detectedExecutorId_ = id;
+        device.telemetry.statusWord = status[0];
+        if (speedOk) {
+            device.telemetry.actualRpm = wordsI32(speed);
+            device.telemetry.running = std::abs(device.telemetry.actualRpm) > 5;
+            if (device.telemetry.actualRpm != 0)
+                device.telemetry.direction = device.telemetry.actualRpm < 0 ? "reverse" : "forward";
+        }
+        for (auto& item : devices_) item.second.telemetry.online = item.first == id;
+        return;
+    }
+    device.telemetry.online = false;
+    if (detectedExecutorId_ == id) {
+        detectedExecutorId_.clear();
+        for (auto& item : devices_) item.second.telemetry.online = false;
+    }
 }
 } // namespace marine

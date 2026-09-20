@@ -7,6 +7,8 @@ LDFLAGS = -lpthread
 MARINE_TEST_SRCS = application/marine/json_value.cpp application/marine/marine_types.cpp application/marine/marine_repository.cpp application/marine/marine_safety.cpp application/marine/marine_executor.cpp application/marine/marine_runtime.cpp application/marine/marine_api.cpp service/atomic/svc_motor_speed.cpp tests/marine_backend_test.cpp
 
 TARGET = app_gateway
+DEMO_TARGET = demo_server
+DEMO_SRC = demo/demo_server.cpp
 
 # C 源文件 (保留不变的底层模块)
 C_SRCS = core/modbus_core.c \
@@ -47,6 +49,7 @@ OBJS = $(C_OBJS) $(CXX_OBJS)
 .PHONY: frontend
 .PHONY: test-backend
 .PHONY: test-motor
+.PHONY: demo
 test-backend:
 	$(CXX) $(CXXFLAGS) $(MARINE_TEST_SRCS) -o marine_backend_test $(LDFLAGS)
 	./marine_backend_test
@@ -64,6 +67,11 @@ frontend:
 	@echo "✅ 前端已编译并部署到C++ public目录"
 
 all: frontend $(TARGET)
+
+demo: frontend $(DEMO_TARGET)
+
+$(DEMO_TARGET): $(DEMO_SRC)
+	$(CXX) -Wall -std=c++17 -o $@ $<
 
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS)

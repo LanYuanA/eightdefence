@@ -2,6 +2,8 @@
 
 基于 C++ 开发的工程化、面向对象、事件驱动的 Modbus RTU 传感器网关及全栈监控面板。系统通过 RS485 串口定时轮询各类环境与安防传感器，对报文进行 CRC 校验和业务解析，同时在后台启动独立线程的 C++ HTTP Server，为 Vue 3 + Vite 构建的赛博朋克风格大屏提供静态资源托管及 RESTful API 数据分发，并支持对受控设备的远程指令透传。
 
+> 面向演示人员的逐步操作说明：[双解耦演示操作手册](DEMO_USER_GUIDE.md)。手册按“先软硬解耦、再软软解耦”的顺序编写。
+
 ## 特性
 
 - **面向对象设备抽象**：基于 `DeviceBase` 基类继承体系，每个传感器与控制设备（空调、恒湿机、净化器等）拥有独立的读写及 Modbus 命令组帧能力。
@@ -84,33 +86,40 @@
 
 ```bash
 cd ui
-npm install
-npm run build
+npm ci
 cd ..
-# 将构建产物部署到 public 目录供后端托管
-cp -r ui/dist/* public/ 2>/dev/null || :
-cp ui/dist/index.html dashboard.html
+make frontend
 ```
 
 ### 3. 构建并运行 C++ 后端
 
 ```bash
-make clean
-make
+make all
 
 # 默认使用 /dev/ttyS9 串口，在 8080 端口启动 HTTP Server
-sudo ./app_gateway
+sudo ./app_gateway -d /dev/ttyS9
 ```
 
 自定义串口路径：
 
 ```bash
-sudo ./app_gateway /dev/ttyUSB0
+sudo ./app_gateway -d /dev/ttyUSB0
 ```
 
 ### 4. 访问面板
 
-浏览器打开 `http://127.0.0.1:8080`，系统将跳转至登录页面，登录后进入赛博朋克风格的实时监控大屏，支持传感器数据实时刷新与设备远程控制。
+浏览器打开 `http://127.0.0.1:8080`，默认进入软软解耦页面。软硬解耦页面地址为 `http://127.0.0.1:8080/hardware-decoupling`，完整演示流程见[双解耦演示操作手册](DEMO_USER_GUIDE.md)。
+
+### 独立演示服务（不启动 app_gateway）
+
+软软解耦与软硬解耦的演示页面可以使用不接串口、不初始化 Modbus 的静态服务：
+
+```bash
+make demo
+./demo_server
+```
+
+浏览器打开 `http://127.0.0.1:8088/software-defined-platform`。任务输入只读取前三个字：`任务一` 关闭 1、2、5，`任务二` 关闭 2、3、8，`任务三` 关闭 4、5、6；其中电机 1、2、3 标记为物理可控，电机 4–8 只做前端模拟展示。
 
 ## API 接口
 

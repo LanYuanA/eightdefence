@@ -14,6 +14,7 @@ import {
   mergeRealMotorTelemetry,
   syncRealRemovalState,
   confirmRealActuatorSwitch,
+  hardwareDisplayProtocol,
 } from '../src/marine/actuators.ts'
 import { createMarineApi } from '../src/marine/api.ts'
 
@@ -247,8 +248,18 @@ test('hardware replacement screen starts without invented RPM and merges real mo
     { address: '0x0E', online: true, running: true, actualRpm: 237, direction: 'reverse', statusWord: 39 },
   ])
   assert.equal(devices.find(device => device.address === '0x0E')?.speed, -237)
+  assert.equal(devices.find(device => device.address === '0x0E')?.direction, 'reverse')
   assert.equal(devices.find(device => device.address === '0x0E')?.status, 'running')
   assert.equal(devices.find(device => device.address === '0x02')?.speed, 0)
+})
+
+test('stopped motor keeps the real direction reported by the gateway', () => {
+  const devices = mergeRealMotorTelemetry(createActuatorDemo().devices, [
+    { address: '0x02', online: true, running: false, actualRpm: 0, direction: 'reverse', statusWord: 39 },
+  ])
+  const motor = devices.find(device => device.address === '0x02')
+  assert.equal(motor?.speed, 0)
+  assert.equal(motor?.direction, 'reverse')
 })
 
 test('real replacement flow enters protection only when the bound motor stops responding', () => {
@@ -298,6 +309,41 @@ test('hardware decoupling motor controls use the direct gateway endpoints', asyn
   assert.equal(requests[1].input, '/api/v1/marine/motors/FIRE-PUMP-01/stop')
 })
 
+test('software demo actions use the scene control endpoints', async () => {
+  const requests = []
+  const api = createMarineApi(async (input, init) => {
+    requests.push({ input, body: JSON.parse(init.body) })
+    return { ok: true, status: 200, json: async () => ({ ok: true }) }
+  })
+  await api.executeSoftwareDemo([2, 3, 8], '现场演示员')
+  await api.resetSoftwareDemo('现场演示员')
+  await api.stopSoftwareDemo('现场演示员')
+  assert.deepEqual(requests.map(item => item.input), [
+    '/api/v1/marine/software-demo/execute',
+    '/api/v1/marine/software-demo/reset',
+    '/api/v1/marine/software-demo/stop',
+  ])
+  assert.deepEqual(requests[0].body.motorNumbers, [2, 3, 8])
+})
+
+test('hardware replacement actions use the gateway workflow endpoints', async () => {
+  const requests = []
+  const api = createMarineApi(async (input, init) => {
+    requests.push({ input, body: JSON.parse(init.body) })
+    return { ok: true, status: 200, json: async () => ({ ok: true }) }
+  })
+  await api.resetHardwareDemo('现场演示员')
+  await api.faultHardwareDemo('现场演示员')
+  await api.switchHardwareDemo('MOTOR-0E', { speedRpm: 200, direction: 'forward', operator: '现场演示员' })
+  assert.deepEqual(requests.map(item => item.input), [
+    '/api/v1/marine/hardware-demo/reset',
+    '/api/v1/marine/hardware-demo/fault',
+    '/api/v1/marine/hardware-demo/switch',
+  ])
+  assert.equal(requests[2].body.deviceId, 'MOTOR-0E')
+  assert.equal(requests[2].body.speedRpm, 200)
+})
+
 test('fault protection cannot switch until an eligible motor is connected', () => {
   const faulted = injectActuatorFault(createActuatorDemo())
   assert.equal(faulted.phase, 'protected')
@@ -336,4 +382,10 @@ test('hardware demo names physical devices by their shipboard responsibility', (
   assert.deepEqual(devices.map(device => device.name), ['水泵 A', '水泵 B', '水泵 C'])
   assert.equal(devices.find(device => device.id === 'MOTOR-0E')?.compatible, true)
   assert.equal(devices.find(device => device.id === 'MOTOR-0F')?.compatible, true)
+})
+
+test('hardware screen presents three protocol types without changing RS485 motor addresses', () => {
+  const devices = createActuatorDemo().devices
+  assert.deepEqual(devices.map(device => hardwareDisplayProtocol(device.address)), ['RS485', 'CAN', 'RS232'])
+  assert.deepEqual(devices.map(device => device.address), ['0x02', '0x0E', '0x0F'])
 })

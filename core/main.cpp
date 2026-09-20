@@ -1,15 +1,6 @@
 /**
  * @file main.cpp
- * @brief 系统主入口 (C++) - v2.0 多线程架构
- *
- * 使用 PollingManager 管理多线程设备轮询。
- * 每个设备任务在独立线程中运行，通过共享的 SerialBus
- * (线程安全互斥锁) 访问 RS-485 总线。
- * 支持:
- *   - 每个设备独立的轮询间隔
- *   - 线程安全的总线访问
- *   - 非阻塞式轮询 (慢设备不阻塞快设备)
- *   - 运行时统计与压力测试
+ * @brief 系统主入口 (C++) - 船舶软件定义演示网关
  */
 
 #include <cstdio>
@@ -390,86 +381,10 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    /* ============================================================
-     * 收集所有设备的任务
-     * ============================================================ */
-    std::vector<DeviceTask> all_tasks;
-
-    /* 按设备分组, 同一设备的多个寄存器读取合并为一组 */
-    /* 云测仪: 连续读模式下 dev_cloud_batch 产生1个任务, 各传感器返回空 */
-    /*         单独读模式下 dev_cloud_batch 无任务, 各传感器各自产生任务 */
-    {
-        auto t = dev_cloud_batch.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_pm25.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_pm10.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_humidity.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_temperature.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_tvoc.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_ch2o.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_co2.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_smoke.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_water.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_infrared.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-    {
-        auto t = dev_light.getTasks();
-        all_tasks.insert(all_tasks.end(), t.begin(), t.end());
-    }
-
-    // 现场演示时为电机状态读取和控制保留 RS485 时间窗口。
-    for (auto& task : all_tasks) task.pollIntervalMs = 10000;
-
-    size_t num_tasks = all_tasks.size();
-    LOG_INFO("共 %zu 个轮询任务:", num_tasks);
-
-    for (size_t i = 0; i < num_tasks; i++) {
-        LOG_INFO("  [%zu] %s (间隔: %u ms)",
-                 i + 1,
-                 all_tasks[i].description.c_str(),
-                 all_tasks[i].pollIntervalMs);
-    }
-
-    /* ============================================================
-     * 启动异步轮询管理器
-     * ============================================================ */
-    PollingManager poller(&asyncBus);
-    g_poller = &poller;
-    poller.addTasks(all_tasks);
-    poller.start();
-
-    printf("[MAIN] poller.start() 已返回, 进入主循环\n"); fflush(stdout);
-    LOG_INFO("多线程轮询已启动, 按 Ctrl+C 退出");
+    // 现场演示只使用三台真实电机。传感器轮询保持关闭，避免与电机状态读取、
+    // 启停和调速指令争用同一条 RS485 总线。
+    g_poller = nullptr;
+    LOG_INFO("传感器轮询已关闭，RS485 总线专用于三台演示电机");
 
     /* ============================================================
      * 主循环: 定期打印统计信息
@@ -505,21 +420,6 @@ int main(int argc, char *argv[]) {
         LOG_INFO("  最大延迟:     %.2f ms", stats.maxLatencyMs.load());
         LOG_INFO("  总线争用次数: %lu", (unsigned long)stats.busContentionCount.load());
 
-        /* 打印轮询统计 */
-        auto groupStats = poller.getGroupStatsSnapshot();
-        uint64_t totalOk = 0, totalFail = 0;
-        for (auto &kv : groupStats) {
-            totalOk += kv.second.successCount;
-            totalFail += kv.second.failCount;
-        }
-        LOG_INFO("======== 轮询统计 ========");
-        LOG_INFO("  任务组数:     %zu", groupStats.size());
-        LOG_INFO("  成功事务:     %lu", (unsigned long)totalOk);
-        LOG_INFO("  失败事务:     %lu", (unsigned long)totalFail);
-        if (totalOk + totalFail > 0) {
-            LOG_INFO("  成功率:       %.1f%%",
-                     100.0 * totalOk / (totalOk + totalFail));
-        }
         /* 异步总线统计 */
         const auto &asyncStats = asyncBus.getStats();
         LOG_INFO("======== 异步总线统计 ========");
@@ -552,9 +452,6 @@ int main(int argc, char *argv[]) {
 
     LOG_INFO("正在停止命令队列...");
     cmdQueue.stop();
-
-    LOG_INFO("正在停止轮询...");
-    poller.stop();
 
     LOG_INFO("正在停止异步总线...");
     asyncBus.stop();

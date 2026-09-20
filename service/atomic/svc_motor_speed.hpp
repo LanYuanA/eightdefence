@@ -50,6 +50,7 @@ private:
     bool writeI32(uint8_t address, uint16_t reg, int32_t value, const Writer& writer, bool simulation) const;
     bool operationAllowed(const std::string& executorId, const std::string& owner, uint64_t generation) const;
     std::string signedDirection(const MotorParameters& parameters, const Device& device, int& signedRpm) const;
+    void refreshInventory();
     mutable std::mutex mutex_;
     std::map<std::string, Device> devices_;
     Writer writer_;
@@ -57,7 +58,8 @@ private:
     EmergencyWriter emergencyWriter_;
     bool simulation_;
     bool emergencyStopped_ = false;
-    size_t nextInventoryRefresh_ = 0;
+    size_t discoveryIndex_ = 0;
+    std::string detectedExecutorId_;
 };
 
 } // namespace marine

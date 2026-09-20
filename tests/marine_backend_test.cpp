@@ -224,21 +224,63 @@ void motor_service_reads_signed_32_bit_speed_and_reports_failed_emergency_stop()
     REQUIRE(!failing.telemetry("EXHAUST-FAN-01").online);
 }
 
-void motor_inventory_refreshes_only_one_device_per_request() {
+void motor_inventory_discovers_one_device_then_heartbeats_only_that_address() {
     marine::MotorAtomicService motors(true);
-    std::atomic<int> reads{0};
+    std::vector<uint8_t> reads;
+    uint8_t connectedAddress = 0x0E;
     motors.attachIo(
         [](uint8_t, uint16_t, const std::vector<uint16_t>&) { return true; },
-        [&](uint8_t, uint16_t reg, uint16_t count, std::vector<uint16_t>& values) {
-            ++reads;
-            if (reg == 0x6041) values = {0x0027};
-            else if (reg == 0x606C && count == 2) values = {0, 0};
-            else return false;
-            return true;
+        [&](uint8_t address, uint16_t reg, uint16_t, std::vector<uint16_t>& values) {
+            if (reg != 0x6041) return false;
+            reads.push_back(address);
+            if (address != connectedAddress) return false;
+            values = {0x0027}; return true;
         });
-    const auto inventory = motors.list();
-    REQUIRE(inventory.size() == 3);
-    REQUIRE(reads.load() == 1);
+
+    auto inventory = motors.list();
+    REQUIRE(!inventory.at(0).online && !inventory.at(1).online && !inventory.at(2).online);
+    inventory = motors.list();
+    REQUIRE(!inventory.at(0).online && inventory.at(1).online && !inventory.at(2).online);
+    motors.list();
+    REQUIRE((reads == std::vector<uint8_t>{0x02, 0x0E, 0x0E}));
+
+    connectedAddress = 0x0F;
+    inventory = motors.list();
+    REQUIRE(!inventory.at(0).online && !inventory.at(1).online && !inventory.at(2).online);
+    inventory = motors.list();
+    REQUIRE(!inventory.at(0).online && !inventory.at(1).online && inventory.at(2).online);
+    motors.list();
+    REQUIRE((reads == std::vector<uint8_t>{0x02, 0x0E, 0x0E, 0x0E, 0x0F, 0x0F}));
+}
+
+void inventory_refreshes_live_speed_after_startup_and_direction_changes() {
+    marine::MotorAtomicService motors(true);
+    int32_t speed = 28;
+    std::vector<uint8_t> speedAddresses;
+    motors.attachIo(
+        [](uint8_t, uint16_t, const std::vector<uint16_t>&) { return true; },
+        [&](uint8_t address, uint16_t reg, uint16_t count, std::vector<uint16_t>& values) {
+            if (address != 0x02) return false;
+            if (reg == 0x6041 && count == 1) { values = {0x27}; return true; }
+            if (reg == 0x606C && count == 2) {
+                speedAddresses.push_back(address);
+                const auto raw = static_cast<uint32_t>(speed);
+                values = {static_cast<uint16_t>(raw >> 16), static_cast<uint16_t>(raw)};
+                return true;
+            }
+            return false;
+        });
+    REQUIRE(motors.list().at(0).actualRpm == 28);
+    speed = 200;
+    REQUIRE(motors.list().at(0).actualRpm == 200);
+    speed = -200;
+    const auto reverse = motors.list().at(0);
+    REQUIRE(reverse.actualRpm == -200);
+    REQUIRE(reverse.running);
+    REQUIRE(reverse.direction == "reverse");
+    speed = 0;
+    REQUIRE(!motors.list().at(0).running);
+    REQUIRE((speedAddresses == std::vector<uint8_t>{0x02, 0x02, 0x02, 0x02}));
 }
 
 void emergency_stop_preempts_a_blocked_runtime_start() {
@@ -364,6 +406,119 @@ void api_directly_controls_motor_for_hardware_decoupling_screen() {
     REQUIRE(stopped.statusCode == 200);
     REQUIRE(stopped.body.find("\"running\":false") != std::string::npos);
 }
+
+void api_controls_software_demo_motors_as_one_scene() {
+    TempDir data; marine::MarineRepository repository(data.path()); REQUIRE(repository.load().empty());
+    auto motors = std::make_shared<marine::MotorAtomicService>(true);
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }), motors);
+    marine::MarineSafety safety(data.path() + "/events.jsonl"); marine::MarineApi api(repository, runtime, safety, motors);
+
+    const auto reset = api.handle(request("POST", "/api/v1/marine/software-demo/reset", "{\"operator\":\"演示员\"}"));
+    REQUIRE(reset.statusCode == 200);
+    REQUIRE(reset.body.find("\"targetRpm\":200") != std::string::npos);
+    REQUIRE(reset.body.find("\"running\":true") != std::string::npos);
+
+    const auto execute = api.handle(request("POST", "/api/v1/marine/software-demo/execute", "{\"operator\":\"演示员\",\"motorNumbers\":[2,3,8]}"));
+    REQUIRE(execute.statusCode == 200);
+    REQUIRE(execute.body.find("\"controlledMotorNumbers\":[2,3]") != std::string::npos);
+    REQUIRE(motors->telemetry("EXHAUST-FAN-01").running);
+    REQUIRE(!motors->telemetry("FIRE-PUMP-01").running);
+    REQUIRE(!motors->telemetry("DRAIN-PUMP-01").running);
+
+    const auto stopped = api.handle(request("POST", "/api/v1/marine/software-demo/stop", "{\"operator\":\"演示员\"}"));
+    REQUIRE(stopped.statusCode == 200);
+    REQUIRE(!motors->telemetry("EXHAUST-FAN-01").running);
+}
+
+void api_runs_hardware_replacement_with_real_motor_state_transitions() {
+    TempDir data; marine::MarineRepository repository(data.path()); REQUIRE(repository.load().empty());
+    auto motors = std::make_shared<marine::MotorAtomicService>(true);
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }), motors);
+    marine::MarineSafety safety(data.path() + "/events.jsonl"); marine::MarineApi api(repository, runtime, safety, motors);
+
+    const auto reset = api.handle(request("POST", "/api/v1/marine/hardware-demo/reset", "{\"operator\":\"演示员\"}"));
+    REQUIRE(reset.statusCode == 200);
+    REQUIRE(motors->telemetry("EXHAUST-FAN-01").running);
+    REQUIRE(motors->telemetry("EXHAUST-FAN-01").targetRpm == 200);
+    REQUIRE(!motors->telemetry("FIRE-PUMP-01").running);
+
+    const auto fault = api.handle(request("POST", "/api/v1/marine/hardware-demo/fault", "{\"operator\":\"演示员\"}"));
+    REQUIRE(fault.statusCode == 200);
+    REQUIRE(!motors->telemetry("EXHAUST-FAN-01").running);
+    REQUIRE(motors->telemetry("EXHAUST-FAN-01").actualRpm == 0);
+
+    const auto switched = api.handle(request("POST", "/api/v1/marine/hardware-demo/switch", "{\"operator\":\"演示员\",\"deviceId\":\"MOTOR-0E\",\"speedRpm\":200,\"direction\":\"forward\"}"));
+    REQUIRE(switched.statusCode == 200);
+    REQUIRE(switched.body.find("\"deviceId\":\"MOTOR-0E\"") != std::string::npos);
+    REQUIRE(motors->telemetry("FIRE-PUMP-01").running);
+    REQUIRE(motors->telemetry("FIRE-PUMP-01").targetRpm == 200);
+    const auto coolBinding = std::find_if(repository.listBindings().begin(), repository.listBindings().end(), [](const marine::Binding& value) { return value.logicalExecutorId == "COOL-01"; });
+    REQUIRE(coolBinding != repository.listBindings().end());
+    REQUIRE(coolBinding->deviceId == "MOTOR-0E");
+}
+
+void hardware_reset_controls_only_the_single_detected_motor() {
+    TempDir data; marine::MarineRepository repository(data.path()); REQUIRE(repository.load().empty());
+    auto motors = std::make_shared<marine::MotorAtomicService>(true);
+    std::vector<uint8_t> writes;
+    motors->attachIo(
+        [&](uint8_t address, uint16_t, const std::vector<uint16_t>&) { writes.push_back(address); return address == 0x0E; },
+        [](uint8_t address, uint16_t reg, uint16_t, std::vector<uint16_t>& values) {
+            if (address != 0x0E || reg != 0x6041) return false;
+            values = {0x0027}; return true;
+        });
+    motors->list();
+    motors->list();
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }), motors);
+    marine::MarineSafety safety(data.path() + "/events.jsonl"); marine::MarineApi api(repository, runtime, safety, motors);
+
+    const auto reset = api.handle(request("POST", "/api/v1/marine/hardware-demo/reset", "{\"operator\":\"演示员\"}"));
+    REQUIRE(reset.statusCode == 200);
+    REQUIRE(!writes.empty());
+    REQUIRE(std::all_of(writes.begin(), writes.end(), [](uint8_t address) { return address == 0x0E; }));
+    const auto bindings = repository.listBindings();
+    const auto binding = std::find_if(bindings.begin(), bindings.end(), [](const marine::Binding& value) { return value.logicalExecutorId == "COOL-01"; });
+    REQUIRE(binding != bindings.end());
+    REQUIRE(binding->deviceId == "MOTOR-0E");
+}
+
+void software_demo_controls_only_the_single_detected_real_motor() {
+    TempDir data; marine::MarineRepository repository(data.path()); REQUIRE(repository.load().empty());
+    auto motors = std::make_shared<marine::MotorAtomicService>(true);
+    std::vector<uint8_t> writes;
+    motors->attachIo(
+        [&](uint8_t address, uint16_t, const std::vector<uint16_t>&) { writes.push_back(address); return address == 0x0E; },
+        [](uint8_t address, uint16_t reg, uint16_t, std::vector<uint16_t>& values) {
+            if (address != 0x0E) return false;
+            if (reg == 0x6041) { values = {0x0027}; return true; }
+            if (reg == 0x606C) { values = {0, 0}; return true; }
+            return false;
+        });
+    motors->list();
+    motors->list();
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }), motors);
+    marine::MarineSafety safety(data.path() + "/events.jsonl"); marine::MarineApi api(repository, runtime, safety, motors);
+
+    writes.clear();
+    const auto reset = api.handle(request("POST", "/api/v1/marine/software-demo/reset", "{\"operator\":\"演示员\"}"));
+    REQUIRE(reset.statusCode == 200);
+    REQUIRE(reset.body.find("\"controlledMotorNumbers\":[2]") != std::string::npos);
+    REQUIRE(!writes.empty());
+    REQUIRE(std::all_of(writes.begin(), writes.end(), [](uint8_t address) { return address == 0x0E; }));
+
+    writes.clear();
+    const auto execute = api.handle(request("POST", "/api/v1/marine/software-demo/execute", "{\"operator\":\"演示员\",\"motorNumbers\":[1,2,5]}"));
+    REQUIRE(execute.statusCode == 200);
+    REQUIRE(execute.body.find("\"controlledMotorNumbers\":[2]") != std::string::npos);
+    REQUIRE(!writes.empty());
+    REQUIRE(std::all_of(writes.begin(), writes.end(), [](uint8_t address) { return address == 0x0E; }));
+
+    writes.clear();
+    const auto virtualOnly = api.handle(request("POST", "/api/v1/marine/software-demo/execute", "{\"operator\":\"演示员\",\"motorNumbers\":[1,5]}"));
+    REQUIRE(virtualOnly.statusCode == 200);
+    REQUIRE(virtualOnly.body.find("\"controlledMotorNumbers\":[]") != std::string::npos);
+    REQUIRE(writes.empty());
+}
 }
 
 int main() {
@@ -379,7 +534,8 @@ int main() {
     offline_sensor_is_reported_as_demo_data();
     motor_service_locks_resources_and_latches_emergency_stop();
     motor_service_reads_signed_32_bit_speed_and_reports_failed_emergency_stop();
-    motor_inventory_refreshes_only_one_device_per_request();
+    motor_inventory_discovers_one_device_then_heartbeats_only_that_address();
+    inventory_refreshes_live_speed_after_startup_and_direction_changes();
     emergency_stop_preempts_a_blocked_runtime_start();
     runtime_waits_for_all_parallel_nodes_before_next_step();
     cancelling_one_run_does_not_cancel_another_run();
@@ -387,6 +543,10 @@ int main() {
     api_returns_conflict_for_stale_binding_version();
     api_runs_updates_and_emergency_stops_motor_service();
     api_directly_controls_motor_for_hardware_decoupling_screen();
+    api_controls_software_demo_motors_as_one_scene();
+    api_runs_hardware_replacement_with_real_motor_state_transitions();
+    hardware_reset_controls_only_the_single_detected_motor();
+    software_demo_controls_only_the_single_detected_real_motor();
     if (failures != 0) {
         std::cerr << failures << " 项测试失败\n";
         return EXIT_FAILURE;

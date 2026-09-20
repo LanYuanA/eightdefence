@@ -11,6 +11,29 @@ export interface ActuatorDevice {
   compatible: boolean
   faultCode: string
   speed: number
+  direction: 'forward' | 'reverse'
+}
+
+export type HardwareDisplayProtocol = 'RS485' | 'CAN' | 'RS232'
+
+export function motorPresentation(device: ActuatorDevice | undefined, gatewayOnline: boolean) {
+  if (!gatewayOnline || !device) {
+    return { rpm: null, direction: '--', state: '未知', connection: '未知', online: false }
+  }
+  if (device.status === 'offline') {
+    return { rpm: null, direction: '--', state: '--', connection: '离线', online: false }
+  }
+  return {
+    rpm: Number.isFinite(device.speed) ? Math.abs(device.speed) : null,
+    direction: device.direction === 'reverse' ? '反转' : '正转',
+    state: device.status === 'running' ? '运行中' : device.status === 'faulted' ? '故障' : '已停止',
+    connection: '在线',
+    online: true,
+  }
+}
+
+export function hardwareDisplayProtocol(address: ActuatorDevice['address']): HardwareDisplayProtocol {
+  return address === '0x02' ? 'RS485' : address === '0x0E' ? 'CAN' : 'RS232'
 }
 
 export interface ActuatorEvent {
@@ -58,9 +81,9 @@ export function createActuatorDemo(): ActuatorDemoState {
     atomicService: { id: 'SERVICE-COOL-01', name: '冷却泵控制服务' },
     logicalExecutor: { id: 'COOL-PUMP-01', name: '中央冷却泵逻辑执行器', boundDeviceId: 'MOTOR-02' },
     devices: [
-      { id: 'MOTOR-02', name: '水泵 A', type: '中央冷却泵 · 原型号', address: '0x02', status: 'offline', compatible: true, faultCode: '—', speed: 0 },
-      { id: 'MOTOR-0E', name: '水泵 B', type: '中央冷却泵 · 替换型号', address: '0x0E', status: 'offline', compatible: true, faultCode: '—', speed: 0 },
-      { id: 'MOTOR-0F', name: '水泵 C', type: '中央冷却泵 · 备用型号', address: '0x0F', status: 'offline', compatible: true, faultCode: '—', speed: 0 },
+      { id: 'MOTOR-02', name: '水泵 A', type: '中央冷却泵 · 原型号', address: '0x02', status: 'offline', compatible: true, faultCode: '—', speed: 0, direction: 'forward' },
+      { id: 'MOTOR-0E', name: '水泵 B', type: '中央冷却泵 · 替换型号', address: '0x0E', status: 'offline', compatible: true, faultCode: '—', speed: 0, direction: 'forward' },
+      { id: 'MOTOR-0F', name: '水泵 C', type: '中央冷却泵 · 备用型号', address: '0x0F', status: 'offline', compatible: true, faultCode: '—', speed: 0, direction: 'forward' },
     ],
     candidateId: null,
     applicationChanges: 0,
@@ -80,7 +103,8 @@ export function mergeRealMotorTelemetry(devices: ActuatorDevice[], motors: any[]
     return {
       ...device,
       status: motor.online ? (motor.running ? 'running' : 'standby') : 'offline',
-      speed: motor.direction === 'reverse' ? -Math.abs(rpm) : rpm,
+      speed: rpm === 0 ? 0 : motor.direction === 'reverse' ? -Math.abs(rpm) : rpm,
+      direction: motor.direction === 'reverse' ? 'reverse' : 'forward',
       faultCode: motor.statusWord === 39 ? '0x0000' : `0x${Number(motor.statusWord || 0).toString(16).padStart(4, '0')}`,
     }
   })

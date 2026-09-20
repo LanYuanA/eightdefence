@@ -18,6 +18,7 @@ std::vector<std::string> capabilitiesFor(const std::string& device) { if (device
 std::string addressFor(const std::string& device) { return device == "MOTOR-02" ? "0x02" : device == "MOTOR-0E" ? "0x0E" : device == "MOTOR-0F" ? "0x0F" : ""; }
 bool compatible(const std::vector<std::string>& available, const std::vector<std::string>& required) { return std::all_of(required.begin(), required.end(), [&](const std::string& item) { return std::find(available.begin(), available.end(), item) != available.end(); }); }
 JsonValue motorJson(const MotorTelemetry& motor) { return JsonValue::Object{{"executorId", motor.executorId}, {"name", motor.name}, {"model", motor.model}, {"address", motor.address}, {"owner", motor.owner}, {"online", motor.online}, {"running", motor.running}, {"targetRpm", motor.targetRpm}, {"actualRpm", motor.actualRpm}, {"direction", motor.direction}, {"statusWord", static_cast<double>(motor.statusWord)}, {"source", motor.source}}; }
+std::string executorForDevice(const std::string& device) { return device == "MOTOR-02" ? "EXHAUST-FAN-01" : device == "MOTOR-0E" ? "FIRE-PUMP-01" : device == "MOTOR-0F" ? "DRAIN-PUMP-01" : ""; }
 }
 
 MarineApi::MarineApi(MarineRepository& repository, MarineRuntime& runtime, MarineSafety& safety, std::shared_ptr<MotorAtomicService> motors) : repository_(repository), runtime_(runtime), safety_(safety), motors_(std::move(motors)) {}
@@ -25,6 +26,105 @@ HttpResponse MarineApi::handle(const HttpRequest& request) {
     const auto& path = request.path;
     if (request.method == "GET" && path == "/api/v1/health") { const auto status = safety_.status(nowMs()); return respond(JsonValue::Object{{"version", "v1"}, {"storage", "ready"}, {"sensorMode", "demo"}, {"motorMode", motors_ && !motors_->simulation() ? "real" : "simulation"}, {"actuatorControlEnabled", status.actuatorControlEnabled}, {"emergencyStopped", status.emergencyStopped}, {"locked", !status.unlocked}}); }
     if (request.method == "GET" && path == "/api/v1/marine/motors") { if (!motors_) return failure(503, "motor_service_unavailable", "电机原子服务未初始化。"); JsonValue::Array values; for (const auto& motor : motors_->list()) values.emplace_back(motorJson(motor)); return respond(values); }
+    const std::string hardwareDemoPrefix = "/api/v1/marine/hardware-demo/";
+    if (request.method == "POST" && path.rfind(hardwareDemoPrefix, 0) == 0) {
+        if (!motors_) return failure(503, "motor_service_unavailable", "电机原子服务未初始化。");
+        JsonValue::Object body; HttpResponse invalid;
+        if (!objectBody(request, body, invalid)) return invalid;
+        std::string operatorName;
+        if (!stringField(body, "operator", operatorName)) return failure(400, "validation_failed", "缺少操作员名称。");
+        if (!safety_.status(nowMs()).actuatorControlEnabled) return failure(423, "emergency_stopped", "执行器急停尚未复位。");
+        auto binding = std::find_if(repository_.listBindings().begin(), repository_.listBindings().end(), [](const Binding& value) { return value.logicalExecutorId == "COOL-01"; });
+        if (binding == repository_.listBindings().end()) return failure(404, "binding_not_found", "中央冷却泵逻辑绑定不存在。");
+        const std::string action = path.substr(hardwareDemoPrefix.size());
+        std::string targetDevice = binding->deviceId;
+        int speedRpm = 200;
+        MotorDirection direction = MotorDirection::Forward;
+
+        if (action == "reset") {
+            const auto inventory = motors_->list();
+            const auto online = std::find_if(inventory.begin(), inventory.end(), [](const MotorTelemetry& motor) { return motor.online; });
+            if (online == inventory.end()) return failure(409, "no_motor_online", "尚未检测到接入的电机，请等待心跳扫描。");
+            targetDevice = online->executorId == "EXHAUST-FAN-01" ? "MOTOR-02" : online->executorId == "FIRE-PUMP-01" ? "MOTOR-0E" : "MOTOR-0F";
+        } else if (action == "fault") {
+            const auto executor = executorForDevice(targetDevice);
+            if (executor.empty()) return failure(409, "invalid_binding", "当前绑定设备无对应电机。");
+            const auto outcome = motors_->stop("", executor);
+            if (!outcome.empty()) return failure(502, outcome, "模拟故障时停止电机失败。");
+            return respond(JsonValue::Object{{"action", action}, {"binding", bindingJson(*binding)}, {"motor", motorJson(motors_->telemetry(executor))}});
+        } else if (action == "switch") {
+            std::string directionText;
+            if (!stringField(body, "deviceId", targetDevice) || executorForDevice(targetDevice).empty() || !intField(body, "speedRpm", speedRpm) || speedRpm < 1 || speedRpm > 500 || !stringField(body, "direction", directionText) || (directionText != "forward" && directionText != "reverse")) return failure(400, "validation_failed", "替换设备或运行参数无效。");
+            direction = directionText == "reverse" ? MotorDirection::Reverse : MotorDirection::Forward;
+            if (targetDevice == binding->deviceId) return failure(409, "same_device", "请选择不同的替换电机。");
+        } else return failure(404, "not_found", "接口不存在。");
+
+        const std::string targetExecutor = executorForDevice(targetDevice);
+        motors_->stop("", targetExecutor);
+        MotorParameters parameters; parameters.executorId = targetExecutor; parameters.speedRpm = speedRpm; parameters.direction = direction; parameters.acceleration = 10; parameters.deceleration = 10;
+        const auto started = motors_->start("HARDWARE-DECOUPLING", parameters);
+        if (!started.empty()) return failure(started == "device_error" ? 502 : 409, started, "替换电机启动失败。");
+
+        Binding updated = *binding; updated.deviceId = targetDevice; updated.address = addressFor(targetDevice); updated.bus = "RS485";
+        const auto saved = repository_.updateBinding(updated, binding->version, operatorName);
+        if (!saved.empty()) { motors_->stop("", targetExecutor); return failure(500, saved, "逻辑执行器绑定更新失败。"); }
+        binding = std::find_if(repository_.listBindings().begin(), repository_.listBindings().end(), [](const Binding& value) { return value.logicalExecutorId == "COOL-01"; });
+        return respond(JsonValue::Object{{"action", action}, {"binding", bindingJson(*binding)}, {"motor", motorJson(motors_->telemetry(targetExecutor))}});
+    }
+    const std::string softwareDemoPrefix = "/api/v1/marine/software-demo/";
+    if (request.method == "POST" && path.rfind(softwareDemoPrefix, 0) == 0) {
+        if (!motors_) return failure(503, "motor_service_unavailable", "电机原子服务未初始化。");
+        JsonValue::Object body; HttpResponse invalid;
+        if (!objectBody(request, body, invalid)) return invalid;
+        std::string operatorName;
+        if (!stringField(body, "operator", operatorName)) return failure(400, "validation_failed", "缺少操作员名称。");
+        if (!safety_.status(nowMs()).actuatorControlEnabled) return failure(423, "emergency_stopped", "执行器急停尚未复位。");
+        const std::array<std::string, 3> executors{{"EXHAUST-FAN-01", "FIRE-PUMP-01", "DRAIN-PUMP-01"}};
+        const std::string action = path.substr(softwareDemoPrefix.size());
+        std::vector<int> targets;
+        if (action == "execute") {
+            const auto numbers = field(body, "motorNumbers");
+            if (numbers == nullptr || !numbers->isArray()) return failure(400, "validation_failed", "缺少电机编号列表。");
+            for (const auto& value : numbers->asArray()) {
+                if (!value.isNumber() || value.asNumber() != static_cast<int>(value.asNumber())) return failure(400, "validation_failed", "电机编号必须为整数。");
+                const int number = static_cast<int>(value.asNumber());
+                if (number >= 1 && number <= 3 && std::find(targets.begin(), targets.end(), number) == targets.end()) targets.push_back(number);
+            }
+        } else if (action == "reset" || action == "stop") targets = {1, 2, 3};
+        else return failure(404, "not_found", "接口不存在。");
+
+        // 真实串口模式下一次只会绑定一台电机。场景中的其余编号由前端模拟，
+        // 后端不得继续向未接入地址发送控制帧，否则一次正常演示会被离线设备拖失败。
+        if (!motors_->simulation()) {
+            const auto inventory = motors_->list();
+            std::vector<int> onlineNumbers;
+            for (size_t index = 0; index < executors.size(); ++index) {
+                const auto found = std::find_if(inventory.begin(), inventory.end(), [&](const MotorTelemetry& motor) {
+                    return motor.executorId == executors.at(index) && motor.online;
+                });
+                if (found != inventory.end()) onlineNumbers.push_back(static_cast<int>(index + 1));
+            }
+            targets.erase(std::remove_if(targets.begin(), targets.end(), [&](int number) {
+                return std::find(onlineNumbers.begin(), onlineNumbers.end(), number) == onlineNumbers.end();
+            }), targets.end());
+        }
+
+        JsonValue::Array controlled;
+        JsonValue::Array telemetry;
+        for (const int number : targets) {
+            const auto& executor = executors.at(static_cast<size_t>(number - 1));
+            std::string outcome;
+            if (action == "reset") {
+                motors_->stop("", executor);
+                MotorParameters parameters; parameters.executorId = executor; parameters.speedRpm = 200; parameters.direction = MotorDirection::Forward; parameters.acceleration = 10; parameters.deceleration = 10;
+                outcome = motors_->start("SOFTWARE-DECOUPLING", parameters);
+            } else outcome = motors_->stop("", executor);
+            if (!outcome.empty()) return failure(outcome == "device_error" ? 502 : 409, outcome, "场景电机控制失败：电机" + std::to_string(number));
+            controlled.emplace_back(number);
+            telemetry.emplace_back(motorJson(motors_->telemetry(executor)));
+        }
+        return respond(JsonValue::Object{{"action", action}, {"controlledMotorNumbers", std::move(controlled)}, {"motors", std::move(telemetry)}});
+    }
     const std::string motorPrefix = "/api/v1/marine/motors/";
     if (request.method == "POST" && path.rfind(motorPrefix, 0) == 0) {
         if (!motors_) return failure(503, "motor_service_unavailable", "电机原子服务未初始化。");

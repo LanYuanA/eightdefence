@@ -21,6 +21,12 @@ export interface MarineApiClient {
   listMotors(): Promise<any[]>
   startMotor(executorId: string, parameters: unknown): Promise<any>
   stopDirectMotor(executorId: string, operator: string): Promise<any>
+  executeSoftwareDemo(motorNumbers: number[], operator: string): Promise<any>
+  resetSoftwareDemo(operator: string): Promise<any>
+  stopSoftwareDemo(operator: string): Promise<any>
+  resetHardwareDemo(operator: string): Promise<any>
+  faultHardwareDemo(operator: string): Promise<any>
+  switchHardwareDemo(deviceId: string, parameters: unknown): Promise<any>
   updateMotor(runId: string, nodeId: string, parameters: unknown): Promise<any>
   stopMotor(runId: string, nodeId: string): Promise<any>
   emergencyStop(operator: string): Promise<any>
@@ -70,6 +76,12 @@ export function createMarineApi(fetcher: FetchLike = fetch as unknown as FetchLi
     listMotors: () => request('/marine/motors', 'GET', undefined, 12000) as Promise<any[]>,
     startMotor: (executorId, parameters) => request(`/marine/motors/${encodeURIComponent(executorId)}/start`, 'POST', parameters, 15000),
     stopDirectMotor: (executorId, operator) => request(`/marine/motors/${encodeURIComponent(executorId)}/stop`, 'POST', { operator }, 15000),
+    executeSoftwareDemo: (motorNumbers, operator) => request('/marine/software-demo/execute', 'POST', { motorNumbers, operator }, 20000),
+    resetSoftwareDemo: operator => request('/marine/software-demo/reset', 'POST', { operator }, 30000),
+    stopSoftwareDemo: operator => request('/marine/software-demo/stop', 'POST', { operator }, 20000),
+    resetHardwareDemo: operator => request('/marine/hardware-demo/reset', 'POST', { operator }, 30000),
+    faultHardwareDemo: operator => request('/marine/hardware-demo/fault', 'POST', { operator }, 20000),
+    switchHardwareDemo: (deviceId, parameters) => request('/marine/hardware-demo/switch', 'POST', { ...(parameters as object), deviceId }, 30000),
     updateMotor: (runId, nodeId, parameters) => request(`/marine/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/motor`, 'PATCH', parameters),
     stopMotor: (runId, nodeId) => request(`/marine/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/stop`, 'POST', {}),
     emergencyStop: operator => request('/marine/emergency-stop', 'POST', { operator }),

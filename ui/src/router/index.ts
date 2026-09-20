@@ -13,10 +13,13 @@ import MarineDemo from '../views/MarineDemo.vue'
 import ResourcePool from '../views/ResourcePool.vue'
 import DeviceGraph from '../views/DeviceGraph.vue'
 import HardwareDecoupling from '../views/HardwareDecoupling.vue'
+import SoftwareDefinedPlatform from '../views/SoftwareDefinedPlatform.vue'
 
 const router = createRouter({
   history: createWebHistory('/'),
   routes: [
+    { path: '/software-defined-platform', name: 'software-defined-platform', component: SoftwareDefinedPlatform, meta: { public: true } },
+    { path: '/cooling-replica', redirect: '/hardware-decoupling' },
     { path: '/legacy-dashboard', name: 'legacy-dashboard', component: Dashboard },
     { path: '/workflow', redirect: '/' },
     { path: '/marine', redirect: '/' },
@@ -28,7 +31,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'dashboard',
-      component: MarineDemo
+      redirect: '/software-defined-platform'
     },
     {
       path: '/logs',
@@ -95,7 +98,7 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const isLoggedIn = localStorage.getItem('isLoggedIn')
-  if (to.name !== 'login' && to.name !== 'dashboard' && to.name !== 'atomic-services' && to.name !== 'hardware-decoupling' && !isLoggedIn) {
+  if (!to.meta.public && to.name !== 'login' && to.name !== 'dashboard' && to.name !== 'atomic-services' && to.name !== 'hardware-decoupling' && !isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
   } else if (to.name === 'login' && isLoggedIn) {
     return { name: 'dashboard' }

@@ -1,0 +1,79 @@
+/* Live telemetry shares the accepted replica's layout, with read-only metrics. */
+.live-parameters h4 { width: 27%; }
+.live-parameters h4 small { display: block; margin-top: 3px; color: #9ec3d1; font-size: .45em; font-weight: 400; letter-spacing: .04em; text-shadow: none; }
+.live-metric { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: .2em; border-right: 1px solid #00c2d54d; }
+.live-metric:last-child { border-right: 0; }
+.live-metric > span { font-size: 1em; color: #bed9e6; }
+.live-metric > strong { font-size: 1.5em; font-weight: 500; white-space: nowrap; }
+.live-metric strong small { font-size: .6em; color: #c9dce8; }
+.live-metric .status-running, .connection-status.online, .gateway-connected { color: #47f4c8; }
+.connection-status { display: flex; align-items: center; gap: .4em; color: #a3b3be; }
+.connection-status.offline { color: #ff9984; }
+.connection-status i, .motor-live-status i { display: inline-block; width: .4em; height: .4em; border-radius: 50%; background: currentColor; }
+.connection-status.online i { box-shadow: 0 0 8px #47f4c888; }
+.live-motor-actions { display: flex; flex: 0 0 10.8em; align-items: center; justify-content: center; gap: .55em; padding: 0 .8em; border-left: 1px solid #00c2d54d; }
+.live-motor-actions button { min-width: 4.7em; height: 2.45em; padding: 0 .65em; border-radius: 7px; font-size: .92em; font-weight: 600; white-space: nowrap; }
+.live-motor-actions .start-button { border: 1px solid #00d8a5; color: #8ff5cd; background: linear-gradient(125deg,#003e3588,#00614266); box-shadow: inset 0 0 10px #00d49b22; }
+.live-motor-actions .stop-button { border: 1px solid #ff604a; color: #ff9b88; background: linear-gradient(125deg,#541c1988,#32100e99); box-shadow: inset 0 0 10px #ff3c2822; }
+.live-motor-actions button:disabled { opacity: .38; cursor: not-allowed; box-shadow: none; }
+.api-buttons > span { min-height: 2.4em; display: flex; align-items: center; justify-content: center; border: 1px solid var(--cyan); border-radius: 9px; background: linear-gradient(140deg,#003c5380,#00172b80); white-space: nowrap; }
+.api-buttons > span small { font: inherit; margin-left: .85em; }
+.motor-live-status { position: absolute; top: .55em; right: .8em; display: flex; align-items: center; gap: .35em; font-size: .7em; color: #8ba9b7; }
+.motor-live-status.online { color: #61e8c5; }
+.motor-live-status small { font: inherit; color: #a6d5df; }
+.replica-motor.selected { border-color: #7cf7ff; box-shadow: inset 0 0 20px #00dbea15, 0 0 8px #00eaff33; }
+.live-cooling .replica-motor-picture { padding-top: 10px; }
+@media (max-width: 760px) {
+  .live-parameters h4 { width: 100%; }
+  .live-metric { flex: 0 0 calc(50% - 8px); align-items: flex-start; padding-left: 8px; min-height: 65px; }
+  .live-metric:nth-child(3), .live-metric:nth-child(5) { border-right: 0; }
+  .live-motor-actions { flex: 1 0 100%; min-height: 48px; border: 0; padding: 0; }
+  .live-motor-actions button { min-height: 42px; flex: 1; }
+  .api-buttons > span { min-height: 42px; font-size: .9em; }
+}
+
+.live-cooling .flow-lit { outline: 1px solid #9dffff; outline-offset: -2px; box-shadow: inset 0 0 24px #00ebff44, 0 0 20px #00dfff88; animation: command-glow .55s ease-in-out infinite alternate; }
+.live-cooling .api-buttons .flow-lit { color: #001d29; background: #61efff; }
+.live-cooling .flow-error { outline: 1px solid #ff806a; box-shadow: inset 0 0 24px #ff503344; }
+.flow-travel .motor-connector::after { content: ''; position: absolute; left: calc(50% - 3px); top: 0; width: 6px; height: 16px; border-radius: 5px; background: #e6ffff; box-shadow: 0 0 12px 4px #00eaff; animation: command-travel .5s linear infinite; }
+@keyframes command-glow { to { filter: brightness(1.25); } }
+@keyframes command-travel { from { top: 0; opacity: .3; } to { top: 85%; opacity: 1; } }
+@media(prefers-reduced-motion:reduce) { .live-cooling .flow-lit, .flow-travel .motor-connector::after { animation: none; } }
+/* Keep the abstraction symbol inside its heading row. */
+.live-cooling .abstraction-heading .replica-icon { width: 3.6em; height: 3.35em; }
+@media (min-width: 761px) {
+  /* Use the upper node's axis, compensating for the smaller icon radius. */
+  .live-cooling .abstraction-heading { left: calc(39.7% + 1.025em); }
+}
+
+.live-cooling .query-lit:not(.flow-lit):not(.flow-error) { outline: 1px solid #d6a2ff; outline-offset: -2px; box-shadow: inset 0 0 18px #b15cff30, 0 0 12px #b15cff65; }
+.query-outbound:not(.flow-travel) .motor-connector::after, .query-return:not(.flow-travel) .motor-connector::after { content: ''; position: absolute; left: calc(50% - 3px); width: 6px; height: 12px; border-radius: 5px; background: #eed4ff; box-shadow: 0 0 10px 3px #bd75ff; animation: command-travel .25s linear both; }
+.query-return:not(.flow-travel) .motor-connector::after { animation-direction: reverse; }
+@media(prefers-reduced-motion:reduce) { .query-outbound:not(.flow-travel) .motor-connector::after, .query-return:not(.flow-travel) .motor-connector::after { animation: none; } }
+
+/* Device presence activates the abstraction interfaces and physical cards. */
+.live-cooling .replica-motor { transition: opacity .3s, filter .3s, box-shadow .3s; }
+.live-cooling .replica-motor.device-online:not(.flow-lit):not(.query-lit):not(.flow-error) { border-color: #36f0ef; box-shadow: inset 0 0 18px #00dbea18, 0 0 10px #00eaff30; }
+.live-cooling .replica-motor.device-offline { opacity: .38; filter: grayscale(.9); border-color: #536c78; box-shadow: none; outline: none; }
+.live-cooling .replica-motor.device-offline .motor-connector { opacity: .25; }
+.live-cooling .interfaces-inactive .replica-api { opacity: .3; filter: grayscale(1); }
+.live-cooling .replica-api { transition: opacity .3s, filter .3s; }
+.live-cooling .middleware-tier { border-bottom: 0; }
+.live-cooling .standalone-adapter { grid-column: 2; margin: 0 3.7% 0 0; position: relative; }
+@media (min-width: 761px) {
+  .live-cooling .replica-architecture { grid-template-rows: 15.65% 16.65% 36.2% 12% 19.5%; }
+  .live-cooling .abstraction-box { grid-template-rows: 1fr 1.67fr; margin-bottom: 12px; }
+  .live-cooling .standalone-adapter { margin-top: 5px; margin-bottom: 10px; }
+  .live-cooling .motor-connector { height: calc(1.65em + 10px); }
+}
+@media (max-width: 760px) {
+  .live-cooling .standalone-adapter { margin: 0; min-height: 80px; }
+}
+/* Static state, one moving packet per explicit operation. */
+.live-cooling .flow-lit { animation: none; }
+.live-cooling .flow-travel .motor-connector::after { animation: none; content: none; }
+.packet-overlay { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; overflow: visible; }
+.packet-overlay circle { filter: drop-shadow(0 0 5px currentColor); }
+.heartbeat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #775b91; vertical-align: middle; transition: background .2s; }
+.heartbeat-dot.received { background: #d6a2ff; box-shadow: 0 0 5px #b15cff; }
+.feedback-updated .live-metric strong { color: #d6a2ff; transition: color .3s; }

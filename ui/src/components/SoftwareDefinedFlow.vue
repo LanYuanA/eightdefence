@@ -70,7 +70,7 @@ const actionServices = [['01', '舱室通风'], ['02', '冷却循环'], ['03', '
       </section>
     </div>
 
-    <div class="decoupling-summary"><span><b>软软解耦</b> 原子服务按任务快速组合，新应用即刻生成</span><i/><span><b>软硬解耦</b> 上层面向抽象接口，底层硬件可替换</span><RouterLink class="decoupling-link" to="/hardware-decoupling">进入替换演示 →</RouterLink></div>
+    <div class="decoupling-summary"><span><b>软软解耦</b> 原子服务按任务快速组合，新应用即刻生成</span><RouterLink class="decoupling-link" to="/software-defined-platform">进入任务演示 →</RouterLink><i/><span><b>软硬解耦</b> 上层面向抽象接口，底层硬件可替换</span><RouterLink class="decoupling-link" to="/hardware-decoupling">进入替换演示 →</RouterLink></div>
   </div>
 </template>
 

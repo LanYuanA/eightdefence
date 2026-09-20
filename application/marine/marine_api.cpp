@@ -94,10 +94,10 @@ HttpResponse MarineApi::handle(const HttpRequest& request) {
         } else if (action == "reset" || action == "stop") targets = {1, 2, 3};
         else return failure(404, "not_found", "接口不存在。");
 
-        // 真实串口模式下一次只会绑定一台电机。场景中的其余编号由前端模拟，
-        // 后端不得继续向未接入地址发送控制帧，否则一次正常演示会被离线设备拖失败。
+        // 软软解耦允许三台真实电机同时接入。控制前只读扫描三个地址，
+        // 对实际在线且命中任务的电机下发指令，其余编号继续由前端模拟。
         if (!motors_->simulation() && action != "stop") {
-            const auto inventory = motors_->list();
+            const auto inventory = motors_->scanAll();
             std::vector<int> onlineNumbers;
             for (size_t index = 0; index < executors.size(); ++index) {
                 const auto found = std::find_if(inventory.begin(), inventory.end(), [&](const MotorTelemetry& motor) {

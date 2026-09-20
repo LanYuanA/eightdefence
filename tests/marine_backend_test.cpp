@@ -566,6 +566,28 @@ void software_demo_stop_retries_transient_motor_failures() {
     REQUIRE(stopped.body.find("\"controlledMotorNumbers\":[1,2,3]") != std::string::npos);
     REQUIRE(stopped.body.find("\"failedMotorNumbers\":[]") != std::string::npos);
 }
+
+void software_demo_reset_starts_every_connected_real_motor() {
+    TempDir data; marine::MarineRepository repository(data.path()); REQUIRE(repository.load().empty());
+    auto motors = std::make_shared<marine::MotorAtomicService>(true);
+    std::vector<uint8_t> writes;
+    motors->attachIo(
+        [&](uint8_t address, uint16_t, const std::vector<uint16_t>&) { writes.push_back(address); return true; },
+        [](uint8_t address, uint16_t reg, uint16_t count, std::vector<uint16_t>& values) {
+            if (reg == 0x6041 && count == 1) { values = {0x0221}; return true; }
+            if (reg == 0x606C && count == 2) { values = {0, static_cast<uint16_t>(address)}; return true; }
+            return false;
+        });
+    marine::MarineRuntime runtime(repository, marine::MarineExecutor([] { return marine::SensorSnapshot::demo(); }), motors);
+    marine::MarineSafety safety(data.path() + "/events.jsonl"); marine::MarineApi api(repository, runtime, safety, motors);
+
+    const auto reset = api.handle(request("POST", "/api/v1/marine/software-demo/reset", "{\"operator\":\"演示员\"}"));
+    REQUIRE(reset.statusCode == 200);
+    REQUIRE(reset.body.find("\"controlledMotorNumbers\":[1,2,3]") != std::string::npos);
+    REQUIRE(std::find(writes.begin(), writes.end(), 0x02) != writes.end());
+    REQUIRE(std::find(writes.begin(), writes.end(), 0x0E) != writes.end());
+    REQUIRE(std::find(writes.begin(), writes.end(), 0x0F) != writes.end());
+}
 }
 
 int main() {
@@ -596,6 +618,7 @@ int main() {
     hardware_reset_controls_only_the_single_detected_motor();
     software_demo_controls_only_the_single_detected_real_motor();
     software_demo_stop_retries_transient_motor_failures();
+    software_demo_reset_starts_every_connected_real_motor();
     if (failures != 0) {
         std::cerr << failures << " 项测试失败\n";
         return EXIT_FAILURE;

@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import DecouplingSwitch from '../components/DecouplingSwitch.vue'
 import ReferenceRegion from '../components/ReferenceRegion.vue'
-import { buildGroupControlCommands, resolveSoftwareTask, type SoftwareTaskPlan } from '../marine/software-defined-tasks'
+import { buildGroupControlCommands, resolveSoftwareTask, terminateSoftwareDemoState, type SoftwareTaskPlan } from '../marine/software-defined-tasks'
 import { marineApi } from '../marine/api'
 
 const DESIGN_WIDTH = 1678
@@ -81,9 +81,13 @@ async function resetDevices() {
 async function stopDemo() {
   await runProcess('stop', async () => {
     await marineApi.stopSoftwareDemo('现场演示员')
-    stopped.value = [1, 2, 3]
-    state.value = activePlan.value ? 'executed' : 'pending'
-    message.value = '三台真实电机已停止，演示已终止'
+    const terminated = terminateSoftwareDemoState()
+    stopped.value = terminated.stopped
+    activePlan.value = terminated.activePlan
+    revealStage.value = terminated.revealStage
+    state.value = terminated.state
+    taskEdited.value = false
+    message.value = '当前在线真实电机已停止，演示已终止'
   })
 }
 
@@ -216,7 +220,7 @@ const groupPath = (index: number) => `M414 0 C414 32 ${selectorX[index]! - 850 +
 
           <section class="feedback-panel" :class="{ 'stage-active': !!processKind && processKind !== 'analysis' }" aria-label="01 现场硬件设备 · 执行反馈">
             <ReferenceRegion :x="850" :y="700" :width="828" :height="48" />
-            <button class="stop-demo" :disabled="!!processKind" @click="stopDemo">■ 停止电机</button>
+            <button class="stop-demo" :disabled="!!processKind" @click="stopDemo">■ 终止演示</button>
             <button class="reset-devices" :disabled="!!processKind" @click="resetDevices">↻ 重置设备状态</button>
             <div class="motor-grid">
               <span v-for="(id, index) in devices" :key="id" class="feedback-motor" :class="{ off: stopped.includes(id), on: !stopped.includes(id), physical: controllable(id), simulated: simulated(id) }" :style="{ left: `${cardX[index]! - 850}px` }" :aria-label="`电机${id}，${controllable(id) ? '真实电机' : '虚拟电机'}，${stopped.includes(id) ? '关' : '开'}`">

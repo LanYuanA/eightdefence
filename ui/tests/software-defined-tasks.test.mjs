@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildGroupControlCommands, resolveSoftwareTask } from '../src/marine/software-defined-tasks.ts'
+import { buildGroupControlCommands, resolveSoftwareTask, terminateSoftwareDemoState } from '../src/marine/software-defined-tasks.ts'
 
 test('任务一 maps to the fixed 125 plan and separates controllable motors', () => {
   assert.deepEqual(resolveSoftwareTask('任务一：机舱静音控制'), {
@@ -38,4 +38,13 @@ test('group control converts AI targets into stop and keep-running outputs', () 
     { motorId: 8, command: 'stop', state: 'off' },
   ])
   assert.deepEqual(buildGroupControlCommands(null), [])
+})
+
+test('terminating the demo clears the AI plan and only marks physical motors stopped', () => {
+  assert.deepEqual(terminateSoftwareDemoState(), {
+    activePlan: null,
+    revealStage: 0,
+    stopped: [1, 2, 3],
+    state: 'pending',
+  })
 })

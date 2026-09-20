@@ -39,3 +39,12 @@ export function buildGroupControlCommands(plan: SoftwareTaskPlan | null): GroupC
     return { motorId, command: stopped ? 'stop' : 'keep', state: stopped ? 'off' : 'on' }
   })
 }
+
+export function terminateSoftwareDemoState() {
+  return {
+    activePlan: null,
+    revealStage: 0,
+    stopped: [1, 2, 3],
+    state: 'pending' as const,
+  }
+}

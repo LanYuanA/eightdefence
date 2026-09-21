@@ -46,7 +46,7 @@ public:
     std::vector<MotorTelemetry> scanAll();
 
 private:
-    struct Device { MotorTelemetry telemetry; uint8_t address; bool directionInverted = false; uint64_t lastReadMs = 0; uint64_t generation = 0; };
+    struct Device { MotorTelemetry telemetry; uint8_t address; bool directionInverted = false; int speedScale = 1; uint64_t lastReadMs = 0; uint64_t generation = 0; };
     bool writeOne(uint8_t address, uint16_t reg, uint16_t value, const Writer& writer, bool simulation) const;
     bool writeI32(uint8_t address, uint16_t reg, int32_t value, const Writer& writer, bool simulation) const;
     bool operationAllowed(const std::string& executorId, const std::string& owner, uint64_t generation) const;

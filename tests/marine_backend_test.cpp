@@ -224,6 +224,28 @@ void motor_service_reads_signed_32_bit_speed_and_reports_failed_emergency_stop()
     REQUIRE(!failing.telemetry("EXHAUST-FAN-01").online);
 }
 
+void motor_service_applies_measured_speed_calibration_to_ids42_motors() {
+    marine::MotorAtomicService motors(true);
+    std::vector<uint16_t> commandedSpeed;
+    motors.attachIo(
+        [&](uint8_t address, uint16_t reg, const std::vector<uint16_t>& values) {
+            if (address == 0x0E && reg == 0x60FF) commandedSpeed = values;
+            return true;
+        },
+        [](uint8_t address, uint16_t reg, uint16_t count, std::vector<uint16_t>& values) {
+            if (address != 0x0E) return false;
+            if (reg == 0x6041 && count == 1) { values = {0x0227}; return true; }
+            if (reg == 0x606C && count == 2) { values = {0, 500}; return true; }
+            return false;
+        });
+    marine::MotorParameters parameters; parameters.executorId = "FIRE-PUMP-01"; parameters.speedRpm = 50;
+    REQUIRE(motors.start("CALIBRATION-TEST", parameters).empty());
+    REQUIRE((commandedSpeed == std::vector<uint16_t>{0, 500}));
+    const auto telemetry = motors.telemetry(parameters.executorId);
+    REQUIRE(telemetry.targetRpm == 50);
+    REQUIRE(telemetry.actualRpm == 50);
+}
+
 void motor_inventory_discovers_one_device_then_heartbeats_only_that_address() {
     marine::MotorAtomicService motors(true);
     std::vector<uint8_t> reads;
@@ -603,6 +625,7 @@ int main() {
     offline_sensor_is_reported_as_demo_data();
     motor_service_locks_resources_and_latches_emergency_stop();
     motor_service_reads_signed_32_bit_speed_and_reports_failed_emergency_stop();
+    motor_service_applies_measured_speed_calibration_to_ids42_motors();
     motor_inventory_discovers_one_device_then_heartbeats_only_that_address();
     motor_inventory_can_scan_all_addresses_without_changing_the_binding();
     inventory_refreshes_live_speed_after_startup_and_direction_changes();

@@ -14,9 +14,9 @@ bool valid(const MotorParameters& p) { return p.speedRpm >= 1 && p.speedRpm <= 5
 }
 
 MotorAtomicService::MotorAtomicService(bool simulation) : simulation_(simulation) {
-    devices_.emplace("EXHAUST-FAN-01", Device{{"EXHAUST-FAN-01", "机舱排烟风机", "IDS57-R", "0x02"}, 0x02});
-    devices_.emplace("FIRE-PUMP-01", Device{{"FIRE-PUMP-01", "消防水泵", "IDS42-R", "0x0E"}, 0x0E});
-    devices_.emplace("DRAIN-PUMP-01", Device{{"DRAIN-PUMP-01", "舱底排水泵", "IDS42-R", "0x0F"}, 0x0F});
+    devices_.emplace("EXHAUST-FAN-01", Device{{"EXHAUST-FAN-01", "机舱排烟风机", "IDS57-R", "0x02"}, 0x02, false, 1});
+    devices_.emplace("FIRE-PUMP-01", Device{{"FIRE-PUMP-01", "消防水泵", "IDS42-R", "0x0E"}, 0x0E, false, 10});
+    devices_.emplace("DRAIN-PUMP-01", Device{{"DRAIN-PUMP-01", "舱底排水泵", "IDS42-R", "0x0F"}, 0x0F, false, 10});
 }
 
 void MotorAtomicService::attachIo(Writer writer, Reader reader, EmergencyWriter emergencyWriter) {
@@ -29,7 +29,7 @@ bool MotorAtomicService::operationAllowed(const std::string& id, const std::stri
     std::lock_guard<std::mutex> lock(mutex_); const auto found = devices_.find(id);
     return found != devices_.end() && !emergencyStopped_ && found->second.generation == generation && found->second.telemetry.owner == owner;
 }
-std::string MotorAtomicService::signedDirection(const MotorParameters& p, const Device& d, int& rpm) const { const bool reverse = (p.direction == MotorDirection::Reverse) != d.directionInverted; rpm = reverse ? -p.speedRpm : p.speedRpm; return reverse ? "reverse" : "forward"; }
+std::string MotorAtomicService::signedDirection(const MotorParameters& p, const Device& d, int& rpm) const { const bool reverse = (p.direction == MotorDirection::Reverse) != d.directionInverted; const int driveRpm = p.speedRpm * d.speedScale; rpm = reverse ? -driveRpm : driveRpm; return reverse ? "reverse" : "forward"; }
 
 std::string MotorAtomicService::start(const std::string& owner, const MotorParameters& p) {
     uint8_t address; uint64_t generation; int rpm = 0; std::string direction; Writer writer; bool simulation;
@@ -39,6 +39,7 @@ std::string MotorAtomicService::start(const std::string& owner, const MotorParam
         if (!valid(p)) return "invalid_parameters";
         if (emergencyStopped_) return "emergency_stopped";
         auto& d = found->second;
+        if (p.speedRpm * d.speedScale > 3000) return "invalid_parameters";
         if (!d.telemetry.owner.empty() && d.telemetry.owner != owner) return "resource_busy";
         direction = signedDirection(p, d, rpm); d.telemetry.owner = owner; generation = ++d.generation; address = d.address; writer = writer_; simulation = simulation_;
     }
@@ -56,19 +57,20 @@ std::string MotorAtomicService::start(const std::string& owner, const MotorParam
     }
     std::lock_guard<std::mutex> lock(mutex_); auto& d = devices_.at(p.executorId);
     if (d.generation != generation || emergencyStopped_) return "emergency_stopped";
-    d.telemetry.online = true; d.telemetry.running = true; d.telemetry.targetRpm = rpm; d.telemetry.actualRpm = simulation ? rpm : 0; d.telemetry.direction = direction; d.telemetry.statusWord = 0x027; return "";
+    d.telemetry.online = true; d.telemetry.running = true; d.telemetry.targetRpm = rpm / d.speedScale; d.telemetry.actualRpm = simulation ? rpm / d.speedScale : 0; d.telemetry.direction = direction; d.telemetry.statusWord = 0x027; return "";
 }
 
 std::string MotorAtomicService::update(const std::string& owner, const MotorParameters& p) {
-    uint8_t address; uint64_t generation; int rpm = 0; std::string oldDirection, direction; Writer writer; Reader reader; bool simulation;
+    uint8_t address; uint64_t generation; int rpm = 0; int speedScale = 1; std::string oldDirection, direction; Writer writer; Reader reader; bool simulation;
     {
         std::lock_guard<std::mutex> lock(mutex_); auto found = devices_.find(p.executorId);
         if (found == devices_.end()) return "unknown_executor";
         if (!valid(p)) return "invalid_parameters";
         auto& d = found->second;
+        if (p.speedRpm * d.speedScale > 3000) return "invalid_parameters";
         if (d.telemetry.owner != owner) return "resource_busy";
         if (emergencyStopped_) return "emergency_stopped";
-        direction = signedDirection(p, d, rpm); oldDirection = d.telemetry.direction; generation = d.generation; address = d.address; writer = writer_; reader = reader_; simulation = simulation_;
+        direction = signedDirection(p, d, rpm); oldDirection = d.telemetry.direction; generation = d.generation; address = d.address; speedScale = d.speedScale; writer = writer_; reader = reader_; simulation = simulation_;
     }
     if (direction != oldDirection) {
         if (!writeI32(address, 0x60FF, 0, writer, simulation)) return "device_error";
@@ -76,7 +78,7 @@ std::string MotorAtomicService::update(const std::string& owner, const MotorPara
             bool stopped = false;
             for (int attempt = 0; attempt < 20 && operationAllowed(p.executorId, owner, generation); ++attempt) {
                 std::vector<uint16_t> words;
-                if (reader && reader(address, 0x606C, 2, words) && words.size() == 2 && std::abs(wordsI32(words)) <= 5) { stopped = true; break; }
+                if (reader && reader(address, 0x606C, 2, words) && words.size() == 2 && std::abs(wordsI32(words) / speedScale) <= 5) { stopped = true; break; }
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             if (!stopped) {
@@ -90,7 +92,7 @@ std::string MotorAtomicService::update(const std::string& owner, const MotorPara
     if (!writeI32(address, 0x6083, p.acceleration, writer, simulation) || !writeI32(address, 0x6084, p.deceleration, writer, simulation) || !writeI32(address, 0x60FF, rpm, writer, simulation)) return "device_error";
     std::lock_guard<std::mutex> lock(mutex_); auto& d = devices_.at(p.executorId);
     if (d.generation != generation || emergencyStopped_) return "emergency_stopped";
-    d.telemetry.targetRpm = rpm; if (simulation) d.telemetry.actualRpm = rpm; d.telemetry.direction = direction; d.telemetry.running = true; return "";
+    d.telemetry.targetRpm = rpm / d.speedScale; if (simulation) d.telemetry.actualRpm = rpm / d.speedScale; d.telemetry.direction = direction; d.telemetry.running = true; return "";
 }
 
 std::string MotorAtomicService::stop(const std::string& owner, const std::string& id) {
@@ -106,16 +108,16 @@ std::string MotorAtomicService::stop(const std::string& owner, const std::string
 }
 
 MotorTelemetry MotorAtomicService::telemetry(const std::string& id) {
-    uint8_t address; uint64_t generation; Reader reader; bool readSpeed = false;
+    uint8_t address; uint64_t generation; int speedScale = 1; Reader reader; bool readSpeed = false;
     {
         std::lock_guard<std::mutex> lock(mutex_); auto found = devices_.find(id); if (found == devices_.end()) return {}; auto& d = found->second; const auto now = steadyMs();
         if (simulation_ || !reader_ || now - d.lastReadMs < 500) return d.telemetry;
-        d.lastReadMs = now; address = d.address; generation = d.generation; reader = reader_; readSpeed = d.telemetry.running || !d.telemetry.owner.empty() || d.telemetry.targetRpm != 0;
+        d.lastReadMs = now; address = d.address; generation = d.generation; speedScale = d.speedScale; reader = reader_; readSpeed = d.telemetry.running || !d.telemetry.owner.empty() || d.telemetry.targetRpm != 0;
     }
     std::vector<uint16_t> speed, status; const bool statusOk = reader(address, 0x6041, 1, status) && status.size() == 1;
     const bool speedOk = readSpeed && statusOk && reader(address, 0x606C, 2, speed) && speed.size() == 2;
     std::lock_guard<std::mutex> lock(mutex_); auto& d = devices_.at(id); if (d.generation != generation) return d.telemetry;
-    if (speedOk) d.telemetry.actualRpm = wordsI32(speed);
+    if (speedOk) d.telemetry.actualRpm = wordsI32(speed) / speedScale;
     if (statusOk) d.telemetry.statusWord = status[0];
     // 状态字是设备在线的心跳依据；转速寄存器偶发超时不应把整台电机判为离线。
     d.telemetry.online = statusOk;
@@ -153,22 +155,23 @@ std::vector<MotorTelemetry> MotorAtomicService::list() {
 
 std::vector<MotorTelemetry> MotorAtomicService::scanAll() {
     static const std::array<const char*, 3> ids{{"EXHAUST-FAN-01", "FIRE-PUMP-01", "DRAIN-PUMP-01"}};
-    Reader reader; bool simulation; std::vector<std::pair<MotorTelemetry, uint8_t>> snapshot;
+    struct ScanTarget { MotorTelemetry telemetry; uint8_t address; int speedScale; };
+    Reader reader; bool simulation; std::vector<ScanTarget> snapshot;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         reader = reader_; simulation = simulation_; snapshot.reserve(ids.size());
-        for (const auto* id : ids) snapshot.emplace_back(devices_.at(id).telemetry, devices_.at(id).address);
+        for (const auto* id : ids) { const auto& device = devices_.at(id); snapshot.push_back({device.telemetry, device.address, device.speedScale}); }
     }
     std::vector<MotorTelemetry> result; result.reserve(snapshot.size());
     for (auto& item : snapshot) {
-        auto telemetry = item.first;
+        auto telemetry = item.telemetry;
         if (!simulation) {
             std::vector<uint16_t> status, speed;
-            telemetry.online = reader && reader(item.second, 0x6041, 1, status) && status.size() == 1;
+            telemetry.online = reader && reader(item.address, 0x6041, 1, status) && status.size() == 1;
             if (telemetry.online) {
                 telemetry.statusWord = status[0];
-                if (reader(item.second, 0x606C, 2, speed) && speed.size() == 2) {
-                    telemetry.actualRpm = wordsI32(speed);
+                if (reader(item.address, 0x606C, 2, speed) && speed.size() == 2) {
+                    telemetry.actualRpm = wordsI32(speed) / item.speedScale;
                     telemetry.running = std::abs(telemetry.actualRpm) > 5;
                     if (telemetry.actualRpm != 0) telemetry.direction = telemetry.actualRpm < 0 ? "reverse" : "forward";
                 }
@@ -181,14 +184,14 @@ std::vector<MotorTelemetry> MotorAtomicService::scanAll() {
 
 void MotorAtomicService::refreshInventory() {
     static const std::array<const char*, 3> ids{{"EXHAUST-FAN-01", "FIRE-PUMP-01", "DRAIN-PUMP-01"}};
-    std::string id; uint8_t address; uint64_t generation; Reader reader;
+    std::string id; uint8_t address; uint64_t generation; int speedScale = 1; Reader reader;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (simulation_ || !reader_) return;
         if (!detectedExecutorId_.empty()) id = detectedExecutorId_;
         else { id = ids[discoveryIndex_]; discoveryIndex_ = (discoveryIndex_ + 1) % ids.size(); }
         const auto& device = devices_.at(id);
-        address = device.address; generation = device.generation; reader = reader_;
+        address = device.address; generation = device.generation; speedScale = device.speedScale; reader = reader_;
     }
 
     std::vector<uint16_t> status, speed;
@@ -203,7 +206,7 @@ void MotorAtomicService::refreshInventory() {
         detectedExecutorId_ = id;
         device.telemetry.statusWord = status[0];
         if (speedOk) {
-            device.telemetry.actualRpm = wordsI32(speed);
+            device.telemetry.actualRpm = wordsI32(speed) / speedScale;
             device.telemetry.running = std::abs(device.telemetry.actualRpm) > 5;
             if (device.telemetry.actualRpm != 0)
                 device.telemetry.direction = device.telemetry.actualRpm < 0 ? "reverse" : "forward";

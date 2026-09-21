@@ -455,7 +455,7 @@ void api_controls_software_demo_motors_as_one_scene() {
 
     const auto reset = api.handle(request("POST", "/api/v1/marine/software-demo/reset", "{\"operator\":\"演示员\"}"));
     REQUIRE(reset.statusCode == 200);
-    REQUIRE(reset.body.find("\"targetRpm\":200") != std::string::npos);
+    REQUIRE(reset.body.find("\"targetRpm\":50") != std::string::npos);
     REQUIRE(reset.body.find("\"running\":true") != std::string::npos);
 
     const auto execute = api.handle(request("POST", "/api/v1/marine/software-demo/execute", "{\"operator\":\"演示员\",\"motorNumbers\":[2,3,8]}"));
@@ -479,7 +479,7 @@ void api_runs_hardware_replacement_with_real_motor_state_transitions() {
     const auto reset = api.handle(request("POST", "/api/v1/marine/hardware-demo/reset", "{\"operator\":\"演示员\"}"));
     REQUIRE(reset.statusCode == 200);
     REQUIRE(motors->telemetry("EXHAUST-FAN-01").running);
-    REQUIRE(motors->telemetry("EXHAUST-FAN-01").targetRpm == 200);
+    REQUIRE(motors->telemetry("EXHAUST-FAN-01").targetRpm == 50);
     REQUIRE(!motors->telemetry("FIRE-PUMP-01").running);
 
     const auto fault = api.handle(request("POST", "/api/v1/marine/hardware-demo/fault", "{\"operator\":\"演示员\"}"));

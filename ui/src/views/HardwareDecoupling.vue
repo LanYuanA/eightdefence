@@ -10,7 +10,7 @@ import motorImage from '../assets/motor-blue-3d.png'
 const demo = ref(createActuatorDemo())
 const gatewayOnline = ref(false)
 const selectedExecutorId = ref('FIRE-PUMP-01')
-const targetRpm = ref(200)
+const targetRpm = ref(50)
 const targetDirection = ref<'forward' | 'reverse'>('forward')
 const motorBusy = ref(false)
 const motorMessage = ref('请选择在线电机并设置运行参数')
@@ -221,10 +221,10 @@ async function resetReplacementDemo() {
       logicalExecutor: { ...fresh.logicalExecutor, boundDeviceId: boundDeviceId ?? onlineDevice?.id ?? fresh.logicalExecutor.boundDeviceId },
     }
     if (executorId) selectedExecutorId.value = executorId
-    targetRpm.value = 200
+    targetRpm.value = 50
     targetDirection.value = 'forward'
     await refreshRealMotors()
-    motorMessage.value = `演示已重置：${onlineDevice?.name ?? '当前在线电机'}以 200 RPM 正转`
+    motorMessage.value = `演示已重置：${onlineDevice?.name ?? '当前在线电机'}以 50 RPM 正转`
   } catch (error) { motorMessage.value = error instanceof Error ? error.message : '重置演示失败' }
   finally { motorBusy.value = false }
 }

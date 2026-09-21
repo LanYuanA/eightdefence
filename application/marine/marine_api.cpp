@@ -39,7 +39,7 @@ HttpResponse MarineApi::handle(const HttpRequest& request) {
         if (binding == repository_.listBindings().end()) return failure(404, "binding_not_found", "中央冷却泵逻辑绑定不存在。");
         const std::string action = path.substr(hardwareDemoPrefix.size());
         std::string targetDevice = binding->deviceId;
-        int speedRpm = 200;
+        int speedRpm = 50;
         MotorDirection direction = MotorDirection::Forward;
 
         if (action == "reset") {
@@ -118,7 +118,7 @@ HttpResponse MarineApi::handle(const HttpRequest& request) {
             std::string outcome;
             if (action == "reset") {
                 motors_->stop("", executor);
-                MotorParameters parameters; parameters.executorId = executor; parameters.speedRpm = 200; parameters.direction = MotorDirection::Forward; parameters.acceleration = 10; parameters.deceleration = 10;
+                MotorParameters parameters; parameters.executorId = executor; parameters.speedRpm = 50; parameters.direction = MotorDirection::Forward; parameters.acceleration = 10; parameters.deceleration = 10;
                 outcome = motors_->start("SOFTWARE-DECOUPLING", parameters);
             } else {
                 const int attempts = action == "stop" && !motors_->simulation() ? 3 : 1;
